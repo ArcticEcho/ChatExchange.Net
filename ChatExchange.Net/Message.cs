@@ -1,10 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 using IronPython.Hosting;
 using Microsoft.Scripting.Hosting;
+using IronPython.Runtime;
 
 
 
@@ -13,13 +10,13 @@ namespace ChatExchangeDotNet
 	public class Message
 	{
 		private readonly ScriptRuntime runtime;
-	    private readonly dynamic messagePY;
+	    private readonly PythonClass messagePY = new PythonClass();
 
 		public int Room
 		{
 			get
 			{
-				return messagePY.room();
+				return messagePY.Class.room();
 			}
 		}
 
@@ -27,31 +24,89 @@ namespace ChatExchangeDotNet
 		{
 			get
 			{
-				return messagePY.content();
+				return messagePY.Class.content();
 				
 			}
 		}
-    content = _utils.LazyFrom('scrape_transcript')
-    owner = _utils.LazyFrom('scrape_transcript')
-    _parent_message_id = _utils.LazyFrom('scrape_transcript')
-    stars = _utils.LazyFrom('scrape_transcript')
-    starred_by_you = _utils.LazyFrom('scrape_transcript')
-    pinned = _utils.LazyFrom('scrape_transcript')
 
-    content_source = _utils.LazyFrom('scrape_history')
-    editor = _utils.LazyFrom('scrape_history')
-    edited = _utils.LazyFrom('scrape_history')
-    edits = _utils.LazyFrom('scrape_history')
-    pins = _utils.LazyFrom('scrape_history')
-    pinners = _utils.LazyFrom('scrape_history')
-    time_stamp = _utils.LazyFrom('scrape_history')
+		public string Owner
+		{
+			get
+			{
+				return messagePY.Class.owner();
+			}
+		}
 
-		public Message()
+		public Dictionary<string, dynamic> Stars
+		{
+			get
+			{
+				var d = new Dictionary<string, dynamic>();
+
+				PythonDictionary pyD = messagePY.Class.stars();
+
+				foreach (var pair in pyD)
+				{
+					d.Add((string)pair.Key, pair.Value);
+				}
+
+				return d;
+			}
+		}
+
+		public bool StarredByYou
+		{
+			get
+			{
+				return (bool)messagePY.Class.starred_by_you();
+				
+			}
+		}
+
+		public bool Pinned
+		{
+			get
+			{
+				return (bool)messagePY.Class.pinned();		
+			}
+		}
+
+		public string ContentSource
+		{
+			get
+			{
+				return (string)messagePY.Class.content_source();
+				
+			}
+		}
+
+		public User Editor
+		{
+			get
+			{
+				var editor = messagePY.Class.editor();
+				// TODO:
+			}
+		}
+
+	//editor = _utils.LazyFrom('scrape_history')
+	//edited = _utils.LazyFrom('scrape_history')
+	//edits = _utils.LazyFrom('scrape_history')
+	//pins = _utils.LazyFrom('scrape_history')
+	//pinners = _utils.LazyFrom('scrape_history')
+	//time_stamp = _utils.LazyFrom('scrape_history')
+
+		public Message(int ID, PythonClass client)
 		{
 			runtime = Python.CreateRuntime();
 			dynamic file = runtime.UseFile("message.py");
-		    messagePY = file.client();
+		    messagePY.Class = file.client(ID, client.Class);
 	    }
+
+		public Message(PythonClass message)
+		{
+			
+		}
 
 	    public ~Message()
 	    {

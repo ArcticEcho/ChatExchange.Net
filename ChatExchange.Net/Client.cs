@@ -9,15 +9,8 @@ namespace ChatExchangeDotNet
     public class Client
     {
 	    private readonly ScriptRuntime runtime;
-	    private readonly dynamic clientPY;
 
-	    public dynamic client
-	    {
-		    get
-		    {
-				return clientPY;
-		    }
-	    }
+		public PythonClass ClientPY { get; private set; }
 
 
 
@@ -25,7 +18,12 @@ namespace ChatExchangeDotNet
 		{
 			runtime = Python.CreateRuntime();
 			dynamic file = runtime.UseFile("client.py");
-		    clientPY = file.client(host, email, password);
+		    ClientPY.Class = file.client(host, email, password);
+	    }
+
+	    public Client(PythonClass client)
+	    {
+		    
 	    }
 
 	    public ~Client()
@@ -35,24 +33,24 @@ namespace ChatExchangeDotNet
 
 
 
-		public dynamic GetMessgae(int messageID)
+		public Message GetMessgae(int messageID)
 		{
-			return clientPY.get_message(messageID);
+			return ClientPY.Class.get_message(messageID);
 		}
 
-		public dynamic GetRoom(int roomID)
+		public Room GetRoom(int roomID)
 		{
-			return clientPY.get_room(roomID);
+			return ClientPY.Class.get_room(roomID);
 		}
 
-		public dynamic GetUser(int userID)
+		public User GetUser(int userID)
 		{
-			return clientPY.get_user(userID);
+			return ClientPY.Class.get_user(userID);
 		}
 
-	    public dynamic GetMe()
+	    public User GetMe()
 	    {
-		    return clientPY.get_me();
+			return ClientPY.Class.get_me();
 	    }
 
 	    public void Login(string email, string password)
@@ -67,12 +65,12 @@ namespace ChatExchangeDotNet
 				throw new ArgumentException("Password can not be null or empty.", "password");
 			}
 
-		    clientPY.login(email, password);
+			ClientPY.Class.login(email, password);
 	    }
 
 	    public void Logout()
 	    {
-		    clientPY.logout();
+			ClientPY.Class.logout();
 	    }
     }
 }
