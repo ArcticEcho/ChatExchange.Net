@@ -1,4 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
 using IronPython.Hosting;
 using Microsoft.Scripting.Hosting;
 using IronPython.Runtime;
@@ -10,13 +13,14 @@ namespace ChatExchangeDotNet
 	public class Message
 	{
 		private readonly ScriptRuntime runtime;
-	    private readonly PythonClass messagePY = new PythonClass();
+
+		public PythonClass MessagePY { get; private set; }
 
 		public int Room
 		{
 			get
 			{
-				return messagePY.Class.room();
+				return (int)MessagePY.Class.room();
 			}
 		}
 
@@ -24,7 +28,7 @@ namespace ChatExchangeDotNet
 		{
 			get
 			{
-				return messagePY.Class.content();
+				return (string)MessagePY.Class.content();
 				
 			}
 		}
@@ -33,7 +37,7 @@ namespace ChatExchangeDotNet
 		{
 			get
 			{
-				return messagePY.Class.owner();
+				return (string)MessagePY.Class.owner();
 			}
 		}
 
@@ -43,7 +47,7 @@ namespace ChatExchangeDotNet
 			{
 				var d = new Dictionary<string, dynamic>();
 
-				PythonDictionary pyD = messagePY.Class.stars();
+				PythonDictionary pyD = MessagePY.Class.stars();
 
 				foreach (var pair in pyD)
 				{
@@ -58,7 +62,7 @@ namespace ChatExchangeDotNet
 		{
 			get
 			{
-				return (bool)messagePY.Class.starred_by_you();
+				return (bool)MessagePY.Class.starred_by_you();
 				
 			}
 		}
@@ -67,7 +71,7 @@ namespace ChatExchangeDotNet
 		{
 			get
 			{
-				return (bool)messagePY.Class.pinned();		
+				return (bool)MessagePY.Class.pinned();		
 			}
 		}
 
@@ -75,8 +79,7 @@ namespace ChatExchangeDotNet
 		{
 			get
 			{
-				return (string)messagePY.Class.content_source();
-				
+				return (string)MessagePY.Class.content_source();
 			}
 		}
 
@@ -84,12 +87,12 @@ namespace ChatExchangeDotNet
 		{
 			get
 			{
-				var editor = messagePY.Class.editor();
-				// TODO:
+				var editor = new PythonClass { Class = MessagePY.Class.editor() };
+
+				return new User(editor);
 			}
 		}
 
-	//editor = _utils.LazyFrom('scrape_history')
 	//edited = _utils.LazyFrom('scrape_history')
 	//edits = _utils.LazyFrom('scrape_history')
 	//pins = _utils.LazyFrom('scrape_history')
@@ -98,19 +101,34 @@ namespace ChatExchangeDotNet
 
 		public Message(int ID, PythonClass client)
 		{
-			runtime = Python.CreateRuntime();
+			var options = new Dictionary<string, object>();
+			options["Frames"] = true;
+			options["FullFrames"] = true;
+
+			var engine = Python.CreateEngine(options);
+
+			var paths = engine.GetSearchPaths();
+			paths.Add(@"C:\Python27\Lib\");
+			paths.Add(@"C:\Python27\Lib\site-packages\");
+			paths.Add(Directory.GetParent((new Uri(Assembly.GetExecutingAssembly().CodeBase)).AbsolutePath).FullName);
+			engine.SetSearchPaths(paths);
+
+			runtime = engine.Runtime;
 			dynamic file = runtime.UseFile("message.py");
-		    messagePY.Class = file.client(ID, client.Class);
+			MessagePY.Class = file.client(ID, client.Class);
 	    }
 
 		public Message(PythonClass message)
 		{
-			
+			MessagePY = message.Class;
 		}
 
-	    public ~Message()
+	    ~Message()
 	    {
-		    runtime.Shutdown();
+		    if (runtime != null)
+			{
+				runtime.Shutdown();		    
+		    }
 	    }
 	}
 }

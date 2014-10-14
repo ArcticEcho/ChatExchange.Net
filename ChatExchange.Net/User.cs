@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using IronPython.Hosting;
@@ -42,19 +44,34 @@ namespace ChatExchangeDotNet
 
 		public User(int ID, PythonClass client)
 		{
-			runtime = Python.CreateRuntime();
+			var options = new Dictionary<string, object>();
+			options["Frames"] = true;
+			options["FullFrames"] = true;
+
+			var engine = Python.CreateEngine(options);
+
+			var paths = engine.GetSearchPaths();
+			paths.Add(@"C:\Python27\Lib\");
+			paths.Add(@"C:\Python27\Lib\site-packages\");
+			paths.Add(Directory.GetParent((new Uri(Assembly.GetExecutingAssembly().CodeBase)).AbsolutePath).FullName);
+			engine.SetSearchPaths(paths);
+
+			runtime = engine.Runtime;
 			dynamic file = runtime.UseFile("user.py");
 		    userPY = file.client(ID, client.Class);
 		}
 
 		public User(PythonClass user)
 		{
-			
+			userPY = user.Class;
 		}
 
-	    public ~User()
+	    ~User()
 	    {
-		    runtime.Shutdown();
+		    if (runtime != null)
+		    {
+				runtime.Shutdown();
+		    }
 	    }
 	}
 }
