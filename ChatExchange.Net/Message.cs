@@ -2,9 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
-using IronPython.Hosting;
-using Microsoft.Scripting.Hosting;
-using IronPython.Runtime;
 
 
 
@@ -12,85 +9,44 @@ namespace ChatExchangeDotNet
 {
 	public class Message
 	{
-		private readonly ScriptRuntime runtime;
-
-		public PythonClass MessagePY { get; private set; }
-
 		public int Room
 		{
-			get
-			{
-				return (int)MessagePY.Class.room();
-			}
+			get { return; }
 		}
 
 		public string Content
 		{
-			get
-			{
-				return (string)MessagePY.Class.content();
-				
-			}
+			get { return; }
 		}
 
 		public string Owner
 		{
-			get
-			{
-				return (string)MessagePY.Class.owner();
-			}
+			get { return; }
 		}
 
 		public Dictionary<string, dynamic> Stars
 		{
-			get
-			{
-				var d = new Dictionary<string, dynamic>();
-
-				PythonDictionary pyD = MessagePY.Class.stars();
-
-				foreach (var pair in pyD)
-				{
-					d.Add((string)pair.Key, pair.Value);
-				}
-
-				return d;
-			}
+			get { return; }
 		}
 
 		public bool StarredByYou
 		{
-			get
-			{
-				return (bool)MessagePY.Class.starred_by_you();
-				
-			}
+			get { return; }
 		}
 
 		public bool Pinned
 		{
-			get
-			{
-				return (bool)MessagePY.Class.pinned();		
-			}
+			get { return; }
 		}
 
 		public string ContentSource
 		{
-			get
-			{
-				return (string)MessagePY.Class.content_source();
-			}
+			get { return; }
 		}
 
 		public User Editor
 		{
-			get
-			{
-				var editor = new PythonClass { Class = MessagePY.Class.editor() };
-
-				return new User(editor);
-			}
+			get { return; }
 		}
 
 	//edited = _utils.LazyFrom('scrape_history')
@@ -99,36 +55,15 @@ namespace ChatExchangeDotNet
 	//pinners = _utils.LazyFrom('scrape_history')
 	//time_stamp = _utils.LazyFrom('scrape_history')
 
-		public Message(int ID, PythonClass client)
+		public Message(int ID, Client client)
 		{
-			var options = new Dictionary<string, object>();
-			options["Frames"] = true;
-			options["FullFrames"] = true;
+			
 
-			var engine = Python.CreateEngine(options);
-
-			var paths = engine.GetSearchPaths();
-			paths.Add(@"C:\Python27\Lib\");
-			paths.Add(@"C:\Python27\Lib\site-packages\");
-			paths.Add(Directory.GetParent((new Uri(Assembly.GetExecutingAssembly().CodeBase)).AbsolutePath).FullName);
-			engine.SetSearchPaths(paths);
-
-			runtime = engine.Runtime;
-			dynamic file = runtime.UseFile("message.py");
-			MessagePY.Class = file.client(ID, client.Class);
 	    }
-
-		public Message(PythonClass message)
-		{
-			MessagePY = message.Class;
-		}
 
 	    ~Message()
 	    {
-		    if (runtime != null)
-			{
-				runtime.Shutdown();		    
-		    }
+
 	    }
 	}
 }

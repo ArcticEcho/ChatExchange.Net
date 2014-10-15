@@ -4,16 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-
-
 namespace ChatExchangeDotNet
 {
-	public class PythonClass
+	class RoomSocketWatcher
 	{
-		public dynamic Class
-		{
-			get;
-			set;
-		}
 	}
 }

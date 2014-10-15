@@ -1,19 +1,109 @@
-# encoding: utf-8
-import json
-import logging
-import threading
-import time
-
-from bs4 import BeautifulSoup
-import requests
-import websocket
-import _utils
-import socket
-
-logger = logging.getLogger(__name__)
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using SuperWebSocket;
+using SuperSocket;
+using SuperSocket.SocketBase;
 
 
-class Browser(object):
+
+namespace ChatExchangeDotNet
+{
+	class Browser
+	{
+		//private WebSocketSession session = new WebSocketSession();
+		private WebSocketServer socket = new WebSocketServer();
+
+		public Dictionary<int, Room> Rooms { get; set; }
+        public Dictionary<int, RoomSocketWatcher> Sockets { get; set; }
+		//self.polls = {}
+		//self.host = None
+
+		public Browser()
+		{
+			var socket = new WebSocketServer();
+
+			socket.Setup(80);
+			//session.Items["User-Agent"] = "ChatExchange/0.dev \r\n(+https://github.com/Manishearth/ChatExchange)";
+
+			if (socket.Start())
+			{
+				
+			}
+		}
+
+
+
+		private void Request(string url)
+		{
+			const int MAX_HTTP_RETRIES = 5;
+			var attempt = 0;
+
+			while (attempt < MAX_HTTP_RETRIES)
+			{
+				attempt++;
+				var response = "";
+
+				try
+				{
+					
+				}
+				catch (Exception)
+				{
+					
+				}
+			}
+		}
+	//	def _request(
+	//	self, method, url,
+	//	data=None, headers=None, with_chat_root=True
+	//):
+	//	if with_chat_root:
+	//		url = self.chat_root + '/' + url
+
+	//	method_method = getattr(self.session, method)
+	//	# using the actual .post method causes data to be form-encoded,
+	//	# whereas using .request with method='POST' would create a query string
+
+	//	# Try again if we fail. We're blaming "the internet" for weirdness.
+	//	MAX_HTTP_RETRIES = 5                # EGAD! A MAGIC NUMBER!
+	//	attempt = 0
+	//	while attempt <= MAX_HTTP_RETRIES:      
+	//		attempt += 1
+	//		response = None
+	//		try:
+	//			response = method_method(
+	//				url, data=data, headers=headers, timeout=self.request_timeout)
+	//			break
+	//		except requests.exceptions.ConnectionError, e:          # We want to try again, so continue
+	//																# BadStatusLine throws this error
+	//			print "Connection Error -> Trying again..."
+	//			time.sleep(0.1)     # short pause before retrying
+	//			if attempt == MAX_HTTP_RETRIES:                     # Only show exception if last try
+	//				raise
+	//			continue
+	//		except (requests.exceptions.Timeout, socket.timeout) as e:                  # Timeout occurred, retry
+	//															# Catching both because of this bug in requests
+	//															# https://github.com/kennethreitz/requests/issues/1236
+	//			print "Timeout -> Trying again..."
+	//			time.sleep(1.0)     # Longer pause because it was a time out. Assume overloaded and give them a second
+	//			if attempt == MAX_HTTP_RETRIES:                     # Only show exception if last try
+	//				raise
+	//			continue
+
+
+	//	response.raise_for_status()
+
+	//	# XXX: until throttling is implemented everywhere in Client, at least add some delay here.
+	//	time.sleep(0.75)
+
+	//	return response
+	}
+
+	/*
+	  class Browser(object):
     """
     An interface for scraping and making requests to Stack Exchange chat.
     """
@@ -660,11 +750,5 @@ class RoomPollingWatcher(object):
             self.on_activity(activity)
 
             time.sleep(self.interval)
-
-
-class BrowserError(Exception):
-    pass
-
-
-class LoginError(BrowserError):
-    pass
+	*/
+}
