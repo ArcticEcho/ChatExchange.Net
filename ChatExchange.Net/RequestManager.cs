@@ -28,7 +28,7 @@ namespace ChatExchangeDotNet
 
             Stream dataStream = null;
             StreamReader reader = null;
-            string responseFromServer = null;
+            string responseFromServer;
 
             try
             {
@@ -39,10 +39,6 @@ namespace ChatExchangeDotNet
                 // Read the content.
                 responseFromServer = reader.ReadToEnd();
                 // Cleanup the streams and the response.
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
             }
             finally
             {                
@@ -109,14 +105,7 @@ namespace ChatExchangeDotNet
             request.CookieContainer = cookies;
 	        request.AllowAutoRedirect = allowAutoRedirect;
             // If login is empty use defaul credentials
-            if (string.IsNullOrEmpty(login))
-            {
-                request.Credentials = CredentialCache.DefaultNetworkCredentials;
-            }
-            else
-            {
-                request.Credentials = new NetworkCredential(login, password);
-            }
+            request.Credentials = string.IsNullOrEmpty(login) ? CredentialCache.DefaultNetworkCredentials : new NetworkCredential(login, password);
 
             if (method == "POST")
             {
@@ -139,10 +128,7 @@ namespace ChatExchangeDotNet
 
 		internal HttpWebResponse GetResponse(HttpWebRequest request)
 		{
-			if (request == null)
-			{
-				throw new ArgumentNullException("request");
-			}
+			if (request == null) { throw new ArgumentNullException("request"); }
 
 			HttpWebResponse response = null;
 
@@ -150,22 +136,12 @@ namespace ChatExchangeDotNet
 			{
 				response = (HttpWebResponse)request.GetResponse();
 				cookies.Add(response.Cookies);
-				// Print the properties of each cookie.
-				Console.WriteLine("\nCookies: ");
-
-				foreach (Cookie cook in cookies.GetCookies(request.RequestUri))
-				{
-					Console.WriteLine("Domain: {0}, String: {1}", cook.Domain, cook);
-				}
-			}
-			catch (WebException ex)
-			{
-				Console.WriteLine("Web exception occurred. Status code: {0}", ex.Status);
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine(ex.Message);
+
 			}
+
 			return response;
 		}
 	}
