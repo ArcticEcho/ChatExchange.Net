@@ -37,15 +37,6 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\..\Visual Studio 2012\3rd Party Libraries\Network\SuperWebSocket(0.8).Source\bin\Net35\Debug\Newtonsoft.Json.dll</HintPath>
     </Reference>
-    <Reference Include="SuperSocket.Common">
-      <HintPath>..\..\..\Visual Studio 2012\3rd Party Libraries\Network\SuperWebSocket(0.8).Source\bin\Net35\Debug\SuperSocket.Common.dll</HintPath>
-    </Reference>
-    <Reference Include="SuperSocket.SocketBase">
-      <HintPath>..\..\..\Visual Studio 2012\3rd Party Libraries\Network\SuperWebSocket(0.8).Source\bin\Net35\Debug\SuperSocket.SocketBase.dll</HintPath>
-    </Reference>
-    <Reference Include="SuperWebSocket">
-      <HintPath>..\..\..\Visual Studio 2012\3rd Party Libraries\Network\SuperWebSocket(0.8).Source\bin\Net35\Debug\SuperWebSocket.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -53,6 +44,10 @@
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
+    <Reference Include="WebSocket4Net, Version=0.10.0.0, Culture=neutral, PublicKeyToken=eb4e154b696bf72a, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\Visual Studio 2012\3rd Party Libraries\Network\WebSocket4Net(0.10).Binaries\net40\Debug\WebSocket4Net.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Message.cs" />

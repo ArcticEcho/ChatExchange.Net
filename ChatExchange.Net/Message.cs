@@ -12,7 +12,11 @@
 
 		public Message(string content, int ID, string author, int authorID, int parentID = -1)
 		{
-			
+			Content = content;
+			this.ID = ID;
+			Author = author;
+			AuthorID = authorID;
+			ParentID = parentID;
 		}
 	}
 }

@@ -9,7 +9,8 @@ namespace ChatExchangeDotNet
 {
     public class RequestManager
     {
-	    readonly CookieContainer cookies = new CookieContainer();
+	    private readonly CookieContainer cookies = new CookieContainer();
+	    private int responseTryCount;
 
         public string LastResponse { protected set; get; }
 
@@ -60,52 +61,48 @@ namespace ChatExchangeDotNet
             return responseFromServer;
         }
 
-        public HttpWebResponse SendPOSTRequest(string uri, string content, string login, string password, bool allowAutoRedirect)
+		public HttpWebResponse SendPOSTRequest(string uri, string content, bool allowAutoRedirect = true, string referer = "", string login = "", string password = "")
         {
-            HttpWebRequest request = GeneratePOSTRequest(uri, content, login, password, allowAutoRedirect);
-
-            return GetResponse(request);
+			return GetResponse(GeneratePOSTRequest(uri, content, allowAutoRedirect, referer, login, password));
         }
 
-        public HttpWebResponse SendGETRequest(string uri, string login, string password, bool allowAutoRedirect)
+		public HttpWebResponse SendGETRequest(string uri, bool allowAutoRedirect = true, string login = "", string password = "")
         {
-            HttpWebRequest request = GenerateGETRequest(uri, login, password, allowAutoRedirect);
-
-            return GetResponse(request);
+            return GetResponse(GenerateGETRequest(uri, allowAutoRedirect, login, password));
         }
 
-        public HttpWebResponse SendRequest(string uri, string content, string method, string login, string password, bool allowAutoRedirect)
+		public HttpWebResponse SendRequest(string uri, string content, string method, bool allowAutoRedirect = true, string login = "", string password = "")
         {
-            HttpWebRequest request = GenerateRequest(uri, content, method, login, password, allowAutoRedirect);
-
-            return GetResponse(request);
+			return GetResponse(GenerateRequest(uri, content, method, allowAutoRedirect, login, password));
         }
 
-        public HttpWebRequest GenerateGETRequest(string uri, string login, string password, bool allowAutoRedirect)
+		public HttpWebRequest GenerateGETRequest(string uri, bool allowAutoRedirect = true, string login = "", string password = "")
         {
-			return GenerateRequest(uri, null, "GET", login, password, allowAutoRedirect);
+			return GenerateRequest(uri, null, "GET", allowAutoRedirect, login, password);
         }
 
-        public HttpWebRequest GeneratePOSTRequest(string uri, string content, string login, string password, bool allowAutoRedirect)
+		public HttpWebRequest GeneratePOSTRequest(string uri, string content, bool allowAutoRedirect = true, string referer = "", string login = "", string password = "")
         {
-            return GenerateRequest(uri, content, "POST", login, password, allowAutoRedirect);
+            return GenerateRequest(uri, content, "POST", allowAutoRedirect, referer, login, password);
         }
 
-        internal HttpWebRequest GenerateRequest(string uri, string content, string method, string login, string password, bool allowAutoRedirect)
+		internal HttpWebRequest GenerateRequest(string uri, string content, string method, bool allowAutoRedirect = true, string referer = "", string login = "", string password = "")
         {
-            if (uri == null)
-            {
-                throw new ArgumentNullException("uri");
-            }
-            // Create a request using a URL that can receive a post. 
-            var request = (HttpWebRequest)WebRequest.Create(uri);
-            // Set the Method property of the request to POST.
-            request.Method = method;
-            // Set cookie container to maintain cookies
-            request.CookieContainer = cookies;
+            if (uri == null) { throw new ArgumentNullException("uri"); }
+
+			var request = (HttpWebRequest)WebRequest.Create(uri);
+
+			request.Method = method;
+
+			request.CookieContainer = cookies;
 	        request.AllowAutoRedirect = allowAutoRedirect;
-            // If login is empty use defaul credentials
-            request.Credentials = string.IsNullOrEmpty(login) ? CredentialCache.DefaultNetworkCredentials : new NetworkCredential(login, password);
+
+			if (!String.IsNullOrEmpty(referer))
+			{
+				request.Referer = referer;
+			}
+
+			request.Credentials = string.IsNullOrEmpty(login) ? CredentialCache.DefaultNetworkCredentials : new NetworkCredential(login, password);
 
             if (method == "POST")
             {
@@ -137,10 +134,20 @@ namespace ChatExchangeDotNet
 				response = (HttpWebResponse)request.GetResponse();
 				cookies.Add(response.Cookies);
 			}
+			catch (WebException ex)
+			{
+				if (responseTryCount == 5) { return response; }
+
+				responseTryCount++;
+
+				GetResponse(request);
+			}
 			catch (Exception ex)
 			{
 
 			}
+
+			responseTryCount = 0;
 
 			return response;
 		}
