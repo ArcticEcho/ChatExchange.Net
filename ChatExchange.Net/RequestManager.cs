@@ -9,21 +9,13 @@ namespace ChatExchangeDotNet
 {
     public class RequestManager
     {
-	    private readonly CookieContainer cookies = new CookieContainer();
-	    private int responseTryCount;
+		private int responseTryCount;
 
-        public string LastResponse { protected set; get; }
+		public CookieContainer CookiesToPass = new CookieContainer();
+	  
 
 
-
-        internal string GetCookieValue(Uri SiteUri, string name)
-        {
-            Cookie cookie = cookies.GetCookies(SiteUri)[name];
-
-            return (cookie == null) ? null : cookie.Value;
-        }
-
-        public string GetResponseContent(HttpWebResponse response)
+	    public string GetResponseContent(HttpWebResponse response)
         {
             if (response == null) { throw new ArgumentNullException("response"); }
 
@@ -56,8 +48,6 @@ namespace ChatExchangeDotNet
                 response.Close();
             }
 
-            LastResponse = responseFromServer;
-
             return responseFromServer;
         }
 
@@ -68,7 +58,7 @@ namespace ChatExchangeDotNet
 
 		public HttpWebResponse SendGETRequest(string uri, bool allowAutoRedirect = true, string login = "", string password = "")
         {
-            return GetResponse(GenerateGETRequest(uri, allowAutoRedirect, login, password));
+			return GetResponse(GenerateGETRequest(uri, allowAutoRedirect, login, password));
         }
 
 		public HttpWebResponse SendRequest(string uri, string content, string method, bool allowAutoRedirect = true, string login = "", string password = "")
@@ -83,10 +73,10 @@ namespace ChatExchangeDotNet
 
 		public HttpWebRequest GeneratePOSTRequest(string uri, string content, bool allowAutoRedirect = true, string referer = "", string login = "", string password = "")
         {
-            return GenerateRequest(uri, content, "POST", allowAutoRedirect, referer, login, password);
+			return GenerateRequest(uri, content, "POST", allowAutoRedirect, referer, login, password);
         }
 
-		internal HttpWebRequest GenerateRequest(string uri, string content, string method, bool allowAutoRedirect = true, string referer = "", string login = "", string password = "")
+	    private HttpWebRequest GenerateRequest(string uri, string content, string method, bool allowAutoRedirect = true, string referer = "", string login = "", string password = "")
         {
             if (uri == null) { throw new ArgumentNullException("uri"); }
 
@@ -94,7 +84,11 @@ namespace ChatExchangeDotNet
 
 			request.Method = method;
 
-			request.CookieContainer = cookies;
+		    if (CookiesToPass != null)
+		    {
+			    request.CookieContainer = CookiesToPass;
+		    }
+
 	        request.AllowAutoRedirect = allowAutoRedirect;
 
 			if (!String.IsNullOrEmpty(referer))
@@ -123,7 +117,7 @@ namespace ChatExchangeDotNet
 			return request;
 		}
 
-		internal HttpWebResponse GetResponse(HttpWebRequest request)
+	    private HttpWebResponse GetResponse(HttpWebRequest request)
 		{
 			if (request == null) { throw new ArgumentNullException("request"); }
 
@@ -132,7 +126,8 @@ namespace ChatExchangeDotNet
 			try
 			{
 				response = (HttpWebResponse)request.GetResponse();
-				cookies.Add(response.Cookies);
+
+				CookiesToPass.Add(response.Cookies);
 			}
 			catch (WebException ex)
 			{

@@ -15,6 +15,7 @@ namespace ChatExchangeDotNet
 		private readonly RequestManager reqManager = new RequestManager();
 		private string fkey;
 		private readonly string host;
+		private CookieCollection siteCookies = new CookieCollection();
 
 		public int ID { get; private set; }
 		
@@ -47,7 +48,11 @@ namespace ChatExchangeDotNet
 
 			var data = "roomid=" + ID + "&fkey=" + fkey; // "since=0&mode=Messages&msgCount=100&fkey=" + fkey;
 
-			var t = reqManager.GetResponseContent(reqManager.SendPOSTRequest("http://chat." + host + "/chats/" + ID + "/events", data)); // Returns "Oops" page, rather than requested data.
+			var cookies = reqManager.CookiesToPass;
+
+			reqManager.CookiesToPass = null;
+
+			var t = reqManager.GetResponseContent(reqManager.SendPOSTRequest("http://chat." + host + "/chats/" + ID + "/events", data));
 
 			var eventTime = (int)JObject.Parse(t)["time"];
 
@@ -56,6 +61,12 @@ namespace ChatExchangeDotNet
 			data = "roomid=" + ID + "&fkey=" + fkey;
 
 			var url = "http://chat." + host + "/ws-auth";
+
+			cookies = new CookieContainer();
+
+			cookies.Add(siteCookies);
+
+			reqManager.CookiesToPass = cookies;
 
 			var r = reqManager.GetResponseContent(reqManager.SendPOSTRequest(url, data)); // Returns "Oops" page, rather than requested data.
 
@@ -95,8 +106,10 @@ namespace ChatExchangeDotNet
 			fkey = GetFkey(CQ.Create(req));
 
 			var data = "oauth_version=null&oauth_server=null&openid_identifier=" + Uri.EscapeDataString("https://openid.stackexchange.com/") + "&fkey=" + fkey;
-
+			
 			var res = reqManager.SendPOSTRequest("http://" + host + "/users/authenticate", data);
+
+			siteCookies = res.Cookies;
 
 			HandlePromt(res);
 		}
@@ -114,16 +127,21 @@ namespace ChatExchangeDotNet
 			reqManager.SendPOSTRequest("https://openid.stackexchange.com/account/prompt/submit", data);
 		}
 
+		/// <summary>
+		/// WARNING! This method is still broken!
+		/// </summary>
 		private void SEChatLogin()
 		{
 			var req = reqManager.GetResponseContent(reqManager.SendGETRequest("http://stackexchange.com/users/chat-login"));
 
 			var dom = CQ.Create(req);
 
-			var authToken = dom["input"].First(e => e.Attributes["name"] != null && e.Attributes["name"] == "authToken").Attributes["value"];
-			var nonce = dom["input"].First(e => e.Attributes["name"] != null && e.Attributes["name"] == "nonce").Attributes["value"];
+			//var authToken = dom["input"].First(e => e.Attributes["name"] != null && e.Attributes["name"] == "authToken").Attributes["value"];
+			//var nonce = dom["input"].First(e => e.Attributes["name"] != null && e.Attributes["name"] == "nonce").Attributes["value"];
 
-			var data = "authToken=" + authToken + "&nonce=" + nonce;
+			//var data = "authToken=" + authToken + "&nonce=" + nonce;
+
+			var data = "oauth_version=null&oauth_server=null&openid_identifier=" + Uri.EscapeDataString("https://openid.stackexchange.com/") + "&fkey=" + fkey;
 
 			var res = reqManager.GetResponseContent(reqManager.SendPOSTRequest("http://chat.stackexchange.com/login/global-fallback", data, true, "http://stackexchange.com/users/chat-login"));
 
