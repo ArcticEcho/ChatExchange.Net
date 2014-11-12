@@ -51,19 +51,19 @@ namespace ChatExchangeDotNet
             return responseFromServer;
         }
 
-		public static HttpWebResponse SendPOSTRequest(string uri, string content, bool allowAutoRedirect = true, string referer = "", string login = "", string password = "")
+		public static HttpWebResponse SendPOSTRequest(string uri, string content, bool allowAutoRedirect = true, string referer = "")
         {
-			return GetResponse(GenerateRequest(uri, content, "POST", allowAutoRedirect, referer, login, password));
+			return GetResponse(GenerateRequest(uri, content, "POST", allowAutoRedirect, referer));
         }
 
-		public static HttpWebResponse SendGETRequest(string uri, bool allowAutoRedirect = true, string login = "", string password = "")
+		public static HttpWebResponse SendGETRequest(string uri, bool allowAutoRedirect = true)
         {
-			return GetResponse(GenerateRequest(uri, null, "GET", allowAutoRedirect, login, password));
+			return GetResponse(GenerateRequest(uri, null, "GET", allowAutoRedirect));
         }
 
 
 
-		private static HttpWebRequest GenerateRequest(string uri, string content, string method, bool allowAutoRedirect = true, string referer = "", string login = "", string password = "")
+		private static HttpWebRequest GenerateRequest(string uri, string content, string method, bool allowAutoRedirect = true, string referer = "")
         {
             if (uri == null) { throw new ArgumentNullException("uri"); }
 
@@ -83,7 +83,7 @@ namespace ChatExchangeDotNet
 				req.Referer = referer;
 			}
 
-			req.Credentials = string.IsNullOrEmpty(login) ? CredentialCache.DefaultNetworkCredentials : new NetworkCredential(login, password);
+			req.Credentials = CredentialCache.DefaultNetworkCredentials;
 
             if (method == "POST")
             {
@@ -119,7 +119,7 @@ namespace ChatExchangeDotNet
 
 				responseTryCount++;
 
-				Thread.Sleep(1000);
+				Thread.Sleep(responseTryCount * 1000);
 
 				GetResponse(request);
 			}

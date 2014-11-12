@@ -23,6 +23,8 @@ namespace ChatExchangeDotNet
 			if (String.IsNullOrEmpty(email)) { throw new ArgumentException("'email' must not be null or empty.", "email"); }
 			if (String.IsNullOrEmpty(password)) { throw new ArgumentException("'password' must not be null or empty.", "password"); }
 
+			Rooms = new List<Room>();
+
 			SEOpenIDLogin(email, password);
 		}
 

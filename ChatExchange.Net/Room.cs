@@ -58,6 +58,7 @@ namespace ChatExchangeDotNet
 			if (String.IsNullOrEmpty(host)) { throw new ArgumentException("'host' can not be null or empty.", "host"); }
 			if (ID < 0) { throw new ArgumentOutOfRangeException("ID", "'ID' can not be negative."); }
 
+			this.ID = ID;
 			Host = host;
 			chatRoot = "http://chat." + Host;
 
@@ -223,7 +224,7 @@ namespace ChatExchangeDotNet
 
 		private int Join()
 		{
-			var data = "since=0&mode=Messages&msgCount=100&fkey=" + fkey;
+			var data = "roomid=" + ID + "&fkey=" + fkey;/*"since=0&mode=Messages&msgCount=100&fkey=" + fkey;*/
 
 			RequestManager.CookiesToPass = null;
 
@@ -247,11 +248,11 @@ namespace ChatExchangeDotNet
 
 			var cookies = new CookieContainer();
 
-			cookies.Add(GetSiteCookies());
+			cookies.Add(GetSiteUsrCookie());
 
 			RequestManager.CookiesToPass = cookies;
 
-			var res = RequestManager.SendPOSTRequest("http://chat." + Host + "/ws-auth", data); // Returns "Oops" page, rather than requested data.
+			var res = RequestManager.SendPOSTRequest(chatRoot + "/ws-auth", data, true, chatRoot + "/rooms/" + ID); // Returns "Oops" page, rather than requested data.
 
 			if (res == null) { throw new Exception("Could not get WebSocket URL. Do you haven an active internet connection?"); }
 
@@ -272,11 +273,14 @@ namespace ChatExchangeDotNet
 
 				// TODO: Finish parsing received message data.
 
-				var content = (string)JObject.Parse(messageData)["content"];
-				var id = (int)JObject.Parse(messageData)["???"];
-				var authorName = (string)JObject.Parse(messageData)["???"];
-				var authorID = (int)JObject.Parse(messageData)["???"];
-				var parentID = (int)JObject.Parse(messageData)["???"];
+
+				var json = JObject.Parse(messageData);
+
+				var content = (string)json["content"];
+				var id = (int)json["message_id"];
+				var authorName = (string)json["user_name"];
+				var authorID = (int)json["user_id"];
+				var parentID = (int)(json["parent_id"] ?? -1);
 
 				if (NewMessageEvent == null || authorID == Me.ID) { return; }
 
@@ -303,16 +307,18 @@ namespace ChatExchangeDotNet
 		/// WARNING! This method has not yet been fully tested!
 		/// </summary>
 		/// <returns>Returns all cookies associated with the room's host.</returns>
-		private CookieCollection GetSiteCookies()
+		private CookieCollection GetSiteUsrCookie()
 		{
 			var allCookies = RequestManager.GlobalCookies.GetCookies();
 			var siteCookies = new CookieCollection();
 
 			foreach (var cookie in allCookies)
 			{
-				if (cookie != null && cookie.Domain == Host)
+				var cookieDomain = cookie.Domain.StartsWith(".") ? cookie.Domain.Substring(1) : cookie.Domain;
+
+				if (cookieDomain == Host && cookie.Name.ToLowerInvariant().Contains("usr"))
 				{
-					allCookies.Add(cookie);
+					siteCookies.Add(cookie);
 				}
 			}
 
