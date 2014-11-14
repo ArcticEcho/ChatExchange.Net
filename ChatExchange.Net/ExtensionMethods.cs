@@ -8,44 +8,67 @@ using CsQuery;
 
 
 
-public static class ExtensionMethods
+namespace ChatExchangeDotNet
 {
-	public static List<Cookie> GetCookies(this CookieContainer container)
+	public static class ExtensionMethods
 	{
-		var cookies = new List<Cookie>();
-
-		var table = (Hashtable)container.GetType().InvokeMember("m_domainTable", BindingFlags.NonPublic | BindingFlags.GetField | BindingFlags.Instance, null, container, new object[] { });
-
-		foreach (var key in table.Keys)
+		public static List<Cookie> GetCookies(this CookieContainer container)
 		{
-			Uri uri;
+			var cookies = new List<Cookie>();
 
-			var domain = key as string;
+			var table = (Hashtable)container.GetType().InvokeMember("m_domainTable", BindingFlags.NonPublic | BindingFlags.GetField | BindingFlags.Instance, null, container, new object[] { });
 
-			if (domain == null) { continue; }
-
-			if (domain.StartsWith("."))
+			foreach (var key in table.Keys)
 			{
-				domain = domain.Substring(1);
+				Uri uri;
+
+				var domain = key as string;
+
+				if (domain == null) { continue; }
+
+				if (domain.StartsWith("."))
+				{
+					domain = domain.Substring(1);
+				}
+
+				var address = string.Format("http://{0}/", domain);
+
+				if (Uri.TryCreate(address, UriKind.RelativeOrAbsolute, out uri) == false) { continue; }
+
+				foreach (Cookie cookie in container.GetCookies(uri))
+				{
+					cookies.Add(cookie);
+				}
 			}
-
-			var address = string.Format("http://{0}/", domain);
-
-			if (Uri.TryCreate(address, UriKind.RelativeOrAbsolute, out uri) == false) { continue; }
-
-			foreach (Cookie cookie in container.GetCookies(uri))
-			{
-				cookies.Add(cookie);
-			}
-		}
 		
-		return cookies;
-	}
+			return cookies;
+		}
 
-	public static string GetFkey(this CQ input)
-	{
-		var fkeyE = input["input"].First(e => e.Attributes["name"] != null && e.Attributes["name"] == "fkey");
+		public static string GetFkey(this CQ input)
+		{
+			var fkeyE = input["input"].First(e => e.Attributes["name"] != null && e.Attributes["name"] == "fkey");
 
-		return fkeyE == null ? "" : fkeyE.Attributes["value"];
+			return fkeyE == null ? "" : fkeyE.Attributes["value"];
+		}
+
+		public static List<Message> GetMessagesByUser(this IEnumerable<Message> message, User user)
+		{
+			return message.GetMessagesByUser(user.ID);
+		}
+
+		public static List<Message> GetMessagesByUser(this IEnumerable<Message> message, int userID)
+		{
+			var userMessages = new List<Message>();
+
+			foreach (var m in message)
+			{
+				if (m.AuthorID == userID)
+				{
+					userMessages.Add(m);
+				}
+			}
+
+			return userMessages;
+		}
 	}
 }

@@ -9,10 +9,11 @@ using CsQuery;
 
 namespace ChatExchangeDotNet
 {
-	public class Client
+	public class Client : IDisposable
 	{
 		private readonly Regex hostParser = new Regex("https?://chat.|/rooms/.*", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 		private readonly Regex idParser = new Regex(".*/rooms/|/.*", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+		private bool disposed;
 
 		public List<Room> Rooms { get; private set; }
 
@@ -28,6 +29,18 @@ namespace ChatExchangeDotNet
 			SEOpenIDLogin(email, password);
 		}
 
+		~Client()
+		{
+			if (disposed) { return; }
+
+			for (var i = 0; i < Rooms.Count; i++)
+			{
+				Rooms[i].Dispose();
+			}
+
+			disposed = true;		
+		}
+
 
 
 		public Room JoinRoom(string roomURL)
@@ -41,8 +54,6 @@ namespace ChatExchangeDotNet
 			{
 				if (host.ToLowerInvariant() == "stackexchange.com")
 				{
-					throw new NotImplementedException();
-
 					SEChatLogin();
 				}
 				else
@@ -57,6 +68,21 @@ namespace ChatExchangeDotNet
 
 			return r;
 		}
+
+		public void Dispose()
+		{
+			if (disposed) { return; }
+
+			for (var i = 0; i < Rooms.Count; i++)
+			{
+				Rooms[i].Dispose();
+			}
+
+			GC.SuppressFinalize(this);
+
+			disposed = true;
+		}
+
 
 
 		private void SEOpenIDLogin(string email, string password)
@@ -117,6 +143,8 @@ namespace ChatExchangeDotNet
 		/// </summary>
 		private void SEChatLogin()
 		{
+			throw new NotImplementedException();
+
 			//var req = RequestManager.GetResponseContent(RequestManager.SendGETRequest("http://stackexchange.com/users/chat-login"));
 
 			//var dom = CQ.Create(req);

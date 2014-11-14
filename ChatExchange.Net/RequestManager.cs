@@ -51,9 +51,9 @@ namespace ChatExchangeDotNet
             return responseFromServer;
         }
 
-		public static HttpWebResponse SendPOSTRequest(string uri, string content, bool allowAutoRedirect = true, string referer = "")
+		public static HttpWebResponse SendPOSTRequest(string uri, string content, bool allowAutoRedirect = true, string referer = "", string origin = "")
         {
-			return GetResponse(GenerateRequest(uri, content, "POST", allowAutoRedirect, referer));
+			return GetResponse(GenerateRequest(uri, content, "POST", allowAutoRedirect, referer, origin));
         }
 
 		public static HttpWebResponse SendGETRequest(string uri, bool allowAutoRedirect = true)
@@ -63,27 +63,35 @@ namespace ChatExchangeDotNet
 
 
 
-		private static HttpWebRequest GenerateRequest(string uri, string content, string method, bool allowAutoRedirect = true, string referer = "")
+		private static HttpWebRequest GenerateRequest(string uri, string content, string method, bool allowAutoRedirect = true, string referer = "", string origin = "")
         {
             if (uri == null) { throw new ArgumentNullException("uri"); }
 
 			var req = (HttpWebRequest)WebRequest.Create(uri);
 
 			req.Method = method;
-
-		    if (CookiesToPass != null)
-		    {
-			    req.CookieContainer = CookiesToPass;
-		    }
-
 	        req.AllowAutoRedirect = allowAutoRedirect;
+			req.Credentials = CredentialCache.DefaultNetworkCredentials;
+			req.CookieContainer = CookiesToPass;
+
+			// Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test
+
+			req.UserAgent = "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.111 Safari/537.36";
+			req.Accept = "*/*";
+			req.Headers.Add("X-Requested-With", "XMLHttpRequest");
+			req.Headers.Add("DNT", "1");
+
+			// Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test
 
 			if (!String.IsNullOrEmpty(referer))
 			{
 				req.Referer = referer;
 			}
 
-			req.Credentials = CredentialCache.DefaultNetworkCredentials;
+			if (!String.IsNullOrEmpty(origin))
+			{
+				req.Headers.Add("Origin", origin);
+			}
 
             if (method == "POST")
             {
@@ -113,7 +121,7 @@ namespace ChatExchangeDotNet
 
 				GlobalCookies.Add(res.Cookies);
 			}
-			catch (WebException ex)
+			catch (WebException)
 			{
 				if (responseTryCount == 5) { return res; }
 

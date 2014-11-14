@@ -52,8 +52,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Client.cs" />
+    <Compile Include="EventType.cs" />
     <Compile Include="ExtensionMethods.cs" />
     <Compile Include="Message.cs" />
+    <Compile Include="MessageParsingOptions.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RequestManager.cs" />
     <Compile Include="Room.cs" />
