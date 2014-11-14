@@ -73,6 +73,7 @@ namespace ChatExchangeDotNet
 	        req.AllowAutoRedirect = allowAutoRedirect;
 			req.Credentials = CredentialCache.DefaultNetworkCredentials;
 			req.CookieContainer = CookiesToPass;
+			req.Timeout = 300000; // 5 mins.
 
 			// Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test
 
@@ -109,15 +110,15 @@ namespace ChatExchangeDotNet
 			return req;
 		}
 
-		private static HttpWebResponse GetResponse(HttpWebRequest request)
+		private static HttpWebResponse GetResponse(HttpWebRequest req)
 		{
-			if (request == null) { throw new ArgumentNullException("request"); }
+			if (req == null) { throw new ArgumentNullException("request"); }
 
 			HttpWebResponse res = null;
 
 			try
 			{
-				res = (HttpWebResponse)request.GetResponse();
+				res = (HttpWebResponse)req.GetResponse();
 
 				GlobalCookies.Add(res.Cookies);
 			}
@@ -129,7 +130,7 @@ namespace ChatExchangeDotNet
 
 				Thread.Sleep(responseTryCount * 1000);
 
-				GetResponse(request);
+				GetResponse(req);
 			}
 
 			responseTryCount = 0;

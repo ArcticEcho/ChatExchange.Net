@@ -181,6 +181,8 @@ namespace ChatExchangeDotNet
 		{
 			var data = "text=" + message + "&fkey=" + fkey; // TODO: Encode message.
 
+			RequestManager.CookiesToPass = RequestManager.GlobalCookies;
+
 			var res = RequestManager.SendPOSTRequest(chatRoot + "/chats/" + ID + "/messages/new", data);
 
 			if (res == null) { return null; }
@@ -355,7 +357,7 @@ namespace ChatExchangeDotNet
 
 		private int GetEventTime()
 		{
-			var data = "since=0&mode=Events&msgCount=100&fkey=" + fkey; /*fkey={fkey}&r{room id}={time stap}*/
+			var data = "since=0&mode=Events&msgCount=1&fkey=" + fkey; /*fkey={fkey}&r{room id}={time stap}*/
 
 			RequestManager.CookiesToPass = null;
 
@@ -383,7 +385,7 @@ namespace ChatExchangeDotNet
 
 			RequestManager.CookiesToPass = /*RequestManager.GlobalCookies;*/cookies;
 
-			var res = RequestManager.SendPOSTRequest(chatRoot + "/ws-auth", data, true, chatRoot + "/rooms/" + ID, chatRoot); // Returns "Oops" page, rather than requested data.
+			var res = RequestManager.SendPOSTRequest(chatRoot + "/ws-auth", data/*, true, chatRoot + "/rooms/" + ID, chatRoot*/); // Returns "Oops" page, rather than requested data.
 
 			if (res == null) { throw new Exception("Could not get WebSocket URL. Do you haven an active internet connection?"); }
 
@@ -409,6 +411,58 @@ namespace ChatExchangeDotNet
 				HandleData(json);
 			};
 		}
+
+		private User GetMe()
+		{
+			var res = RequestManager.SendGETRequest(chatRoot + "/chats/join/favorite");
+
+			if (res == null) { throw new Exception("Could not get user information. Do you have an active internet connection?"); }
+
+			var dom = CQ.Create(RequestManager.GetResponseContent(res));
+
+			var e = dom[".topbar-menu-links a"].First();
+
+			var name = e.Text();
+			var id = int.Parse(e.Attr("href").Split('/')[2]);
+			var isMod = User.IsModerator(Host, id);
+
+			return new User(name, id, isMod);
+		}
+
+		private void SetFkey()
+		{
+			var res = RequestManager.SendGETRequest("http://" + Host + "/users/login?returnurl = %%2f");
+
+			if (res == null) { throw new Exception("Could not get fkey. Do you have an active internet connection?"); }
+
+			var resContent = RequestManager.GetResponseContent(res);
+
+			var fk = CQ.Create(resContent).GetFkey();
+
+			if (String.IsNullOrEmpty(fk)) { throw new Exception("Could not get fkey. Have Do you have an active internet connection?"); }
+
+			fkey = fk;
+		}
+
+		private CookieCollection GetSiteCookies()
+		{
+			var allCookies = RequestManager.GlobalCookies.GetCookies();
+			var siteCookies = new CookieCollection();
+
+			foreach (var cookie in allCookies)
+			{
+				var cookieDomain = cookie.Domain.StartsWith(".") ? cookie.Domain.Substring(1) : cookie.Domain;
+
+				if ((cookieDomain == Host && cookie.Name.ToLowerInvariant().Contains("usr")) || cookie.Name == "csr" || cookie.Name == "sl")
+				{
+					siteCookies.Add(cookie);
+				}
+			}
+
+			return siteCookies;
+		}
+
+		# region Incoming message handling methods.
 
 		/// <summary>
 		/// WARNING! This method has not yet been fully tested!
@@ -510,54 +564,6 @@ namespace ChatExchangeDotNet
 
 		}
 
-		private User GetMe()
-		{
-			var res = RequestManager.SendGETRequest(chatRoot + "/chats/join/favorite");
-
-			if (res == null) { throw new Exception("Could not get user information. Do you have an active internet connection?"); }
-
-			var dom = CQ.Create(RequestManager.GetResponseContent(res));
-
-			var e = dom[".topbar-menu-links a"].First();
-
-			var name = e.Text();
-			var id = int.Parse(e.Attr("href").Split('/')[2]);
-			var isMod = User.IsModerator(Host, id);
-
-			return new User(name, id, isMod);
-		}
-
-		private void SetFkey()
-		{
-			var res = RequestManager.SendGETRequest("http://" + Host + "/users/login?returnurl = %%2f");
-
-			if (res == null) { throw new Exception("Could not get fkey. Do you have an active internet connection?"); }
-
-			var resContent = RequestManager.GetResponseContent(res);
-
-			var fk = CQ.Create(resContent).GetFkey();
-
-			if (String.IsNullOrEmpty(fk)) { throw new Exception("Could not get fkey. Have Do you have an active internet connection?"); }
-
-			fkey = fk;
-		}
-
-		private CookieCollection GetSiteCookies()
-		{
-			var allCookies = RequestManager.GlobalCookies.GetCookies();
-			var siteCookies = new CookieCollection();
-
-			foreach (var cookie in allCookies)
-			{
-				var cookieDomain = cookie.Domain.StartsWith(".") ? cookie.Domain.Substring(1) : cookie.Domain;
-
-				if ((cookieDomain == Host && cookie.Name.ToLowerInvariant().Contains("usr")) || cookie.Name == "csr")
-				{
-					siteCookies.Add(cookie);
-				}
-			}
-
-			return siteCookies;
-		}
+		# endregion
 	}
 }
