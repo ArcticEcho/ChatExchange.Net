@@ -60,6 +60,7 @@
     <Compile Include="RequestManager.cs" />
     <Compile Include="Room.cs" />
     <Compile Include="User.cs" />
+    <Compile Include="UserRoomAccess.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

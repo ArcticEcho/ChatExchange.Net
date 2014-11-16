@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using CsQuery;
+using Newtonsoft.Json.Linq;
 
 
 
@@ -13,14 +14,36 @@ namespace ChatExchangeDotNet
 		public string Name { get; private set; }
 		public int ID { get; private set; }
 		public bool IsMod { get; private set; }
+		public bool IsRoomOwner { get; private set; }
+		public int Reputation { get; private set; }
 
 
 
-		public User(string name, int id, bool isMod = false)
+		public User(string name, int id, int roomID, string host)
 		{
 			Name = name;
 			ID = id;
-			IsMod = isMod;
+
+			var res = RequestManager.SendPOSTRequest("http://chat." + host + "/user/info", "ids=" + id + "&roomid=" + roomID);
+
+			if (res == null)
+			{
+				Reputation = -1;
+			}
+			else
+			{
+				var resContent = RequestManager.GetResponseContent(res);
+
+				var json = JObject.Parse(resContent);
+
+				var isMod = json["users"][0]["is_moderator"];
+				var isOwner = json["users"][0]["is_owner"];
+				var rep = json["users"][0]["reputation"];
+
+				IsMod = isMod != null && isMod.Type == JTokenType.Boolean && (bool)isMod;
+				IsRoomOwner = isOwner != null && isOwner.Type == JTokenType.Boolean && (bool)isOwner;
+				Reputation = rep == null || rep.Type != JTokenType.Integer ? 1 : (int)rep;
+			}
 		}
 
 
@@ -30,7 +53,7 @@ namespace ChatExchangeDotNet
 		/// <param name="host"></param>
 		/// <param name="userID"></param>
 		/// <returns>True if the user is a moderator, otherwise false.</returns>
-		public static bool IsModerator(string host, int userID)
+		private static bool IsModerator(string host, int userID)
 		{
 			if (String.IsNullOrEmpty(host)) { throw new ArgumentException("'host' can not be null or empty.", "host"); }
 			if (userID < -1) { throw new ArgumentOutOfRangeException("userID", "'userID' can not be less than -1."); }

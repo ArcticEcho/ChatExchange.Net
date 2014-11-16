@@ -104,6 +104,8 @@ namespace ChatExchangeDotNet
 
 			SetFkey();
 
+			//var testFkey = CQ.Create(RequestManager.GetResponseContent(RequestManager.SendGETRequest(chatRoot + "/rooms/" + ID))).GetFkey();
+
 			var eventTime = GetEventTime();
 
 			var url = GetSocketURL(eventTime);
@@ -128,7 +130,7 @@ namespace ChatExchangeDotNet
 		/// <returns></returns>
 		public Message GetMessage(int ID)
 		{
-			throw new NotImplementedException();
+			//throw new NotImplementedException();
 
 			//TODO: Finish off implementation.
 
@@ -171,6 +173,8 @@ namespace ChatExchangeDotNet
 
 			return new Message("", ID, authorName, authorID, -1, starCount, pinCount);
 		}
+
+		# region Normal user chat commands.
 
 		/// <summary>
 		/// Posts a new message in the room.
@@ -216,13 +220,7 @@ namespace ChatExchangeDotNet
 
 			var res = RequestManager.SendPOSTRequest(chatRoot + "/chats/" + ID + "/messages/" + messageID, data);
 
-			if (res == null) { return false; }
-
-			var resContent = RequestManager.GetResponseContent(res);
-
-			//TODO: Check if edit was successful.
-
-			return true;
+			return res != null && RequestManager.GetResponseContent(res) != "It is too late to edit this message";
 		}
 
 		/// <summary>
@@ -240,15 +238,9 @@ namespace ChatExchangeDotNet
 		{
 			var data = "&fkey=" + fkey;
 
-			var res = RequestManager.SendPOSTRequest(chatRoot + "/chats/" + ID + "/messages/" + messageID + "/delete", data);
+			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/delete", data);
 
-			if (res == null) { return false; }
-
-			var resContent = RequestManager.GetResponseContent(res);
-
-			//TODO: Check if delete was successful.
-
-			return true;
+			return res != null && RequestManager.GetResponseContent(res) != "It is too late to delete this message";
 		}
 
 		/// <summary>
@@ -275,6 +267,12 @@ namespace ChatExchangeDotNet
 			return true;
 		}
 
+		
+
+		# endregion
+
+		#region Owner chat commands.
+
 		/// <summary>
 		/// WARNING! This method has not yet been fully tested!
 		/// </summary>
@@ -288,6 +286,8 @@ namespace ChatExchangeDotNet
 		/// </summary>
 		public bool TogglePinning(int messageID)
 		{
+			if (!Me.IsMod && !Me.IsRoomOwner) { return false; }
+
 			var data = "fkey=" + fkey;
 
 			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/owner-star", data);
@@ -299,6 +299,82 @@ namespace ChatExchangeDotNet
 			return true;
 		}
 
+		/// <summary>
+		/// WARNING! This method has not yet been fully tested!
+		/// </summary>
+		public bool KickMute(User user)
+		{
+			return KickMute(user.ID);
+		}
+
+		/// <summary>
+		/// WARNING! This method has not yet been fully tested!
+		/// </summary>
+		public bool KickMute(int userID)
+		{
+			if (!Me.IsMod && !Me.IsRoomOwner) { return false; }
+
+			var data = "userID=" + userID + "&fkey=" + fkey;
+
+			var res = RequestManager.SendPOSTRequest(chatRoot + "/rooms/kickute/" + ID, data);
+
+			return res != null && RequestManager.GetResponseContent(res).Contains("The user has been kicked and cannot return");
+		}
+
+		/// <summary>
+		/// WARNING! This method has not yet been fully tested!
+		/// </summary>
+		public bool SetUserRoomAccess(UserRoomAccess access, User user)
+		{
+			return SetUserRoomAccess(access, user.ID);
+		}
+
+		/// <summary>
+		/// WARNING! This method has not yet been fully tested!
+		/// </summary>
+		public bool SetUserRoomAccess(UserRoomAccess access, int userID)
+		{
+			if (!Me.IsMod && !Me.IsRoomOwner) { return false; }
+
+			var data = "fkey=" + fkey + "&aclUserId=" + userID + "&userAccess=";
+
+			switch (access)
+			{
+				case UserRoomAccess.Normal:
+				{
+					data += "remove";
+
+					break;
+				}
+
+				case UserRoomAccess.ExplicitReadOnly:
+				{
+					data += "read-only";
+
+					break;
+				}
+
+				case UserRoomAccess.ExplicitReadWrite:
+				{
+					data += "read-write";
+
+					break;
+				}
+
+				case UserRoomAccess.Owner:
+				{
+					data += "owner";
+
+					break;
+				}
+			}
+
+			var res = RequestManager.SendPOSTRequest(chatRoot + "/rooms/setuseraccess/" + ID, data);
+
+			return res != null;
+		}
+
+		#endregion
 
 		public void Dispose()
 		{
@@ -357,9 +433,9 @@ namespace ChatExchangeDotNet
 
 		private int GetEventTime()
 		{
-			var data = "since=0&mode=Events&msgCount=1&fkey=" + fkey; /*fkey={fkey}&r{room id}={time stap}*/
+			var data = "since=0&mode=Events&msgCount=100&fkey=" + fkey;
 
-			RequestManager.CookiesToPass = null;
+			RequestManager.CookiesToPass = GetSiteCookies();
 
 			var res = RequestManager.SendPOSTRequest(chatRoot + "/chats/" + ID + "/events", data);
 
@@ -379,13 +455,9 @@ namespace ChatExchangeDotNet
 		{
 			var data = "roomid=" + ID + "&fkey=" + fkey;
 
-			var cookies = new CookieContainer();
+			RequestManager.CookiesToPass = GetSiteCookies();//cookies;
 
-			cookies.Add(GetSiteCookies());
-
-			RequestManager.CookiesToPass = /*RequestManager.GlobalCookies;*/cookies;
-
-			var res = RequestManager.SendPOSTRequest(chatRoot + "/ws-auth", data/*, true, chatRoot + "/rooms/" + ID, chatRoot*/); // Returns "Oops" page, rather than requested data.
+			var res = RequestManager.SendPOSTRequest(chatRoot + "/ws-auth", data, true, chatRoot + "/rooms/" + ID, chatRoot); // Returns "Oops" page, rather than requested data.
 
 			if (res == null) { throw new Exception("Could not get WebSocket URL. Do you haven an active internet connection?"); }
 
@@ -424,9 +496,8 @@ namespace ChatExchangeDotNet
 
 			var name = e.Text();
 			var id = int.Parse(e.Attr("href").Split('/')[2]);
-			var isMod = User.IsModerator(Host, id);
 
-			return new User(name, id, isMod);
+			return new User(name, id, ID, Host);
 		}
 
 		private void SetFkey()
@@ -444,7 +515,7 @@ namespace ChatExchangeDotNet
 			fkey = fk;
 		}
 
-		private CookieCollection GetSiteCookies()
+		private CookieContainer GetSiteCookies()
 		{
 			var allCookies = RequestManager.GlobalCookies.GetCookies();
 			var siteCookies = new CookieCollection();
@@ -453,13 +524,17 @@ namespace ChatExchangeDotNet
 			{
 				var cookieDomain = cookie.Domain.StartsWith(".") ? cookie.Domain.Substring(1) : cookie.Domain;
 
-				if ((cookieDomain == Host && cookie.Name.ToLowerInvariant().Contains("usr")) || cookie.Name == "csr" || cookie.Name == "sl")
+				if ((cookieDomain == Host && cookie.Name.ToLowerInvariant().Contains("usr")) || cookie.Name == "csr")
 				{
 					siteCookies.Add(cookie);
 				}
 			}
 
-			return siteCookies;
+			var cookies = new CookieContainer();
+
+			cookies.Add(siteCookies);
+
+			return cookies;
 		}
 
 		# region Incoming message handling methods.
@@ -475,7 +550,7 @@ namespace ChatExchangeDotNet
 
 			switch (eventType)
 			{
-				case EventType.MessagePosted | EventType.MessageReply | EventType.UserMentioned:
+				case EventType.MessagePosted:// | EventType.MessageReply | EventType.UserMentioned:
 				{
 					HandleNewMessage(json);
 

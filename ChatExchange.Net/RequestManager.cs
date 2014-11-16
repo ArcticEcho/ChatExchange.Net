@@ -101,6 +101,12 @@ namespace ChatExchangeDotNet
                 req.ContentType = "application/x-www-form-urlencoded";
                 req.ContentLength = data.Length;
 
+				// Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test
+
+				req.KeepAlive = true;
+
+				// Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test
+
 	            using (var dataStream = req.GetRequestStream())
 	            {
 		            dataStream.Write(data, 0, data.Length);
@@ -119,6 +125,14 @@ namespace ChatExchangeDotNet
 			try
 			{
 				res = (HttpWebResponse)req.GetResponse();
+
+				foreach (var cookie in res.Cookies)
+				{
+					if (!GlobalCookies.GetCookies().Contains((Cookie)cookie))
+					{
+						GlobalCookies.Add((Cookie)cookie);
+					}
+				}
 
 				GlobalCookies.Add(res.Cookies);
 			}
