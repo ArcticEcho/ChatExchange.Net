@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Text.RegularExpressions;
 using CsQuery;
 using Newtonsoft.Json.Linq;
 using WebSocket4Net;
@@ -12,6 +13,7 @@ namespace ChatExchangeDotNet
 {
 	public class Room : IDisposable
 	{
+		private Regex messageHasParent = new Regex(@"^:\d*?\s", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 		private bool disposed;
 		private WebSocket socket;
 		private readonly string chatRoot;
@@ -148,11 +150,6 @@ namespace ChatExchangeDotNet
 
 
 
-		/// <summary>
-		/// WARNING! This method has not yet been fully tested!
-		/// </summary>
-		/// <param name="ID"></param>
-		/// <returns></returns>
 		public Message GetMessage(int ID)
 		{
 			var res = RequestManager.SendGETRequest(chatRoot + "/messages/" + ID + "/history");
@@ -164,9 +161,9 @@ namespace ChatExchangeDotNet
 			var contentData = lastestDom[".content"].ToList();
 
 			var content = contentData.Count == 2 ? contentData.Last().InnerText : contentData[1].InnerText;
-			content = content.Substring(22, content.Length - 55);
+			content = content.Substring(22, content.Length - 61);
 
-			var parentID = content.StartsWith(":") ? int.Parse(content.Substring(1, content.IndexOf(' '))) : -1;
+			var parentID = messageHasParent.IsMatch(content) ? int.Parse(content.Substring(1, content.IndexOf(' '))) : -1;
 			var authorName = lastestDom[".username a"].First().Text();
 			var authorID = int.Parse(lastestDom[".username a"].First().Attr("href").Split('/')[2]);
 
@@ -175,14 +172,9 @@ namespace ChatExchangeDotNet
 
 		# region Normal user chat commands.
 
-		/// <summary>
-		/// Posts a new message in the room.
-		/// </summary>
-		/// <param name="message">The text to post.</param>
-		/// <returns>Returns a new Message object if the message was successfully posted, otherwise null.</returns>
 		public Message PostMessage(string message)
 		{
-			var data = "text=" + message + "&fkey=" + fkey; // TODO: Encode message.
+			var data = "text=" + message + "&fkey=" + fkey;
 
 			RequestManager.CookiesToPass = RequestManager.GlobalCookies;
 
@@ -202,44 +194,32 @@ namespace ChatExchangeDotNet
 			return m;
 		}
 
-		/// <summary>
-		/// WARNING! This method has not yet been fully tested!
-		/// </summary>
 		public bool EditMessage(Message oldMessage, string newMessage)
 		{
 			return EditMessage(oldMessage.ID, newMessage);
 		}
 
-		/// <summary>
-		/// WARNING! This method has not yet been fully tested!
-		/// </summary>
 		public bool EditMessage(int messageID, string newMessage)
 		{
-			var data = "text=" + newMessage + "&fkey=" + fkey; // TODO: Encode message.
+			var data = "text=" + newMessage + "&fkey=" + fkey;
 
 			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID, data);
 
-			return res != null && RequestManager.GetResponseContent(res) == "ok";
+			return res != null && RequestManager.GetResponseContent(res) == "\"ok\"";
 		}
 
-		/// <summary>
-		/// WARNING! This method has not yet been fully tested!
-		/// </summary>
 		public bool DeleteMessage(Message message)
 		{
 			return DeleteMessage(message.ID);
 		}
 
-		/// <summary>
-		/// WARNING! This method has not yet been fully tested!
-		/// </summary>
 		public bool DeleteMessage(int messageID)
 		{
 			var data = "fkey=" + fkey;
 
 			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/delete", data);
 
-			return res != null && RequestManager.GetResponseContent(res) != "ok";
+			return res != null && RequestManager.GetResponseContent(res) != "\"ok\"";
 		}
 
 		/// <summary>
@@ -259,7 +239,7 @@ namespace ChatExchangeDotNet
 
 			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/star", data);
 
-			return res != null /*&& RequestManager.GetResponseContent(res) != "ok"*/;
+			return res != null && RequestManager.GetResponseContent(res) != "\"ok\"";
 		}
 
 		
@@ -267,6 +247,22 @@ namespace ChatExchangeDotNet
 		# endregion
 
 		#region Owner chat commands.
+
+		public bool UnstarMessage(Message message)
+		{
+			return UnstarMessage(message.ID);
+		}
+
+		public bool UnstarMessage(int messageID)
+		{
+			if (!Me.IsMod && !Me.IsRoomOwner) { return false; }
+
+			var data = "fkey=" + fkey;
+
+			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/unstar", data);
+
+			return res != null && RequestManager.GetResponseContent(res) != "\"ok\"";
+		}
 
 		/// <summary>
 		/// WARNING! This method has not yet been fully tested!
@@ -287,11 +283,7 @@ namespace ChatExchangeDotNet
 
 			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/owner-star", data);
 
-			if (res == null) { return false; }
-
-			//TODO: Check res if pinning was successfully.
-
-			return true;
+			return res != null && RequestManager.GetResponseContent(res) != "\"ok\"";
 		}
 
 		/// <summary>
