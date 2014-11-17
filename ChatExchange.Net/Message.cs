@@ -1,4 +1,9 @@
 ﻿using System;
+using CsQuery;
+
+
+
+//TODO: Add functionality to reply to message.
 
 
 
@@ -11,27 +16,77 @@ namespace ChatExchangeDotNet
 		public string AuthorName { get; private set; }
 		public int AuthorID { get; private set; }
 		public int ParentID { get; private set; }
-		public int StarCount { get; set; }
-		public int PinCount { get; set; }
+		public string Host { get; private set; }
 
-
-
-		public Message(string content, int ID, string authorName, int authorID, int parentID = -1, int starCount = 0, int pinCount = 0)
+		/// <summary>
+		/// WARNING! This property has not yet been fully tested!
+		/// </summary>
+		public int StarCount
 		{
+			get
+			{
+				var res = RequestManager.SendGETRequest("http://chat." + Host + "/messages/" + ID + "/history");
+
+				if (res == null) { return -1; }
+
+				var dom = CQ.Create(RequestManager.GetResponseContent(res));
+				var count = 0;
+
+				if (dom[".stars"] != null)
+				{
+					if (dom[".stars"][".times"] != null && !String.IsNullOrEmpty(dom[".stars"][".times"].First().Text()))
+					{
+						count = int.Parse(dom[".stars"][".times"].First().Text());
+					}
+					else
+					{
+						count = 1;
+					}
+				}
+
+				return count;
+			}
+		}
+
+		/// <summary>
+		/// WARNING! This property has not yet been fully tested!
+		/// </summary>
+		public int PinCount 
+		{
+			get
+			{
+				var res = RequestManager.SendGETRequest("http://chat." + Host + "/messages/" + ID + "/history");
+
+				if (res == null) { return -1; }
+
+				var dom = CQ.Create(RequestManager.GetResponseContent(res)).Select(".monologue").First();
+				var count = 0;
+
+				foreach (var e in dom["#content p"]/*.Where(e => e[".stars.owner-star"] == null)*/)
+				{
+					count++;
+				}
+
+				return count;		
+			}
+		}
+
+
+
+		public Message(string host, string content, int ID, string authorName, int authorID, int parentID = -1)
+		{
+			if (String.IsNullOrEmpty(host)) { throw new ArgumentException("'host' can not be null or empty.", "host"); }
 			if (String.IsNullOrEmpty(content)) { throw new ArgumentException("'content' can not be null or empty.", "content"); }
 			if (ID < 0) { throw new ArgumentOutOfRangeException("ID", "'ID' can not be less than 0."); }
 			if (String.IsNullOrEmpty(authorName)) { throw new ArgumentException("'authorName' can not be null or empty.", "authorName"); }
 			if (authorID < -1) { throw new ArgumentOutOfRangeException("authorID", "'authorID' can not be less than -1."); }
-			if (starCount < 0) { throw new ArgumentOutOfRangeException("starCount", "'starCount' can not be less than 0."); }
-			if (pinCount < 0) { throw new ArgumentOutOfRangeException("pinCount", "'pinCount' can not be less than 0."); }
 
+			Host = host;
 			Content = content;
 			this.ID = ID;
 			AuthorName = authorName;
 			AuthorID = authorID;
 			ParentID = parentID;
-			StarCount = starCount;
-			PinCount = pinCount;
 		}
 
 

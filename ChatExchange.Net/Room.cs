@@ -17,6 +17,41 @@ namespace ChatExchangeDotNet
 		private readonly string chatRoot;
 		private string fkey;
 
+		/// <param name="newMessage">The newly posted message.</param>
+		public delegate void NewMessageEventHandler(Message newMessage);
+
+		/// <param name="oldMessage">The previous state of the message.</param>
+		/// <param name="newMessage">The current state of the message.</param>
+		public delegate void MessageEditedEventHandler(Message oldMessage, Message newMessage);
+
+		/// <param name="user">The user that has joined/entered the room.</param>
+		public delegate void UserJoinEventHandler(User user);
+
+		/// <param name="user">The user that has left the room.</param>
+		public delegate void UserLeftEventHandler(User user);
+
+		/// <summary>
+		/// Occurs when a new message is posted. Returns the newly posted message.
+		/// </summary>
+		public event NewMessageEventHandler NewMessage;
+
+		/// <summary>
+		/// Occurs when a message is edited.
+		/// </summary>
+		public event MessageEditedEventHandler MessageEdited;
+
+		/// <summary>
+		/// Occurs when a user joins/enters the room.
+		/// </summary>
+		public event UserJoinEventHandler UserJoind;
+
+		/// <summary>
+		/// Occurs when a user leaves the room.
+		/// </summary>
+		public event UserLeftEventHandler UserLeft;
+
+
+
 		/// <summary>
 		/// Gets/sets the currently used MessageParingOption.
 		/// </summary>
@@ -36,16 +71,6 @@ namespace ChatExchangeDotNet
 		/// Returns the currently logged in user.
 		/// </summary>
 		public User Me { get; private set; }
-		
-		/// <summary>
-		/// Called whenever a new message is posted. Returns the newly posted message.
-		/// </summary>
-		public Action<Message> NewMessageEvent { get; set; }
-
-		/// <summary>
-		/// Called whenever a message is edited. Returns the newly edited message.
-		/// </summary>
-		public Action<Message> MessageEditedEvent { get; set; }
 
 		/// <summary>
 		/// Messages posted by all users from when this object was first instantiated.
@@ -138,7 +163,6 @@ namespace ChatExchangeDotNet
 
 			if (res == null) { throw new Exception("Could not retrieve data of message " + ID + ". Do you have an active internet connection?"); }
 
-			var histDom = CQ.Create(RequestManager.GetResponseContent(res));
 			var lastestDom = CQ.Create(RequestManager.GetResponseContent(res)).Select(".monologue").First();
 
 			/*
@@ -147,31 +171,12 @@ namespace ChatExchangeDotNet
 			 * 
 			 */
 
+			// Get parent ID.
+
 			var authorName = lastestDom[".username a"].First().Text();
 			var authorID = int.Parse(lastestDom[".username a"].First()["href"].Text().Split('/')[2]);
 
-			var starCount = 0;
-
-			if (lastestDom[".stars"] != null)
-			{
-				if (lastestDom[".stars"][".times"] != null && !String.IsNullOrEmpty(lastestDom[".stars"][".times"].First().Text()))
-				{
-					starCount = int.Parse(lastestDom[".stars"][".times"].First().Text());
-				}
-				else
-				{
-					starCount = 1;
-				}
-			}
-
-			var pinCount = 0;
-
-			foreach (var e in histDom["#content p"]/*.Where(e => e[".stars.owner-star"] == null)*/)
-			{
-				pinCount++;
-			}
-
-			return new Message("", ID, authorName, authorID, -1, starCount, pinCount);
+			return new Message(Host, "", ID, authorName, authorID, -1);
 		}
 
 		# region Normal user chat commands.
@@ -195,7 +200,7 @@ namespace ChatExchangeDotNet
 
 			var messageID = (int)JObject.Parse(resContent)["id"];
 
-			var m = new Message(message, messageID, Me.Name, Me.ID);
+			var m = new Message(Host, message, messageID, Me.Name, Me.ID);
 
 			MyMessages.Add(m);
 			AllMessages.Add(m);
@@ -376,6 +381,8 @@ namespace ChatExchangeDotNet
 
 		#endregion
 
+		#region Inherited methods.
+
 		public void Dispose()
 		{
 			if (disposed) { return; }
@@ -428,6 +435,8 @@ namespace ChatExchangeDotNet
 		{
 			return Host.GetHashCode() + ID.GetHashCode();
 		}
+
+		#endregion
 
 
 
@@ -544,36 +553,54 @@ namespace ChatExchangeDotNet
 		/// </summary>
 		private void HandleData(JObject json)
 		{
-			var eventType = (EventType)(int)(json["event_type"] ?? 0);
+			var data = json["r" + ID]["e"][0];
 
-			if ((int)(json["roomid"] ?? -1) != ID) { return; }
+			if (data.Type == JTokenType.Null) { return; }
+
+			var eventType = (EventType)(int)(data["event_type"]);
+
+			if ((int)(data["roomid"].Type != JTokenType.Integer ? -1 : data["roomid"]) != ID) { return; }
 
 			switch (eventType)
 			{
-				case EventType.MessagePosted:// | EventType.MessageReply | EventType.UserMentioned:
+				case EventType.MessagePosted:
 				{
-					HandleNewMessage(json);
+					HandleNewMessage(data);
+
+					break;
+				}
+
+				case EventType.MessageReply:
+				{
+					HandleNewMessage(data);
+
+					break;
+				}
+
+				case EventType.UserMentioned:
+				{
+					HandleNewMessage(data);
 
 					break;
 				}
 
 				case EventType.MessageEdited:
 				{
-					HandleEdit(json);
+					HandleEdit(data);
 
 					break;
 				}
 
 				case EventType.UserEntered:
 				{
-					HandleUserJoin(json);
+					HandleUserJoin(data);
 
 					break;
 				}
 
 				case EventType.UserLeft:
 				{
-					HandleUserLeave(json);
+					HandleUserLeave(data);
 
 					break;
 				}
@@ -583,60 +610,73 @@ namespace ChatExchangeDotNet
 		/// <summary>
 		/// WARNING! This method has noy yet been fully tested!
 		/// </summary>
-		private void HandleNewMessage(JObject json)
+		private void HandleNewMessage(JToken json)
 		{
 			var content = (string)json["content"];
 			var id = (int)json["message_id"];
 			var authorName = (string)json["user_name"];
 			var authorID = (int)json["user_id"];
-			var parentID = (int)(json["parent_id"] ?? -1);
+			var parentID = (int)(json["parent_id"].Type == JTokenType.Null ? -1 : json["parent_id"]);
 
-			var message = new Message(content, id, authorName, authorID, parentID);
+			var message = new Message(Host, content, id, authorName, authorID, parentID);
 
 			AllMessages.Add(message);
 
-			if (NewMessageEvent == null || authorID == Me.ID) { return; }
+			if (NewMessage == null || authorID == Me.ID) { return; }
 
-			NewMessageEvent(message);
+			NewMessage(message);
 		}
 
 		/// <summary>
 		/// WARNING! This method has noy yet been fully tested!
 		/// </summary>
-		private void HandleEdit(JObject json)
+		private void HandleEdit(JToken json)
 		{
 			var content = (string)json["content"];
 			var id = (int)json["message_id"];
 			var authorName = (string)json["user_name"];
 			var authorID = (int)json["user_id"];
-			var parentID = (int)(json["parent_id"] ?? -1); //TODO: Does this even exist?
+			var parentID = (int)(json["parent_id"].Type == JTokenType.Null ? -1 : json["parent_id"]);
 
-			var message = new Message(content, id, authorName, authorID, parentID);
+			var currentMessage = new Message(Host, content, id, authorName, authorID, parentID);
+			var oldMessage = this[id];
 
-			AllMessages.Remove(this[id]);
-			AllMessages.Add(message);
+			AllMessages.Remove(oldMessage);
+			AllMessages.Add(currentMessage);
 
-			if (MessageEditedEvent == null || authorID == Me.ID) { return; }
+			if (MessageEdited == null || authorID == Me.ID) { return; }
 
-			MessageEditedEvent(message);
+			MessageEdited(oldMessage, currentMessage);
 		}
 
-		private void HandleUserJoin(JObject json)
+		/// <summary>
+		/// WARNING! This method has noy yet been fully tested!
+		/// </summary>
+		private void HandleUserJoin(JToken json)
 		{
-			throw new NotImplementedException();
-
-			var userName = (string)json["user_name"];
-			var userID = (int)json["user_id"];
-		}
-
-		private void HandleUserLeave(JObject json)
-		{
-			throw new NotImplementedException();
-
 			var userName = (string)json["user_name"];
 			var userID = (int)json["user_id"];
 
+			var user = new User(userName, userID, ID, Host);
 
+			if (UserJoind == null || userID == Me.ID) { return; }
+
+			UserJoind(user);
+		}
+
+		/// <summary>
+		/// WARNING! This method has noy yet been fully tested!
+		/// </summary>
+		private void HandleUserLeave(JToken json)
+		{
+			var userName = (string)json["user_name"];
+			var userID = (int)json["user_id"];
+
+			var user = new User(userName, userID, ID, Host);
+
+			if (UserLeft == null || userID == Me.ID) { return; }
+
+			UserLeft(user);
 		}
 
 		# endregion
