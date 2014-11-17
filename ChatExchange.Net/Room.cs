@@ -155,28 +155,22 @@ namespace ChatExchangeDotNet
 		/// <returns></returns>
 		public Message GetMessage(int ID)
 		{
-			//throw new NotImplementedException();
-
-			//TODO: Finish off implementation.
-
 			var res = RequestManager.SendGETRequest(chatRoot + "/messages/" + ID + "/history");
 
 			if (res == null) { throw new Exception("Could not retrieve data of message " + ID + ". Do you have an active internet connection?"); }
 
-			var lastestDom = CQ.Create(RequestManager.GetResponseContent(res)).Select(".monologue").First();
+			var lastestDom = CQ.Create(RequestManager.GetResponseContent(res)).Select(".monologue").Last();
+			
+			var contentData = lastestDom[".content"].ToList();
 
-			/*
-			 * 
-			 * latest_content = str(latest_soup.select('.content')[0]).partition('>')[2].rpartition('<')[0].strip()
-			 * 
-			 */
+			var content = contentData.Count == 2 ? contentData.Last().InnerText : contentData[1].InnerText;
+			content = content.Substring(22, content.Length - 55);
 
-			// Get parent ID.
-
+			var parentID = content.StartsWith(":") ? int.Parse(content.Substring(1, content.IndexOf(' '))) : -1;
 			var authorName = lastestDom[".username a"].First().Text();
-			var authorID = int.Parse(lastestDom[".username a"].First()["href"].Text().Split('/')[2]);
+			var authorID = int.Parse(lastestDom[".username a"].First().Attr("href").Split('/')[2]);
 
-			return new Message(Host, "", ID, authorName, authorID, -1);
+			return new Message(Host, content, ID, authorName, authorID, parentID);
 		}
 
 		# region Normal user chat commands.
@@ -223,9 +217,9 @@ namespace ChatExchangeDotNet
 		{
 			var data = "text=" + newMessage + "&fkey=" + fkey; // TODO: Encode message.
 
-			var res = RequestManager.SendPOSTRequest(chatRoot + "/chats/" + ID + "/messages/" + messageID, data);
+			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID, data);
 
-			return res != null && RequestManager.GetResponseContent(res) != "It is too late to edit this message";
+			return res != null && RequestManager.GetResponseContent(res) == "ok";
 		}
 
 		/// <summary>
@@ -241,11 +235,11 @@ namespace ChatExchangeDotNet
 		/// </summary>
 		public bool DeleteMessage(int messageID)
 		{
-			var data = "&fkey=" + fkey;
+			var data = "fkey=" + fkey;
 
 			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/delete", data);
 
-			return res != null && RequestManager.GetResponseContent(res) != "It is too late to delete this message";
+			return res != null && RequestManager.GetResponseContent(res) != "ok";
 		}
 
 		/// <summary>
@@ -265,11 +259,7 @@ namespace ChatExchangeDotNet
 
 			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/star", data);
 
-			if (res == null) { return false; }
-
-			//TODO: Check res if starring was successfully.
-
-			return true;
+			return res != null /*&& RequestManager.GetResponseContent(res) != "ok"*/;
 		}
 
 		
@@ -442,9 +432,9 @@ namespace ChatExchangeDotNet
 
 		private int GetEventTime()
 		{
-			var data = "since=0&mode=Events&msgCount=100&fkey=" + fkey;
+			var data = "mode=Events&msgCount=0&fkey=" + fkey;
 
-			RequestManager.CookiesToPass = GetSiteCookies();
+			RequestManager.CookiesToPass = null;//GetSiteCookies();
 
 			var res = RequestManager.SendPOSTRequest(chatRoot + "/chats/" + ID + "/events", data);
 
@@ -455,16 +445,11 @@ namespace ChatExchangeDotNet
 			return (int)JObject.Parse(resContent)["time"];
 		}
 
-		/// <summary>
-		/// WARNING! This method has not yet been fully tested!
-		/// </summary>
-		/// <param name="eventTime"></param>
-		/// <returns></returns>
 		private string GetSocketURL(int eventTime)
 		{
 			var data = "roomid=" + ID + "&fkey=" + fkey;
 
-			RequestManager.CookiesToPass = GetSiteCookies();//cookies;
+			RequestManager.CookiesToPass = GetSiteCookies();
 
 			var res = RequestManager.SendPOSTRequest(chatRoot + "/ws-auth", data, true, chatRoot + "/rooms/" + ID, chatRoot); // Returns "Oops" page, rather than requested data.
 
@@ -475,15 +460,11 @@ namespace ChatExchangeDotNet
 			return (string)JObject.Parse(resContent)["url"] + "?l=" + eventTime;
 		}
 
-		/// <summary>
-		/// WARNING! This method has not yet been fully tested!
-		/// </summary>
-		/// <param name="socketURL"></param>
 		private void InitialiseSocket(string socketURL)
 		{
 			// TODO: Do we need to pass cookies?
 
-			socket = new WebSocket(socketURL, "", null, null, "", chatRoot);
+			socket = new WebSocket(socketURL/*, "", null, null, "", chatRoot*/);
 
 			socket.MessageReceived += (o, oo) =>
 			{
@@ -511,7 +492,7 @@ namespace ChatExchangeDotNet
 
 		private void SetFkey()
 		{
-			var res = RequestManager.SendGETRequest("http://" + Host + "/users/login?returnurl = %%2f");
+			var res = RequestManager.SendGETRequest(chatRoot + "/rooms/" + ID);
 
 			if (res == null) { throw new Exception("Could not get fkey. Do you have an active internet connection?"); }
 

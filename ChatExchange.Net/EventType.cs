@@ -47,7 +47,7 @@
 		UserMentioned = 8,
 
 		/// <summary>
-		/// A message has been flagged.
+		/// A message has been flagged as spam/offensive.
 		/// </summary>
 		MessageFlagged = 9,
 
@@ -62,7 +62,7 @@
 		FileAdded = 11,
 
 		/// <summary>
-		/// Wait, there's two message flagging events?!
+		/// A message has been flagged for moderator attention.
 		/// </summary>
 		ModeratorFlag = 12,
 
