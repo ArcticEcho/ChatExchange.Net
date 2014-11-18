@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Net;
+using System.Text.RegularExpressions;
 using CsQuery;
 
 
@@ -90,6 +92,13 @@ namespace ChatExchangeDotNet
 		}
 
 
+
+		public static string GetMessageContent(string host, int roomID, int messageID)
+		{
+			var res = RequestManager.SendGETRequest("http://chat." + host + "/messages/" + roomID + "/" + messageID);
+
+			return res == null ? "" : WebUtility.HtmlDecode(Regex.Unescape(RequestManager.GetResponseContent(res)));
+		}
 
 		public static bool operator ==(Message a, Message b)
 		{

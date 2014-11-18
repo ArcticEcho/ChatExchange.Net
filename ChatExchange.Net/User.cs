@@ -16,7 +16,7 @@ namespace ChatExchangeDotNet
 
 
 
-		public User(string name, int id, int roomID, string host)
+		public User(string host, int roomID, string name, int id)
 		{
 			Name = name;
 			ID = id;
