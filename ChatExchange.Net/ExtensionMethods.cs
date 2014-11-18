@@ -51,11 +51,20 @@ namespace ChatExchangeDotNet
 			return fkeyE == null ? "" : fkeyE.Attributes["value"];
 		}
 
-		public static List<Message> GetMessagesByUserID(this IEnumerable<Message> message, int userID)
+		public static List<Message> GetMessagesByUser(this IEnumerable<Message> messages, User user)
 		{
+			if (user == null) { throw new ArgumentNullException("user"); }
+
+			return messages.GetMessagesByUser(user.ID);
+		}
+
+		public static List<Message> GetMessagesByUser(this IEnumerable<Message> messages, int userID)
+		{
+			if (messages == null) { throw new ArgumentNullException("messages"); }
+
 			var userMessages = new List<Message>();
 
-			foreach (var m in message)
+			foreach (var m in messages)
 			{
 				if (m.AuthorID == userID)
 				{

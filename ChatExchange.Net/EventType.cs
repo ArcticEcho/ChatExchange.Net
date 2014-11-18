@@ -42,7 +42,7 @@
 		DebugMessage = 7,
 
 		/// <summary>
-		/// You have been mentioned (@YourUsername) in a message.
+		/// You have been mentioned (@Username) in a message.
 		/// </summary>
 		UserMentioned = 8,
 

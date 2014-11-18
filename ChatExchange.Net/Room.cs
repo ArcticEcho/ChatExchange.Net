@@ -223,6 +223,16 @@ namespace ChatExchangeDotNet
 			return m;
 		}
 
+		public Message PostReply(int targetMessageID, string message)
+		{
+			return PostMessage(":" + targetMessageID + " " + message);
+		}
+
+		public Message PostReply(Message targetMessage, string message)
+		{
+			return PostMessage(":" + targetMessage.ID + " " + message);
+		}
+
 		public bool EditMessage(Message oldMessage, string newMessage)
 		{
 			return EditMessage(oldMessage.ID, newMessage);
