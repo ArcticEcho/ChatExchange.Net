@@ -41,6 +41,9 @@ namespace ChatExchangeDotNet
 		/// <param name="user">The user that has left the room.</param>
 		public delegate void UserLeftEventHandler(User user);
 
+		/// <param name="message">The message that mentions the user.</param>
+		public delegate void UserMentiondEventHandler(Message message);
+
 		/// <summary>
 		/// Occurs when a new message is posted. Returns the newly posted message.
 		/// </summary>
@@ -65,6 +68,11 @@ namespace ChatExchangeDotNet
 		/// Occurs when a user leaves the room.
 		/// </summary>
 		public event UserLeftEventHandler UserLeft;
+
+		/// <summary>
+		/// Occurs when the logged in user is (@username) mentioned in a message.
+		/// </summary>
+		public event UserMentiondEventHandler UserMentioned;
 
 		# endregion.
 
@@ -103,7 +111,7 @@ namespace ChatExchangeDotNet
 		/// <summary>
 		/// A list of all the "pingable" users in the room.
 		/// </summary>
-		public List<User> PingableUsers { get; private set; }
+		//public List<User> PingableUsers { get; private set; }
 
 		/// <summary>
 		/// Gets the Message object associated with the specified message ID.
@@ -147,7 +155,7 @@ namespace ChatExchangeDotNet
 			IgnoreOwnEvents = true;
 			this.ID = ID;
 			Host = host;
-			PingableUsers = GetPingableUsers();
+			//PingableUsers = GetPingableUsers();
 			AllMessages = new List<Message>();
 			MyMessages = new List<Message>();
 			chatRoot = "http://chat." + Host;
@@ -443,14 +451,14 @@ namespace ChatExchangeDotNet
 
 		# region Instantiation related methods.
 
-		private List<User> GetPingableUsers()
-		{
-			var users = new List<User>();
+		//private List<User> GetPingableUsers()
+		//{
+		//	var users = new List<User>();
 
+		//	// Parse data returned from http://chat.{domain}/rooms/pingable/{room id}
 
-
-			return users;
-		}
+		//	return users;
+		//}
 
 		private User GetMe()
 		{
@@ -565,9 +573,6 @@ namespace ChatExchangeDotNet
 
 		# region Incoming message handling methods.
 
-		/// <summary>
-		/// WARNING! This method has not yet been fully tested!
-		/// </summary>
 		private void HandleData(JObject json)
 		{
 			var data = json["r" + ID];
@@ -657,9 +662,6 @@ namespace ChatExchangeDotNet
 			NewMessage(message);
 		}
 
-		/// <summary>
-		/// WARNING! This method has noy yet been fully tested!
-		/// </summary>
 		private void HandleUserMentioned(JToken json)
 		{
 			var id = (int)json["message_id"];
@@ -672,14 +674,11 @@ namespace ChatExchangeDotNet
 
 			AllMessages.Add(message);
 
-			if (NewMessage == null || (authorID == Me.ID && IgnoreOwnEvents)) { return; }
+			if (UserMentioned == null || (authorID == Me.ID && IgnoreOwnEvents)) { return; }
 
-			NewMessage(message);
+			UserMentioned(message);
 		}
 
-		/// <summary>
-		/// WARNING! This method has noy yet been fully tested!
-		/// </summary>
 		private void HandleEdit(JToken json)
 		{
 			var id = (int)json["message_id"];

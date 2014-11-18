@@ -20,9 +20,6 @@ namespace ChatExchangeDotNet
 		public int ParentID { get; private set; }
 		public string Host { get; private set; }
 
-		/// <summary>
-		/// WARNING! This property has not yet been fully tested!
-		/// </summary>
 		public int StarCount
 		{
 			get
@@ -31,14 +28,14 @@ namespace ChatExchangeDotNet
 
 				if (res == null) { return -1; }
 
-				var dom = CQ.Create(RequestManager.GetResponseContent(res));
+				var dom = CQ.Create(RequestManager.GetResponseContent(res))[".stars"];
 				var count = 0;
 
-				if (dom[".stars"] != null)
+				if (dom != null && dom.Length != 0)
 				{
-					if (dom[".stars"][".times"] != null && !String.IsNullOrEmpty(dom[".stars"][".times"].First().Text()))
+					if (dom[".times"] != null && !String.IsNullOrEmpty(dom[".times"].First().Text()))
 					{
-						count = int.Parse(dom[".stars"][".times"].First().Text());
+						count = int.Parse(dom[".times"].First().Text());
 					}
 					else
 					{
@@ -50,9 +47,6 @@ namespace ChatExchangeDotNet
 			}
 		}
 
-		/// <summary>
-		/// WARNING! This property has not yet been fully tested!
-		/// </summary>
 		public int PinCount 
 		{
 			get
@@ -61,12 +55,19 @@ namespace ChatExchangeDotNet
 
 				if (res == null) { return -1; }
 
-				var dom = CQ.Create(RequestManager.GetResponseContent(res)).Select(".monologue").First();
+				var dom = CQ.Create(RequestManager.GetResponseContent(res))[".owner-star"];
 				var count = 0;
 
-				foreach (var e in dom["#content p"]/*.Where(e => e[".stars.owner-star"] == null)*/)
+				if (dom != null && dom.Length != 0)
 				{
-					count++;
+					if (dom[".times"] != null && !String.IsNullOrEmpty(dom[".times"].First().Text()))
+					{
+						count = int.Parse(dom[".times"].First().Text());
+					}
+					else
+					{
+						count = 1;
+					}
 				}
 
 				return count;		
