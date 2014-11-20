@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
 using System.Linq;
+using System.Text.RegularExpressions;
 using CsQuery;
 
 
@@ -12,6 +13,11 @@ namespace ChatExchangeDotNet
 {
 	public static class ExtensionMethods
 	{
+		private static readonly Regex hasMention = new Regex(@"^:\d*?\s|@\S{3,}?\b", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+		private static readonly Regex isReply = new Regex(@"^:\d*?\s", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+
+
 		public static List<Cookie> GetCookies(this CookieContainer container)
 		{
 			var cookies = new List<Cookie>();
@@ -73,6 +79,16 @@ namespace ChatExchangeDotNet
 			}
 
 			return userMessages;
+		}
+
+		public static string StripMention(this string input, string replaceWith = "")
+		{
+			return hasMention.Replace(input, replaceWith);
+		}
+
+		public static bool IsReply(this string message, bool includeMention = false)
+		{
+			return includeMention ? hasMention.IsMatch(message) : isReply.IsMatch(message);
 		}
 	}
 }

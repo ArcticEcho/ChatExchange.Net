@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using CsQuery;
 using Newtonsoft.Json.Linq;
 using WebSocket4Net;
@@ -14,11 +14,11 @@ namespace ChatExchangeDotNet
 {
 	public class Room : IDisposable
 	{
-		private readonly Regex messageHasParent = new Regex(@"^:\d*?\s", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 		private bool disposed;
 		private WebSocket socket;
 		private readonly string chatRoot;
 		private string fkey;
+		private Regex isRateLimited = new Regex(@"\d\sseconds?$");
 
 		# region Events.
 
@@ -79,9 +79,14 @@ namespace ChatExchangeDotNet
 		# region Public properties/indexer.
 
 		/// <summary>
-		/// If true, all events triggered by the loggined user will not be raised. Default set to true.
+		/// If true, actions by the currently logged in user will not raise any events. Default set to true.
 		/// </summary>
 		public bool IgnoreOwnEvents { get; set; }
+
+		/// <summary>
+		/// If true, removes (@Username) mentions and the message reply prefix (:012345) from all messages. Default set to true.
+		/// </summary>
+		public bool StripMentionFromMessages { get; set; }
 
 		/// <summary>
 		/// The host domain of the room.
@@ -146,13 +151,13 @@ namespace ChatExchangeDotNet
 		/// </summary>
 		/// <param name="host">The host domain of the room (e.g., meta.stackexchange.com).</param>
 		/// <param name="ID">The room's identification number.</param>
-		/// <param name="parsingOption">The MessageParsingOption to be used when parsing received messages.</param>
 		public Room(string host, int ID)
 		{
 			if (String.IsNullOrEmpty(host)) { throw new ArgumentException("'host' can not be null or empty.", "host"); }
 			if (ID < 0) { throw new ArgumentOutOfRangeException("ID", "'ID' can not be negative."); }
 
 			IgnoreOwnEvents = true;
+			StripMentionFromMessages = true;
 			this.ID = ID;
 			Host = host;
 			//PingableUsers = GetPingableUsers();
@@ -188,13 +193,18 @@ namespace ChatExchangeDotNet
 
 			var lastestDom = CQ.Create(RequestManager.GetResponseContent(res)).Select(".monologue").Last();
 			
-			var content = Message.GetMessageContent(Host, ID, messageID); 
+			var content = Message.GetMessageContent(Host, ID, messageID, false); 
 
-			var parentID = messageHasParent.IsMatch(content) ? int.Parse(content.Substring(1, content.IndexOf(' '))) : -1;
+			var parentID = content.IsReply() ? int.Parse(content.Substring(1, content.IndexOf(' '))) : -1;
 			var authorName = lastestDom[".username a"].First().Text();
 			var authorID = int.Parse(lastestDom[".username a"].First().Attr("href").Split('/')[2]);
 
-			return new Message(Host, content, messageID, authorName, authorID, parentID);
+			return new Message(Host, StripMentionFromMessages ? content.StripMention() : content, messageID, authorName, authorID, parentID);
+		}
+
+		public User GetUser(int userID)
+		{
+			return new User(Host, ID, userID);
 		}
 
 		# region Normal user chat commands.
@@ -209,7 +219,18 @@ namespace ChatExchangeDotNet
 
 			if (res == null) { return null; }
 
-			var json = JObject.Parse(RequestManager.GetResponseContent(res));
+			var resContent = RequestManager.GetResponseContent(res);
+
+			if (isRateLimited.IsMatch(resContent))
+			{
+				var delay = int.Parse(new String(resContent.Where(Char.IsDigit).ToArray())) * 1000;
+
+				Thread.Sleep(delay + 1000);
+
+				PostMessage(message);
+			}
+
+			var json = JObject.Parse(resContent);
 
 			var messageID = (int)(json["id"].Type != JTokenType.Integer ? -1 : json["id"]);
 
@@ -244,7 +265,18 @@ namespace ChatExchangeDotNet
 
 			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID, data);
 
-			return res != null && RequestManager.GetResponseContent(res) == "\"ok\"";
+			var resContent = RequestManager.GetResponseContent(res);
+
+			if (isRateLimited.IsMatch(resContent))
+			{
+				var delay = int.Parse(new String(resContent.Where(Char.IsDigit).ToArray())) * 1000;
+
+				Thread.Sleep(delay + 1000);
+
+				EditMessage(messageID, newMessage);
+			}
+
+			return res != null && resContent == "\"ok\"";
 		}
 
 		public bool DeleteMessage(Message message)
@@ -257,8 +289,19 @@ namespace ChatExchangeDotNet
 			var data = "fkey=" + fkey;
 
 			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/delete", data);
+			
+			var resContent = RequestManager.GetResponseContent(res);
 
-			return res != null && RequestManager.GetResponseContent(res) == "\"ok\"";
+			if (isRateLimited.IsMatch(resContent))
+			{
+				var delay = int.Parse(new String(resContent.Where(Char.IsDigit).ToArray())) * 1000;
+
+				Thread.Sleep(delay + 1000);
+
+				DeleteMessage(messageID);
+			}
+
+			return res != null && resContent == "\"ok\"";
 		}
 
 		public bool ToggleStarring(Message message)
@@ -271,25 +314,30 @@ namespace ChatExchangeDotNet
 			var data = "fkey=" + fkey;
 
 			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/star", data);
+			
+			var resContent = RequestManager.GetResponseContent(res);
 
-			return res != null && RequestManager.GetResponseContent(res) != "\"ok\"";
+			if (isRateLimited.IsMatch(resContent))
+			{
+				var delay = int.Parse(new String(resContent.Where(Char.IsDigit).ToArray())) * 1000;
+
+				Thread.Sleep(delay + 1000);
+
+				ToggleStarring(messageID);
+			}
+
+			return res != null && resContent != "\"ok\"";
 		}
 
 		# endregion
 
 		#region Owner chat commands.
 
-		/// <summary>
-		/// WARNING! This method has not yet been fully tested!
-		/// </summary>
 		public bool UnstarMessage(Message message)
 		{
 			return UnstarMessage(message.ID);
 		}
 
-		/// <summary>
-		/// WARNING! This method has not yet been fully tested!
-		/// </summary>
 		public bool UnstarMessage(int messageID)
 		{
 			if (!Me.IsMod && !Me.IsRoomOwner) { return false; }
@@ -301,17 +349,11 @@ namespace ChatExchangeDotNet
 			return res != null && RequestManager.GetResponseContent(res) != "\"ok\"";
 		}
 
-		/// <summary>
-		/// WARNING! This method has not yet been fully tested!
-		/// </summary>
 		public bool TogglePinning(Message message)
 		{
 			return TogglePinning(message.ID);
 		}
 		
-		/// <summary>
-		/// WARNING! This method has not yet been fully tested!
-		/// </summary>
 		public bool TogglePinning(int messageID)
 		{
 			if (!Me.IsMod && !Me.IsRoomOwner) { return false; }
@@ -323,39 +365,27 @@ namespace ChatExchangeDotNet
 			return res != null && RequestManager.GetResponseContent(res) != "\"ok\"";
 		}
 
-		/// <summary>
-		/// WARNING! This method has not yet been fully tested!
-		/// </summary>
 		public bool KickMute(User user)
 		{
 			return KickMute(user.ID);
 		}
 
-		/// <summary>
-		/// WARNING! This method has not yet been fully tested!
-		/// </summary>
 		public bool KickMute(int userID)
 		{
 			if (!Me.IsMod && !Me.IsRoomOwner) { return false; }
 
 			var data = "userID=" + userID + "&fkey=" + fkey;
 
-			var res = RequestManager.SendPOSTRequest(chatRoot + "/rooms/kickute/" + ID, data);
+			var res = RequestManager.SendPOSTRequest(chatRoot + "/rooms/kickmute/" + ID, data);
 
-			return res != null && RequestManager.GetResponseContent(res).Contains("The user has been kicked and cannot return");
+			return res != null && RequestManager.GetResponseContent(res).Contains("has been kicked");
 		}
 
-		/// <summary>
-		/// WARNING! This method has not yet been fully tested!
-		/// </summary>
 		public bool SetUserRoomAccess(UserRoomAccess access, User user)
 		{
 			return SetUserRoomAccess(access, user.ID);
 		}
 
-		/// <summary>
-		/// WARNING! This method has not yet been fully tested!
-		/// </summary>
 		public bool SetUserRoomAccess(UserRoomAccess access, int userID)
 		{
 			if (!Me.IsMod && !Me.IsRoomOwner) { return false; }
@@ -393,9 +423,7 @@ namespace ChatExchangeDotNet
 				}
 			}
 
-			var res = RequestManager.SendPOSTRequest(chatRoot + "/rooms/setuseraccess/" + ID, data);
-
-			return res != null;
+			return RequestManager.SendPOSTRequest(chatRoot + "/rooms/setuseraccess/" + ID, data) != null;
 		}
 
 		#endregion
@@ -480,10 +508,9 @@ namespace ChatExchangeDotNet
 
 			var e = dom[".topbar-menu-links a"].First();
 
-			var name = e.Text();
 			var id = int.Parse(e.Attr("href").Split('/')[2]);
 
-			return new User(Host, ID, name, id);
+			return new User(Host, ID, id);
 		}
 
 		private void SetFkey()
@@ -557,23 +584,18 @@ namespace ChatExchangeDotNet
 		{
 			socket = new WebSocket(socketURL, "", null, null, "", chatRoot);
 
-			socket.Error += (o, oo) =>
-			{
-				var e = (Exception)o;
-			};
-
-			socket.DataReceived += (o, oo) =>
-			{
-				var json = JObject.Parse(Encoding.UTF8.GetString(oo.Data));
-
-				HandleData(json);
-			};
-
 			socket.MessageReceived += (o, oo) =>
 			{
-				var json = JObject.Parse(oo.Message);
+				try
+				{
+					var json = JObject.Parse(oo.Message);
 
-				HandleData(json);
+					HandleData(json);
+				}
+				catch (Exception)
+				{
+
+				}
 			};
 
 			socket.Open();
@@ -613,6 +635,7 @@ namespace ChatExchangeDotNet
 				case EventType.MessageReply:
 				{
 					HandleNewMessage(data);
+					HandleUserMentioned(data);
 
 					return;
 				}
@@ -658,7 +681,7 @@ namespace ChatExchangeDotNet
 		private void HandleNewMessage(JToken json)
 		{
 			var id = (int)json["message_id"];
-			var content = Message.GetMessageContent(Host, ID, id);
+			var content = Message.GetMessageContent(Host, ID, id, StripMentionFromMessages);
 			var authorName = (string)json["user_name"];
 			var authorID = (int)json["user_id"];
 			var parentID = (int)(json["parent_id"] ?? -1);
@@ -675,7 +698,7 @@ namespace ChatExchangeDotNet
 		private void HandleUserMentioned(JToken json)
 		{
 			var id = (int)json["message_id"];
-			var content = Message.GetMessageContent(Host, ID, id);
+			var content = Message.GetMessageContent(Host, ID, id, StripMentionFromMessages);
 			var authorName = (string)json["user_name"];
 			var authorID = (int)json["user_id"];
 			var parentID = (int)(json["parent_id"] ?? -1);
@@ -692,7 +715,7 @@ namespace ChatExchangeDotNet
 		private void HandleEdit(JToken json)
 		{
 			var id = (int)json["message_id"];
-			var content = Message.GetMessageContent(Host, ID, id);
+			var content = Message.GetMessageContent(Host, ID, id, StripMentionFromMessages);
 			var authorName = (string)json["user_name"];
 			var authorID = (int)json["user_id"];
 			var parentID = (int)(json["parent_id"] ?? -1);
@@ -711,13 +734,12 @@ namespace ChatExchangeDotNet
 		private void HandleStarToggle(JToken json)
 		{
 			var id = (int)json["message_id"];
-			var starrerName = (string)json["user_name"];
 			var starrerID = (int)json["user_id"];
 			var starCount = (int)(json["message_stars"] ?? 0);
 			var pinCount = (int)(json["message_owner_stars"] ?? 0);
 
 			var message = this[id];
-			var user = new User(Host, ID, starrerName, starrerID);
+			var user = new User(Host, ID, starrerID);
 
 			if (MessageStarToggled == null || (starrerID == Me.ID && IgnoreOwnEvents)) { return; }
 
@@ -726,10 +748,9 @@ namespace ChatExchangeDotNet
 
 		private void HandleUserJoin(JToken json)
 		{
-			var username = (string)json["user_name"];
 			var userID = (int)json["user_id"];
 
-			var user = new User(Host, ID, username, userID);
+			var user = new User(Host, ID, userID);
 
 			if (UserJoind == null || (userID == Me.ID && IgnoreOwnEvents)) { return; }
 
@@ -738,10 +759,9 @@ namespace ChatExchangeDotNet
 
 		private void HandleUserLeave(JToken json)
 		{
-			var username = (string)json["user_name"];
 			var userID = (int)json["user_id"];
 
-			var user = new User(Host, ID, username, userID);
+			var user = new User(Host, ID, userID);
 
 			if (UserLeft == null || (userID == Me.ID && IgnoreOwnEvents)) { return; }
 

@@ -75,15 +75,6 @@ namespace ChatExchangeDotNet
 			req.CookieContainer = CookiesToPass;
 			req.Timeout = 300000; // 5 mins.
 
-			// Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test
-
-			req.UserAgent = "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.111 Safari/537.36";
-			req.Accept = "*/*";
-			req.Headers.Add("X-Requested-With", "XMLHttpRequest");
-			req.Headers.Add("DNT", "1");
-
-			// Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test
-
 			if (!String.IsNullOrEmpty(referer))
 			{
 				req.Referer = referer;
@@ -100,12 +91,6 @@ namespace ChatExchangeDotNet
 
                 req.ContentType = "application/x-www-form-urlencoded";
                 req.ContentLength = data.Length;
-
-				// Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test
-
-				req.KeepAlive = true;
-
-				// Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test ~ Test
 
 	            using (var dataStream = req.GetRequestStream())
 	            {

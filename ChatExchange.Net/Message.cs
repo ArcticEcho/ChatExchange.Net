@@ -5,10 +5,6 @@ using CsQuery;
 
 
 
-//TODO: Add functionality to reply to message.
-
-
-
 namespace ChatExchangeDotNet
 {
 	public class Message
@@ -94,11 +90,17 @@ namespace ChatExchangeDotNet
 
 
 
-		public static string GetMessageContent(string host, int roomID, int messageID)
+		public static string GetMessageContent(string host, int roomID, int messageID, bool stripMention = true)
 		{
 			var res = RequestManager.SendGETRequest("http://chat." + host + "/messages/" + roomID + "/" + messageID);
 
-			return res == null ? "" : WebUtility.HtmlDecode(Regex.Unescape(RequestManager.GetResponseContent(res)));
+			if (res == null || res.StatusCode != HttpStatusCode.OK) { return ""; }
+
+			var content = RequestManager.GetResponseContent(res);
+
+			if (String.IsNullOrEmpty(content)) { return ""; }
+
+			return WebUtility.HtmlDecode(Regex.Unescape(stripMention ? content.StripMention() : content));
 		}
 
 		public static bool operator ==(Message a, Message b)

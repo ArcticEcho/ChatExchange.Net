@@ -16,9 +16,8 @@ namespace ChatExchangeDotNet
 
 
 
-		public User(string host, int roomID, string name, int id)
+		public User(string host, int roomID, int id)
 		{
-			Name = name;
 			ID = id;
 			RoomID = roomID;
 			Host = host;
@@ -35,10 +34,12 @@ namespace ChatExchangeDotNet
 
 				var json = JObject.Parse(resContent);
 
+				var name = json["users"][0]["name"];
 				var isMod = json["users"][0]["is_moderator"];
 				var isOwner = json["users"][0]["is_owner"];
 				var rep = json["users"][0]["reputation"];
 
+				Name = name != null && name.Type == JTokenType.String ? (string)name : "";
 				IsMod = isMod != null && isMod.Type == JTokenType.Boolean && (bool)isMod;
 				IsRoomOwner = isOwner != null && isOwner.Type == JTokenType.Boolean && (bool)isOwner;
 				Reputation = rep == null || rep.Type != JTokenType.Integer ? 1 : (int)rep;
