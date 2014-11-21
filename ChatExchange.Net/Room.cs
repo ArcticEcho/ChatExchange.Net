@@ -14,6 +14,8 @@ namespace ChatExchangeDotNet
 {
 	public class Room : IDisposable
 	{
+		private Thread actionQueueThread;
+		private List<UserAction> actionQueue = new List<UserAction>(); //TODO: Move rate limited methods to action queue with limiting.
 		private bool disposed;
 		private WebSocket socket;
 		private readonly string chatRoot;
@@ -77,6 +79,11 @@ namespace ChatExchangeDotNet
 		# endregion.
 
 		# region Public properties/indexer.
+
+		/// <summary>
+		/// Gets/sets the procesing priority options to be used when handling rate limiting actions (message posting/editing/starring/deleting).
+		/// </summary>
+		public UAQPriorityOptions QueuePriorityOptions { get; set; }
 
 		/// <summary>
 		/// If true, actions by the currently logged in user will not raise any events. Default set to true.
@@ -147,7 +154,7 @@ namespace ChatExchangeDotNet
 
 
 		/// <summary>
-		/// WARNING! This class is not yet fully implemented/tested!
+		/// Provides access to chat room functions, such as, message posting/editing/deleting/starring, user kick-muting/access level changing, basic message/user retrieval and the ability to subscribe to events.
 		/// </summary>
 		/// <param name="host">The host domain of the room (e.g., meta.stackexchange.com).</param>
 		/// <param name="ID">The room's identification number.</param>
@@ -155,6 +162,9 @@ namespace ChatExchangeDotNet
 		{
 			if (String.IsNullOrEmpty(host)) { throw new ArgumentException("'host' can not be null or empty.", "host"); }
 			if (ID < 0) { throw new ArgumentOutOfRangeException("ID", "'ID' can not be negative."); }
+
+			actionQueueThread = new Thread(ProcessUserActionQueue);
+			actionQueueThread.Start();
 
 			IgnoreOwnEvents = true;
 			StripMentionFromMessages = true;
@@ -180,11 +190,16 @@ namespace ChatExchangeDotNet
 			if (socket != null && !disposed)
 			{
 				socket.Close();
+				actionQueueThread.Abort();
 			}
 		}
 
 
-
+		/// <summary>
+		/// Retrieves a message from the room.
+		/// </summary>
+		/// <param name="messageID">The ID of the message to fetch.</param>
+		/// <returns>A Message object representing the requested message, or null if the message could not be found.</returns>
 		public Message GetMessage(int messageID)
 		{
 			var res = RequestManager.SendGETRequest(chatRoot + "/messages/" + messageID + "/history");
@@ -209,9 +224,14 @@ namespace ChatExchangeDotNet
 
 		# region Normal user chat commands.
 
+		/// <summary>
+		/// Posts a new message in the room.
+		/// </summary>
+		/// <param name="message">The message to post.</param>
+		/// <returns>A Message object representing the newly posted message (if successful), otherwise returns null.</returns>
 		public Message PostMessage(string message)
 		{
-			var data = "text=" + Uri.EscapeDataString(message) + "&fkey=" + fkey;
+			var data = "text=" + Uri.EscapeDataString(message).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
 
 			RequestManager.CookiesToPass = RequestManager.GlobalCookies;
 
@@ -225,7 +245,7 @@ namespace ChatExchangeDotNet
 			{
 				var delay = int.Parse(new String(resContent.Where(Char.IsDigit).ToArray())) * 1000;
 
-				Thread.Sleep(delay + 1000);
+				Thread.Sleep(delay + 3000);
 
 				PostMessage(message);
 			}
@@ -244,6 +264,7 @@ namespace ChatExchangeDotNet
 			return m;
 		}
 
+
 		public Message PostReply(int targetMessageID, string message)
 		{
 			return PostMessage(":" + targetMessageID + " " + message);
@@ -261,7 +282,7 @@ namespace ChatExchangeDotNet
 
 		public bool EditMessage(int messageID, string newMessage)
 		{
-			var data = "text=" + Uri.EscapeDataString(newMessage) + "&fkey=" + fkey;
+			var data = "text=" + Uri.EscapeDataString(newMessage).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
 
 			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID, data);
 
@@ -271,7 +292,7 @@ namespace ChatExchangeDotNet
 			{
 				var delay = int.Parse(new String(resContent.Where(Char.IsDigit).ToArray())) * 1000;
 
-				Thread.Sleep(delay + 1000);
+				Thread.Sleep(delay + 3000);
 
 				EditMessage(messageID, newMessage);
 			}
@@ -296,7 +317,7 @@ namespace ChatExchangeDotNet
 			{
 				var delay = int.Parse(new String(resContent.Where(Char.IsDigit).ToArray())) * 1000;
 
-				Thread.Sleep(delay + 1000);
+				Thread.Sleep(delay + 3000);
 
 				DeleteMessage(messageID);
 			}
@@ -321,7 +342,7 @@ namespace ChatExchangeDotNet
 			{
 				var delay = int.Parse(new String(resContent.Where(Char.IsDigit).ToArray())) * 1000;
 
-				Thread.Sleep(delay + 1000);
+				Thread.Sleep(delay + 3000);
 
 				ToggleStarring(messageID);
 			}
@@ -435,6 +456,7 @@ namespace ChatExchangeDotNet
 			if (disposed) { return; }
 
 			socket.Close();
+			actionQueueThread.Abort();
 
 			GC.SuppressFinalize(this);
 
@@ -599,6 +621,34 @@ namespace ChatExchangeDotNet
 			};
 
 			socket.Open();
+		}
+
+		private void ProcessUserActionQueue()
+		{
+			//while (!disposed)
+			//{
+			//	UserAction nextAction;
+
+			//	switch (QueuePriorityOptions.Priority)
+			//	{
+			//		case UAQPriority.Order:
+			//		{
+			//			nextAction = actionQueue.FirstOrDefault();
+
+			//			break;
+			//		}
+
+			//		case UAQPriority.Throughput:
+			//		{
+			//			break;
+			//		}
+
+			//		case UAQPriority.ActionType:
+			//		{
+			//			break;
+			//		}
+			//	}
+			//}
 		}
 
 		# endregion

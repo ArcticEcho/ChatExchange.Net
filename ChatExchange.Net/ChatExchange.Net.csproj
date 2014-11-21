@@ -51,6 +51,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="UAQPriorityOptions.cs" />
     <Compile Include="Client.cs" />
     <Compile Include="EventType.cs" />
     <Compile Include="ExtensionMethods.cs" />
@@ -59,6 +60,9 @@
     <Compile Include="RequestManager.cs" />
     <Compile Include="Room.cs" />
     <Compile Include="User.cs" />
+    <Compile Include="UserAction.cs" />
+    <Compile Include="UAQPriority.cs" />
+    <Compile Include="UserActionType.cs" />
     <Compile Include="UserRoomAccess.cs" />
   </ItemGroup>
   <ItemGroup>
