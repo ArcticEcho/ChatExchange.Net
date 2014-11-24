@@ -99,7 +99,7 @@ namespace ChatExchangeDotNet
 
 			var res = RequestManager.SendPOSTRequest("https://openid.stackexchange.com/account/login/submit", data);
 
-			if (res == null) { throw new Exception("Could not login using OpenID. Have you entered the correct credentials and have an active internet connection?");}
+			if (res == null || res.Headers["X-Frame-Options"] == "DENY") { throw new Exception("Could not login using the specified OpenID credentials. Have you entered the correct credentials and have an active internet connection?"); }
 
 			HandlePromt(res);
 		}

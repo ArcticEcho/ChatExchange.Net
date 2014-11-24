@@ -2,7 +2,6 @@
 using System.IO;
 using System.Net;
 using System.Text;
-using System.Threading;
 
 
 
@@ -10,8 +9,6 @@ namespace ChatExchangeDotNet
 {
     public static class RequestManager
     {
-		private static int responseTryCount;
-
 	    public static readonly CookieContainer GlobalCookies = new CookieContainer();
 		public static CookieContainer CookiesToPass = new CookieContainer();
 
@@ -103,7 +100,7 @@ namespace ChatExchangeDotNet
 
 		private static HttpWebResponse GetResponse(HttpWebRequest req)
 		{
-			if (req == null) { throw new ArgumentNullException("request"); }
+			if (req == null) { throw new ArgumentNullException("req"); }
 
 			HttpWebResponse res = null;
 
@@ -123,16 +120,8 @@ namespace ChatExchangeDotNet
 			}
 			catch (WebException)
 			{
-				if (responseTryCount == 5) { return res; }
 
-				responseTryCount++;
-
-				Thread.Sleep(responseTryCount * 1000);
-
-				GetResponse(req);
 			}
-
-			responseTryCount = 0;
 
 			return res;
 		}

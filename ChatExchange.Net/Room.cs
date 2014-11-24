@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using System.Text.RegularExpressions;
-using System.Threading;
 using CsQuery;
 using Newtonsoft.Json.Linq;
 using WebSocket4Net;
@@ -14,13 +12,10 @@ namespace ChatExchangeDotNet
 {
 	public class Room : IDisposable
 	{
-		private Thread actionQueueThread;
-		private List<UserAction> actionQueue = new List<UserAction>(); //TODO: Move rate limited methods to action queue with limiting.
 		private bool disposed;
 		private WebSocket socket;
 		private readonly string chatRoot;
 		private string fkey;
-		private Regex isRateLimited = new Regex(@"\d\sseconds?$");
 
 		# region Events.
 
@@ -79,11 +74,6 @@ namespace ChatExchangeDotNet
 		# endregion.
 
 		# region Public properties/indexer.
-
-		/// <summary>
-		/// Gets/sets the procesing priority options to be used when handling rate limiting actions (message posting/editing/starring/deleting).
-		/// </summary>
-		public UAQPriorityOptions QueuePriorityOptions { get; set; }
 
 		/// <summary>
 		/// If true, actions by the currently logged in user will not raise any events. Default set to true.
@@ -163,9 +153,6 @@ namespace ChatExchangeDotNet
 			if (String.IsNullOrEmpty(host)) { throw new ArgumentException("'host' can not be null or empty.", "host"); }
 			if (ID < 0) { throw new ArgumentOutOfRangeException("ID", "'ID' can not be negative."); }
 
-			actionQueueThread = new Thread(ProcessUserActionQueue);
-			actionQueueThread.Start();
-
 			IgnoreOwnEvents = true;
 			StripMentionFromMessages = true;
 			this.ID = ID;
@@ -183,6 +170,8 @@ namespace ChatExchangeDotNet
 			var url = GetSocketURL(count);
 
 			InitialiseSocket(url);
+
+			RequestManager.CookiesToPass = RequestManager.GlobalCookies;
 		}
 
 		~Room()
@@ -190,7 +179,6 @@ namespace ChatExchangeDotNet
 			if (socket != null && !disposed)
 			{
 				socket.Close();
-				actionQueueThread.Abort();
 			}
 		}
 
@@ -233,25 +221,12 @@ namespace ChatExchangeDotNet
 		{
 			var data = "text=" + Uri.EscapeDataString(message).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
 
-			RequestManager.CookiesToPass = RequestManager.GlobalCookies;
-
 			var res = RequestManager.SendPOSTRequest(chatRoot + "/chats/" + ID + "/messages/new", data);
 
 			if (res == null) { return null; }
 
 			var resContent = RequestManager.GetResponseContent(res);
-
-			if (isRateLimited.IsMatch(resContent))
-			{
-				var delay = int.Parse(new String(resContent.Where(Char.IsDigit).ToArray())) * 1000;
-
-				Thread.Sleep(delay + 3000);
-
-				PostMessage(message);
-			}
-
 			var json = JObject.Parse(resContent);
-
 			var messageID = (int)(json["id"].Type != JTokenType.Integer ? -1 : json["id"]);
 
 			if (messageID == -1) { return null; }
@@ -263,7 +238,6 @@ namespace ChatExchangeDotNet
 
 			return m;
 		}
-
 
 		public Message PostReply(int targetMessageID, string message)
 		{
@@ -286,18 +260,11 @@ namespace ChatExchangeDotNet
 
 			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID, data);
 
+			if (res == null) { return false; }
+
 			var resContent = RequestManager.GetResponseContent(res);
 
-			if (isRateLimited.IsMatch(resContent))
-			{
-				var delay = int.Parse(new String(resContent.Where(Char.IsDigit).ToArray())) * 1000;
-
-				Thread.Sleep(delay + 3000);
-
-				EditMessage(messageID, newMessage);
-			}
-
-			return res != null && resContent == "\"ok\"";
+			return resContent == "\"ok\"";
 		}
 
 		public bool DeleteMessage(Message message)
@@ -307,22 +274,13 @@ namespace ChatExchangeDotNet
 
 		public bool DeleteMessage(int messageID)
 		{
-			var data = "fkey=" + fkey;
+			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/delete", "fkey=" + fkey);
 
-			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/delete", data);
-			
+			if (res == null) { return false; }
+
 			var resContent = RequestManager.GetResponseContent(res);
 
-			if (isRateLimited.IsMatch(resContent))
-			{
-				var delay = int.Parse(new String(resContent.Where(Char.IsDigit).ToArray())) * 1000;
-
-				Thread.Sleep(delay + 3000);
-
-				DeleteMessage(messageID);
-			}
-
-			return res != null && resContent == "\"ok\"";
+			return resContent == "\"ok\"";
 		}
 
 		public bool ToggleStarring(Message message)
@@ -332,22 +290,13 @@ namespace ChatExchangeDotNet
 
 		public bool ToggleStarring(int messageID)
 		{
-			var data = "fkey=" + fkey;
+			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/star", "fkey=" + fkey);
 
-			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/star", data);
-			
+			if (res == null) { return false; }
+
 			var resContent = RequestManager.GetResponseContent(res);
 
-			if (isRateLimited.IsMatch(resContent))
-			{
-				var delay = int.Parse(new String(resContent.Where(Char.IsDigit).ToArray())) * 1000;
-
-				Thread.Sleep(delay + 3000);
-
-				ToggleStarring(messageID);
-			}
-
-			return res != null && resContent != "\"ok\"";
+			return resContent != "\"ok\"";
 		}
 
 		# endregion
@@ -456,7 +405,6 @@ namespace ChatExchangeDotNet
 			if (disposed) { return; }
 
 			socket.Close();
-			actionQueueThread.Abort();
 
 			GC.SuppressFinalize(this);
 
@@ -621,34 +569,6 @@ namespace ChatExchangeDotNet
 			};
 
 			socket.Open();
-		}
-
-		private void ProcessUserActionQueue()
-		{
-			//while (!disposed)
-			//{
-			//	UserAction nextAction;
-
-			//	switch (QueuePriorityOptions.Priority)
-			//	{
-			//		case UAQPriority.Order:
-			//		{
-			//			nextAction = actionQueue.FirstOrDefault();
-
-			//			break;
-			//		}
-
-			//		case UAQPriority.Throughput:
-			//		{
-			//			break;
-			//		}
-
-			//		case UAQPriority.ActionType:
-			//		{
-			//			break;
-			//		}
-			//	}
-			//}
 		}
 
 		# endregion
