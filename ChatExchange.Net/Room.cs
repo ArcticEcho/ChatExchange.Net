@@ -176,7 +176,7 @@ namespace ChatExchangeDotNet
 
 		~Room()
 		{
-			if (socket != null && !disposed)
+			if (socket != null && socket.State == WebSocketState.Open && !disposed)
 			{
 				socket.Close();
 			}
@@ -404,7 +404,10 @@ namespace ChatExchangeDotNet
 		{
 			if (disposed) { return; }
 
-			socket.Close();
+			if (socket.State == WebSocketState.Open)
+			{
+				socket.Close();
+			}
 
 			GC.SuppressFinalize(this);
 
