@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Net;
-using System.Text.RegularExpressions;
 using CsQuery;
 
 
@@ -15,6 +14,7 @@ namespace ChatExchangeDotNet
 		public int AuthorID { get; private set; }
 		public int ParentID { get; private set; }
 		public string Host { get; private set; }
+        public int RoomID { get; private set; }
 
 		public int StarCount
 		{
@@ -72,7 +72,7 @@ namespace ChatExchangeDotNet
 
 
 
-		public Message(string host, string content, int ID, string authorName, int authorID, int parentID = -1)
+		public Message(string host, int roomID, string content, int ID, string authorName, int authorID, int parentID = -1)
 		{
 			if (String.IsNullOrEmpty(host)) { throw new ArgumentException("'host' can not be null or empty.", "host"); }
 			if (String.IsNullOrEmpty(content)) { throw new ArgumentException("'content' can not be null or empty.", "content"); }
@@ -81,6 +81,7 @@ namespace ChatExchangeDotNet
 			if (authorID < -1) { throw new ArgumentOutOfRangeException("authorID", "'authorID' can not be less than -1."); }
 
 			Host = host;
+            RoomID = roomID;
 			Content = content;
 			this.ID = ID;
 			AuthorName = authorName;
@@ -94,13 +95,11 @@ namespace ChatExchangeDotNet
 		{
 			var res = RequestManager.SendGETRequest("http://chat." + host + "/messages/" + roomID + "/" + messageID);
 
-			if (res == null || res.StatusCode != HttpStatusCode.OK) { return ""; }
+			if (res == null || res.StatusCode != HttpStatusCode.OK) { return null; }
 
 			var content = RequestManager.GetResponseContent(res);
 
-			if (String.IsNullOrEmpty(content)) { return ""; }
-
-			return WebUtility.HtmlDecode(Regex.Unescape(stripMention ? content.StripMention() : content));
+			return String.IsNullOrEmpty(content) ? null : WebUtility.HtmlDecode(stripMention ? content.StripMention() : content);
 		}
 
 		public static bool operator ==(Message a, Message b)

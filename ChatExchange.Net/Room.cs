@@ -202,7 +202,7 @@ namespace ChatExchangeDotNet
 			var authorName = lastestDom[".username a"].First().Text();
 			var authorID = int.Parse(lastestDom[".username a"].First().Attr("href").Split('/')[2]);
 
-			return new Message(Host, StripMentionFromMessages ? content.StripMention() : content, messageID, authorName, authorID, parentID);
+			return new Message(Host, ID, StripMentionFromMessages ? content.StripMention() : content, messageID, authorName, authorID, parentID);
 		}
 
 		public User GetUser(int userID)
@@ -231,7 +231,7 @@ namespace ChatExchangeDotNet
 
 			if (messageID == -1) { return null; }
 
-			var m = new Message(Host, message, messageID, Me.Name, Me.ID);
+			var m = new Message(Host, ID, message, messageID, Me.Name, Me.ID);
 
 			MyMessages.Add(m);
 			AllMessages.Add(m);
@@ -659,7 +659,7 @@ namespace ChatExchangeDotNet
 			var authorID = (int)json["user_id"];
 			var parentID = (int)(json["parent_id"] ?? -1);
 
-			var message = new Message(Host, content, id, authorName, authorID, parentID);
+			var message = new Message(Host, ID, content, id, authorName, authorID, parentID);
 
 			AllMessages.Add(message);
 
@@ -676,7 +676,7 @@ namespace ChatExchangeDotNet
 			var authorID = (int)json["user_id"];
 			var parentID = (int)(json["parent_id"] ?? -1);
 
-			var message = new Message(Host, content, id, authorName, authorID, parentID);
+			var message = new Message(Host, ID, content, id, authorName, authorID, parentID);
 
 			AllMessages.Add(message);
 
@@ -693,7 +693,7 @@ namespace ChatExchangeDotNet
 			var authorID = (int)json["user_id"];
 			var parentID = (int)(json["parent_id"] ?? -1);
 
-			var currentMessage = new Message(Host, content, id, authorName, authorID, parentID);
+			var currentMessage = new Message(Host, ID, content, id, authorName, authorID, parentID);
 			var oldMessage = this[id];
 
 			AllMessages.Remove(oldMessage);
