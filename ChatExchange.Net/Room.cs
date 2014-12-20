@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Text.RegularExpressions;
+using System.Threading;
 using CsQuery;
 using Newtonsoft.Json.Linq;
 using WebSocket4Net;
@@ -10,737 +12,827 @@ using WebSocket4Net;
 
 namespace ChatExchangeDotNet
 {
-	public class Room : IDisposable
-	{
-		private bool disposed;
-		private WebSocket socket;
-		private readonly string chatRoot;
-		private string fkey;
-
-		# region Events.
-
-		/// <param name="newMessage">The newly posted message.</param>
-		public delegate void NewMessageEventHandler(Message newMessage);
-
-		/// <param name="oldMessage">The previous state of the message.</param>
-		/// <param name="newMessage">The current state of the message.</param>
-		public delegate void MessageEditedEventHandler(Message oldMessage, Message newMessage);
-
-		/// <param name="message">The message that someone has (un)starred.</param>
-		/// <param name="starer">The user that (un)starred the message.</param>
-		/// <param name="starCount">The current star count.</param>
-		/// <param name="starCount">The current pin count.</param>
-		public delegate void MessageStarToggledEventHandler(Message message, User starer, int starCount, int pinCount);
-
-		/// <param name="user">The user that has joined/entered the room.</param>
-		public delegate void UserJoinEventHandler(User user);
-
-		/// <param name="user">The user that has left the room.</param>
-		public delegate void UserLeftEventHandler(User user);
-
-		/// <param name="message">The message that mentions the user.</param>
-		public delegate void UserMentiondEventHandler(Message message);
-
-		/// <summary>
-		/// Occurs when a new message is posted. Returns the newly posted message.
-		/// </summary>
-		public event NewMessageEventHandler NewMessage;
-
-		/// <summary>
-		/// Occurs when a message is edited.
-		/// </summary>
-		public event MessageEditedEventHandler MessageEdited;
-
-		/// <summary>
-		/// Occurs when someone stars/pins (or unstars/unpins) a message.
-		/// </summary>
-		public event MessageStarToggledEventHandler MessageStarToggled;
-
-		/// <summary>
-		/// Occurs when a user joins/enters the room.
-		/// </summary>
-		public event UserJoinEventHandler UserJoind;
-
-		/// <summary>
-		/// Occurs when a user leaves the room.
-		/// </summary>
-		public event UserLeftEventHandler UserLeft;
-
-		/// <summary>
-		/// Occurs when the logged in user is (@username) mentioned in a message.
-		/// </summary>
-		public event UserMentiondEventHandler UserMentioned;
-
-		# endregion.
-
-		# region Public properties/indexer.
-
-		/// <summary>
-		/// If true, actions by the currently logged in user will not raise any events. Default set to true.
-		/// </summary>
-		public bool IgnoreOwnEvents { get; set; }
-
-		/// <summary>
-		/// If true, removes (@Username) mentions and the message reply prefix (:012345) from all messages. Default set to true.
-		/// </summary>
-		public bool StripMentionFromMessages { get; set; }
-
-		/// <summary>
-		/// The host domain of the room.
-		/// </summary>
-		public string Host { get; private set; }
-
-		/// <summary>
-		/// The identification number of the room.
-		/// </summary>
-		public int ID { get; private set; }
-
-		/// <summary>
-		/// Returns the currently logged in user.
-		/// </summary>
-		public User Me { get; private set; }
-
-		/// <summary>
-		/// Messages posted by all users from when this object was first instantiated.
-		/// </summary>
-		public List<Message> AllMessages { get; private set; }
-
-		/// <summary>
-		/// All successfully posted messages by the currently logged in user.
-		/// </summary>
-		public List<Message> MyMessages { get; private set; }
-
-		/// <summary>
-		/// A list of all the "pingable" users in the room.
-		/// </summary>
-		//public List<User> PingableUsers { get; private set; }
-
-		/// <summary>
-		/// Gets the Message object associated with the specified message ID.
-		/// </summary>
-		/// <param name="messageID"></param>
-		/// <returns>The Message object associated with the specified ID.</returns>
-		public Message this[int messageID]
-		{
-			get
-			{
-				if (messageID < 0) { throw new IndexOutOfRangeException(); }
-
-				if (AllMessages.Any(m => m.ID == messageID))
-				{
-					return AllMessages.First(m => m.ID == messageID);
-				}
-
-				var message = GetMessage(messageID);
-
-				AllMessages.Add(message);
+    public class Room : IDisposable
+    {
+        private bool disposing;
+        private bool disposed;
+        private WebSocket socket;
+        private readonly string chatRoot;
+        private string fkey;
+
+        # region Events.
+
+        /// <param name="newMessage">The newly posted message.</param>
+        public delegate void NewMessageEventHandler(Message newMessage);
+
+        /// <param name="oldMessage">The previous state of the message.</param>
+        /// <param name="newMessage">The current state of the message.</param>
+        public delegate void MessageEditedEventHandler(Message oldMessage, Message newMessage);
+
+        /// <param name="message">The message that someone has (un)starred.</param>
+        /// <param name="starer">The user that (un)starred the message.</param>
+        /// <param name="starCount">The current star count.</param>
+        /// <param name="starCount">The current pin count.</param>
+        public delegate void MessageStarToggledEventHandler(Message message, User starer, int starCount, int pinCount);
+
+        /// <param name="user">The user that has joined/entered the room.</param>
+        public delegate void UserJoinEventHandler(User user);
+
+        /// <param name="user">The user that has left the room.</param>
+        public delegate void UserLeftEventHandler(User user);
+
+        /// <param name="message">The message that mentions the user.</param>
+        public delegate void UserMentiondEventHandler(Message message);
+
+        /// <summary>
+        /// Occurs when a new message is posted. Returns the newly posted message.
+        /// </summary>
+        public event NewMessageEventHandler NewMessage;
+
+        /// <summary>
+        /// Occurs when a message is edited.
+        /// </summary>
+        public event MessageEditedEventHandler MessageEdited;
+
+        /// <summary>
+        /// Occurs when someone stars/pins (or unstars/unpins) a message.
+        /// </summary>
+        public event MessageStarToggledEventHandler MessageStarToggled;
+
+        /// <summary>
+        /// Occurs when a user joins/enters the room.
+        /// </summary>
+        public event UserJoinEventHandler UserJoind;
+
+        /// <summary>
+        /// Occurs when a user leaves the room.
+        /// </summary>
+        public event UserLeftEventHandler UserLeft;
+
+        /// <summary>
+        /// Occurs when the logged in user is (@username) mentioned in a message.
+        /// </summary>
+        public event UserMentiondEventHandler UserMentioned;
+
+        # endregion.
+
+        # region Public properties/indexer.
+
+        /// <summary>
+        /// If true, actions by the currently logged in user will not raise any events. Default set to true.
+        /// </summary>
+        public bool IgnoreOwnEvents { get; set; }
+
+        /// <summary>
+        /// If true, removes (@Username) mentions and the message reply prefix (:012345) from all messages. Default set to true.
+        /// </summary>
+        public bool StripMentionFromMessages { get; set; }
+
+        /// <summary>
+        /// The host domain of the room.
+        /// </summary>
+        public string Host { get; private set; }
+
+        /// <summary>
+        /// The identification number of the room.
+        /// </summary>
+        public int ID { get; private set; }
+
+        /// <summary>
+        /// Returns the currently logged in user.
+        /// </summary>
+        public User Me { get; private set; }
+
+        /// <summary>
+        /// Messages posted by all users from when this object was first instantiated.
+        /// </summary>
+        public List<Message> AllMessages { get; private set; }
+
+        /// <summary>
+        /// All successfully posted messages by the currently logged in user.
+        /// </summary>
+        public List<Message> MyMessages { get; private set; }
+
+        /// <summary>
+        /// A list of all the "pingable" users in the room.
+        /// </summary>
+        //public List<User> PingableUsers { get; private set; }
 
-				return message;		
-			}
-		}
+        /// <summary>
+        /// Gets the Message object associated with the specified message ID.
+        /// </summary>
+        /// <param name="messageID"></param>
+        /// <returns>The Message object associated with the specified ID.</returns>
+        public Message this[int messageID]
+        {
+            get
+            {
+                if (messageID < 0) { throw new IndexOutOfRangeException(); }
+
+                if (AllMessages.Any(m => m.ID == messageID))
+                {
+                    return AllMessages.First(m => m.ID == messageID);
+                }
 
-		# endregion.
+                var message = GetMessage(messageID);
 
+                AllMessages.Add(message);
+
+                return message;		
+            }
+        }
 
+        # endregion.
 
-		/// <summary>
-		/// Provides access to chat room functions, such as, message posting/editing/deleting/starring, user kick-muting/access level changing, basic message/user retrieval and the ability to subscribe to events.
-		/// </summary>
-		/// <param name="host">The host domain of the room (e.g., meta.stackexchange.com).</param>
-		/// <param name="ID">The room's identification number.</param>
-		public Room(string host, int ID)
-		{
-			if (String.IsNullOrEmpty(host)) { throw new ArgumentException("'host' can not be null or empty.", "host"); }
-			if (ID < 0) { throw new ArgumentOutOfRangeException("ID", "'ID' can not be negative."); }
-
-			IgnoreOwnEvents = true;
-			StripMentionFromMessages = true;
-			this.ID = ID;
-			Host = host;
-			//PingableUsers = GetPingableUsers();
-			AllMessages = new List<Message>();
-			MyMessages = new List<Message>();
-			chatRoot = "http://chat." + Host;
-			Me = GetMe();
 
-			SetFkey();
 
-			var count = GetGlobalEventCount();
+        /// <summary>
+        /// Provides access to chat room functions, such as, message posting/editing/deleting/starring, user kick-muting/access level changing, basic message/user retrieval and the ability to subscribe to events.
+        /// </summary>
+        /// <param name="host">The host domain of the room (e.g., meta.stackexchange.com).</param>
+        /// <param name="ID">The room's identification number.</param>
+        public Room(string host, int ID)
+        {
+            if (String.IsNullOrEmpty(host)) { throw new ArgumentException("'host' can not be null or empty.", "host"); }
+            if (ID < 0) { throw new ArgumentOutOfRangeException("ID", "'ID' can not be negative."); }
 
-			var url = GetSocketURL(count);
+            IgnoreOwnEvents = true;
+            StripMentionFromMessages = true;
+            this.ID = ID;
+            Host = host;
+            //PingableUsers = GetPingableUsers();
+            AllMessages = new List<Message>();
+            MyMessages = new List<Message>();
+            chatRoot = "http://chat." + Host;
+            Me = GetMe();
 
-			InitialiseSocket(url);
+            SetFkey();
 
-			RequestManager.CookiesToPass = RequestManager.GlobalCookies;
-		}
+            var count = GetGlobalEventCount();
 
-		~Room()
-		{
-			if (socket != null && socket.State == WebSocketState.Open && !disposed)
-			{
-				socket.Close();
-			}
-		}
+            var url = GetSocketURL(count);
 
+            InitialiseSocket(url);
 
-		/// <summary>
-		/// Retrieves a message from the room.
-		/// </summary>
-		/// <param name="messageID">The ID of the message to fetch.</param>
-		/// <returns>A Message object representing the requested message, or null if the message could not be found.</returns>
-		public Message GetMessage(int messageID)
-		{
-			var res = RequestManager.SendGETRequest(chatRoot + "/messages/" + messageID + "/history");
+            RequestManager.CookiesToPass = RequestManager.GlobalCookies;
+        }
 
-			if (res == null) { throw new Exception("Could not retrieve data of message " + messageID + ". Do you have an active internet connection?"); }
+        ~Room()
+        {
+            if (socket != null && socket.State == WebSocketState.Open && !disposed)
+            {
+                socket.Close();
+            }
+        }
 
-			var lastestDom = CQ.Create(RequestManager.GetResponseContent(res)).Select(".monologue").Last();
-			
-			var content = Message.GetMessageContent(Host, ID, messageID, false); 
 
-			var parentID = content.IsReply() ? int.Parse(content.Substring(1, content.IndexOf(' '))) : -1;
-			var authorName = lastestDom[".username a"].First().Text();
-			var authorID = int.Parse(lastestDom[".username a"].First().Attr("href").Split('/')[2]);
 
-			return new Message(Host, ID, StripMentionFromMessages ? content.StripMention() : content, messageID, authorName, authorID, parentID);
-		}
+        /// <summary>
+        /// Retrieves a message from the room.
+        /// </summary>
+        /// <param name="messageID">The ID of the message to fetch.</param>
+        /// <returns>A Message object representing the requested message, or null if the message could not be found.</returns>
+        public Message GetMessage(int messageID)
+        {
+            var res = RequestManager.SendGETRequest(chatRoot + "/messages/" + messageID + "/history");
 
-		public User GetUser(int userID)
-		{
-			return new User(Host, ID, userID);
-		}
+            if (res == null) { throw new Exception("Could not retrieve data of message " + messageID + ". Do you have an active internet connection?"); }
 
-		# region Normal user chat commands.
+            var lastestDom = CQ.Create(RequestManager.GetResponseContent(res)).Select(".monologue").Last();
+            
+            var content = Message.GetMessageContent(Host, ID, messageID, false); 
 
-		/// <summary>
-		/// Posts a new message in the room.
-		/// </summary>
-		/// <param name="message">The message to post.</param>
-		/// <returns>A Message object representing the newly posted message (if successful), otherwise returns null.</returns>
-		public Message PostMessage(string message)
-		{
-			var data = "text=" + Uri.EscapeDataString(message).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
+            var parentID = content.IsReply() ? int.Parse(content.Substring(1, content.IndexOf(' '))) : -1;
+            var authorName = lastestDom[".username a"].First().Text();
+            var authorID = int.Parse(lastestDom[".username a"].First().Attr("href").Split('/')[2]);
 
-			var res = RequestManager.SendPOSTRequest(chatRoot + "/chats/" + ID + "/messages/new", data);
+            return new Message(Host, ID, StripMentionFromMessages ? content.StripMention() : content, messageID, authorName, authorID, parentID);
+        }
 
-			if (res == null) { return null; }
+        public User GetUser(int userID)
+        {
+            return new User(Host, ID, userID);
+        }
 
-			var resContent = RequestManager.GetResponseContent(res);
-			var json = JObject.Parse(resContent);
-			var messageID = (int)(json["id"].Type != JTokenType.Integer ? -1 : json["id"]);
+        # region Normal user chat commands.
 
-			if (messageID == -1) { return null; }
+        /// <summary>
+        /// Posts a new message in the room.
+        /// </summary>
+        /// <param name="message">The message to post.</param>
+        /// <returns>A Message object representing the newly posted message (if successful), otherwise returns null.</returns>
+        public Message PostMessage(string message)
+        {
+            while (true)
+            {
+                var data = "text=" + Uri.EscapeDataString(message).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
 
-			var m = new Message(Host, ID, message, messageID, Me.Name, Me.ID);
+                var res = RequestManager.SendPOSTRequest(chatRoot + "/chats/" + ID + "/messages/new", data);
 
-			MyMessages.Add(m);
-			AllMessages.Add(m);
+                if (res == null) { return null; }
 
-			return m;
-		}
+                var resContent = RequestManager.GetResponseContent(res);
 
-		public Message PostReply(int targetMessageID, string message)
-		{
-			return PostMessage(":" + targetMessageID + " " + message);
-		}
+                if (HandleThrottling(resContent))
+                {
+                    continue;
+                }
 
-		public Message PostReply(Message targetMessage, string message)
-		{
-			return PostMessage(":" + targetMessage.ID + " " + message);
-		}
+                var json = JObject.Parse(resContent);
+                var messageID = (int)(json["id"].Type != JTokenType.Integer ? -1 : json["id"]);
 
-		public bool EditMessage(Message oldMessage, string newMessage)
-		{
-			return EditMessage(oldMessage.ID, newMessage);
-		}
+                if (messageID == -1) { return null; }
 
-		public bool EditMessage(int messageID, string newMessage)
-		{
-			var data = "text=" + Uri.EscapeDataString(newMessage).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
+                var m = new Message(Host, ID, message, messageID, Me.Name, Me.ID);
 
-			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID, data);
+                MyMessages.Add(m);
+                AllMessages.Add(m);
 
-			if (res == null) { return false; }
+                return m;
+            }
+        }
 
-			var resContent = RequestManager.GetResponseContent(res);
+        public Message PostReply(int targetMessageID, string message)
+        {
+            return PostMessage(":" + targetMessageID + " " + message);
+        }
 
-			return resContent == "\"ok\"";
-		}
+        public Message PostReply(Message targetMessage, string message)
+        {
+            return PostMessage(":" + targetMessage.ID + " " + message);
+        }
 
-		public bool DeleteMessage(Message message)
-		{
-			return DeleteMessage(message.ID);
-		}
+        public bool EditMessage(Message oldMessage, string newMessage)
+        {
+            return EditMessage(oldMessage.ID, newMessage);
+        }
 
-		public bool DeleteMessage(int messageID)
-		{
-			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/delete", "fkey=" + fkey);
+        public bool EditMessage(int messageID, string newMessage)
+        {
+            while (true)
+            {
+                var data = "text=" + Uri.EscapeDataString(newMessage).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
 
-			if (res == null) { return false; }
+                var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID, data);
 
-			var resContent = RequestManager.GetResponseContent(res);
+                if (res == null) { return false; }
 
-			return resContent == "\"ok\"";
-		}
+                var resContent = RequestManager.GetResponseContent(res);
 
-		public bool ToggleStarring(Message message)
-		{
-			return ToggleStarring(message.ID);
-		}
+                if (HandleThrottling(resContent))
+                {
+                    continue;
+                }
 
-		public bool ToggleStarring(int messageID)
-		{
-			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/star", "fkey=" + fkey);
+                return resContent == "\"ok\"";
+            }
+        }
 
-			if (res == null) { return false; }
+        public bool DeleteMessage(Message message)
+        {
+            return DeleteMessage(message.ID);
+        }
 
-			var resContent = RequestManager.GetResponseContent(res);
+        public bool DeleteMessage(int messageID)
+        {
+            while (true)
+            {
+                var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/delete", "fkey=" + fkey);
 
-			return resContent != "\"ok\"";
-		}
+                if (res == null) { return false; }
 
-		# endregion
+                var resContent = RequestManager.GetResponseContent(res);
 
-		#region Owner chat commands.
+                if (HandleThrottling(resContent))
+                {
+                    continue;
+                }
 
-		public bool UnstarMessage(Message message)
-		{
-			return UnstarMessage(message.ID);
-		}
+                return resContent == "\"ok\"";
+            }
+        }
 
-		public bool UnstarMessage(int messageID)
-		{
-			if (!Me.IsMod && !Me.IsRoomOwner) { return false; }
+        public bool ToggleStarring(Message message)
+        {
+            return ToggleStarring(message.ID);
+        }
 
-			var data = "fkey=" + fkey;
+        public bool ToggleStarring(int messageID)
+        {
+            while (true)
+            {
+                var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/star", "fkey=" + fkey);
 
-			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/unstar", data);
+                if (res == null) { return false; }
 
-			return res != null && RequestManager.GetResponseContent(res) != "\"ok\"";
-		}
+                var resContent = RequestManager.GetResponseContent(res);
 
-		public bool TogglePinning(Message message)
-		{
-			return TogglePinning(message.ID);
-		}
-		
-		public bool TogglePinning(int messageID)
-		{
-			if (!Me.IsMod && !Me.IsRoomOwner) { return false; }
+                if (HandleThrottling(resContent))
+                {
+                    continue;
+                }
 
-			var data = "fkey=" + fkey;
+                return resContent != "\"ok\"";
+            }
+        }
 
-			var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/owner-star", data);
+        # endregion
 
-			return res != null && RequestManager.GetResponseContent(res) != "\"ok\"";
-		}
+        #region Owner chat commands.
 
-		public bool KickMute(User user)
-		{
-			return KickMute(user.ID);
-		}
+        public bool UnstarMessage(Message message)
+        {
+            return UnstarMessage(message.ID);
+        }
 
-		public bool KickMute(int userID)
-		{
-			if (!Me.IsMod && !Me.IsRoomOwner) { return false; }
+        public bool UnstarMessage(int messageID)
+        {
+            while (true)
+            {
+                if (!Me.IsMod && !Me.IsRoomOwner) { return false; }
 
-			var data = "userID=" + userID + "&fkey=" + fkey;
+                var data = "fkey=" + fkey;
 
-			var res = RequestManager.SendPOSTRequest(chatRoot + "/rooms/kickmute/" + ID, data);
+                var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/unstar", data);
 
-			return res != null && RequestManager.GetResponseContent(res).Contains("has been kicked");
-		}
+                if (res == null) { return false; }
 
-		public bool SetUserRoomAccess(UserRoomAccess access, User user)
-		{
-			return SetUserRoomAccess(access, user.ID);
-		}
+                var resContent = RequestManager.GetResponseContent(res);
 
-		public bool SetUserRoomAccess(UserRoomAccess access, int userID)
-		{
-			if (!Me.IsMod && !Me.IsRoomOwner) { return false; }
+                if (HandleThrottling(resContent))
+                {
+                    continue;
+                }
 
-			var data = "fkey=" + fkey + "&aclUserId=" + userID + "&userAccess=";
+                return resContent == "\"ok\"";
+            }
+        }
 
-			switch (access)
-			{
-				case UserRoomAccess.Normal:
-				{
-					data += "remove";
+        public bool TogglePinning(Message message)
+        {
+            return TogglePinning(message.ID);
+        }
+        
+        public bool TogglePinning(int messageID)
+        {
+            while (true)
+            {
+                if (!Me.IsMod && !Me.IsRoomOwner) { return false; }
 
-					break;
-				}
+                var data = "fkey=" + fkey;
 
-				case UserRoomAccess.ExplicitReadOnly:
-				{
-					data += "read-only";
+                var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/owner-star", data);
 
-					break;
-				}
+                if (res == null) { return false; }
 
-				case UserRoomAccess.ExplicitReadWrite:
-				{
-					data += "read-write";
+                var resContent = RequestManager.GetResponseContent(res);
 
-					break;
-				}
+                if (HandleThrottling(resContent))
+                {
+                    continue;
+                }
 
-				case UserRoomAccess.Owner:
-				{
-					data += "owner";
+                return resContent == "\"ok\"";
+            }
+        }
 
-					break;
-				}
-			}
+        public bool KickMute(User user)
+        {
+            return KickMute(user.ID);
+        }
 
-			return RequestManager.SendPOSTRequest(chatRoot + "/rooms/setuseraccess/" + ID, data) != null;
-		}
+        public bool KickMute(int userID)
+        {
+            if (!Me.IsMod && !Me.IsRoomOwner) { return false; }
 
-		#endregion
+            var data = "userID=" + userID + "&fkey=" + fkey;
 
-		#region Inherited methods.
+            var res = RequestManager.SendPOSTRequest(chatRoot + "/rooms/kickmute/" + ID, data);
 
-		public void Dispose()
-		{
-			if (disposed) { return; }
+            return res != null && RequestManager.GetResponseContent(res).Contains("has been kicked");
+        }
 
-			if (socket.State == WebSocketState.Open)
-			{
-				socket.Close();
-			}
+        public bool SetUserRoomAccess(UserRoomAccess access, User user)
+        {
+            return SetUserRoomAccess(access, user.ID);
+        }
 
-			GC.SuppressFinalize(this);
+        public bool SetUserRoomAccess(UserRoomAccess access, int userID)
+        {
+            if (!Me.IsMod && !Me.IsRoomOwner) { return false; }
 
-			disposed = true;
-		}
+            var data = "fkey=" + fkey + "&aclUserId=" + userID + "&userAccess=";
 
-		public static bool operator ==(Room a, Room b)
-		{
-			if ((object)a == null || (object)b == null) { return false; }
+            switch (access)
+            {
+                case UserRoomAccess.Normal:
+                {
+                    data += "remove";
 
-			if (ReferenceEquals(a, b)) { return true; }
+                    break;
+                }
 
-			return a.GetHashCode() == b.GetHashCode();
-		}
+                case UserRoomAccess.ExplicitReadOnly:
+                {
+                    data += "read-only";
 
-		public static bool operator !=(Room a, Room b)
-		{
-			return !(a == b);
-		}
+                    break;
+                }
 
-		public bool Equals(Room room)
-		{
-			if (room == null) { return false; }
+                case UserRoomAccess.ExplicitReadWrite:
+                {
+                    data += "read-write";
 
-			return room.GetHashCode() == GetHashCode();
-		}
+                    break;
+                }
 
-		public bool Equals(string host, int id)
-		{
-			if (String.IsNullOrEmpty(host) || id < 0) { return false; }
+                case UserRoomAccess.Owner:
+                {
+                    data += "owner";
 
-			return String.Equals(host, Host, StringComparison.InvariantCultureIgnoreCase) && ID == id;
-		}
+                    break;
+                }
+            }
 
-		public override bool Equals(object obj)
-		{
-			if (obj == null) { return false; }
+            return RequestManager.SendPOSTRequest(chatRoot + "/rooms/setuseraccess/" + ID, data) != null;
+        }
 
-			if (!(obj is Room)) { return false; }
+        #endregion
 
-			return obj.GetHashCode() == GetHashCode();
-		}
+        #region Inherited/overridden methods.
 
-		public override int GetHashCode()
-		{
-			return Host.GetHashCode() + ID.GetHashCode();
-		}
+        public void Dispose()
+        {
+            if (disposed) { return; }
 
-		#endregion
+            disposing = true;
 
+            if (socket.State == WebSocketState.Open)
+            {
+                socket.Close();
+            }
 
+            GC.SuppressFinalize(this);
 
-		# region Instantiation related methods.
+            disposed = true;
+            disposing = false;
+        }
 
-		//private List<User> GetPingableUsers()
-		//{
-		//	var users = new List<User>();
+        public static bool operator ==(Room a, Room b)
+        {
+            if ((object)a == null || (object)b == null) { return false; }
 
-		//	// Parse data returned from http://chat.{domain}/rooms/pingable/{room id}
+            if (ReferenceEquals(a, b)) { return true; }
 
-		//	return users;
-		//}
+            return a.GetHashCode() == b.GetHashCode();
+        }
 
-		private User GetMe()
-		{
-			var res = RequestManager.SendGETRequest(chatRoot + "/chats/join/favorite");
+        public static bool operator !=(Room a, Room b)
+        {
+            return !(a == b);
+        }
 
-			if (res == null) { throw new Exception("Could not get user information. Do you have an active internet connection?"); }
+        public bool Equals(Room room)
+        {
+            if (room == null) { return false; }
 
-			var dom = CQ.Create(RequestManager.GetResponseContent(res));
+            return room.GetHashCode() == GetHashCode();
+        }
 
-			var e = dom[".topbar-menu-links a"].First();
+        public bool Equals(string host, int id)
+        {
+            if (String.IsNullOrEmpty(host) || id < 0) { return false; }
 
-			var id = int.Parse(e.Attr("href").Split('/')[2]);
+            return String.Equals(host, Host, StringComparison.InvariantCultureIgnoreCase) && ID == id;
+        }
 
-			return new User(Host, ID, id);
-		}
+        public override bool Equals(object obj)
+        {
+            if (obj == null) { return false; }
 
-		private void SetFkey()
-		{
-			var res = RequestManager.SendGETRequest(chatRoot + "/rooms/" + ID);
+            if (!(obj is Room)) { return false; }
 
-			if (res == null) { throw new Exception("Could not get fkey. Do you have an active internet connection?"); }
+            return obj.GetHashCode() == GetHashCode();
+        }
 
-			var resContent = RequestManager.GetResponseContent(res);
+        public override int GetHashCode()
+        {
+            return Host.GetHashCode() + ID.GetHashCode();
+        }
 
-			var fk = CQ.Create(resContent).GetFkey();
+        #endregion
 
-			if (String.IsNullOrEmpty(fk)) { throw new Exception("Could not get fkey. Have Do you have an active internet connection?"); }
 
-			fkey = fk;
-		}
 
-		private CookieContainer GetSiteCookies()
-		{
-			var allCookies = RequestManager.GlobalCookies.GetCookies();
-			var siteCookies = new CookieCollection();
+        private bool HandleThrottling(string res)
+        {
+            if (Regex.IsMatch(res, @"(?i)^you can perform this action again in \d*"))
+            {
+                var delay = Regex.Replace(res, @"\D", "");
 
-			foreach (var cookie in allCookies)
-			{
-				var cookieDomain = cookie.Domain.StartsWith(".") ? cookie.Domain.Substring(1) : cookie.Domain;
+                Thread.Sleep(int.Parse(delay) * 1000);
 
-				if ((cookieDomain == Host && cookie.Name.ToLowerInvariant().Contains("usr")) || cookie.Name == "csr")
-				{
-					siteCookies.Add(cookie);
-				}
-			}
+                return true;
+            }
 
-			var cookies = new CookieContainer();
+            return false;
+        }
 
-			cookies.Add(siteCookies);
+        # region Instantiation related methods.
 
-			return cookies;
-		}
+        //private List<User> GetPingableUsers()
+        //{
+        //	var users = new List<User>();
 
-		private int GetGlobalEventCount()
-		{
-			var data = "mode=Events&msgCount=0&fkey=" + fkey;
+        //	// Parse data returned from http://chat.{domain}/rooms/pingable/{room id}
 
-			RequestManager.CookiesToPass = GetSiteCookies();
+        //	return users;
+        //}
 
-			var res = RequestManager.SendPOSTRequest(chatRoot + "/chats/" + ID + "/events", data);
+        private User GetMe()
+        {
+            var res = RequestManager.SendGETRequest(chatRoot + "/chats/join/favorite");
 
-			if (res == null) { throw new Exception("Could not get eventtime for room " + ID + " on " + Host + ". Do you have an active internet conection?"); }
+            if (res == null) { throw new Exception("Could not get user information. Do you have an active internet connection?"); }
 
-			var resContent = RequestManager.GetResponseContent(res);
+            var dom = CQ.Create(RequestManager.GetResponseContent(res));
 
-			return (int)JObject.Parse(resContent)["time"];
-		}
+            var e = dom[".topbar-menu-links a"][0];
 
-		private string GetSocketURL(int eventTime)
-		{
-			var data = "roomid=" + ID + "&fkey=" + fkey;
+            var id = int.Parse(e.Attributes["href"].Split('/')[2]);
 
-			RequestManager.CookiesToPass = GetSiteCookies();
+            return new User(Host, ID, id);
+        }
 
-			var res = RequestManager.SendPOSTRequest(chatRoot + "/ws-auth", data, true, chatRoot + "/rooms/" + ID, chatRoot);
+        private void SetFkey()
+        {
+            var res = RequestManager.SendGETRequest(chatRoot + "/rooms/" + ID);
 
-			if (res == null) { throw new Exception("Could not get WebSocket URL. Do you haven an active internet connection?"); }
+            if (res == null) { throw new Exception("Could not get fkey. Do you have an active internet connection?"); }
 
-			var resContent = RequestManager.GetResponseContent(res);
+            var resContent = RequestManager.GetResponseContent(res);
 
-			return (string)JObject.Parse(resContent)["url"] + "?l=" + eventTime;
-		}
+            var fk = CQ.Create(resContent).GetFkey();
 
-		private void InitialiseSocket(string socketURL)
-		{
-			socket = new WebSocket(socketURL, "", null, null, "", chatRoot);
+            if (String.IsNullOrEmpty(fk)) { throw new Exception("Could not get fkey. Have Do you have an active internet connection?"); }
 
-			socket.MessageReceived += (o, oo) =>
-			{
-				try
-				{
-					var json = JObject.Parse(oo.Message);
+            fkey = fk;
+        }
 
-					HandleData(json);
-				}
-				catch (Exception)
-				{
+        private CookieContainer GetSiteCookies()
+        {
+            var allCookies = RequestManager.GlobalCookies.GetCookies();
+            var siteCookies = new CookieCollection();
 
-				}
-			};
+            foreach (var cookie in allCookies)
+            {
+                var cookieDomain = cookie.Domain.StartsWith(".") ? cookie.Domain.Substring(1) : cookie.Domain;
 
-			socket.Open();
-		}
+                if ((cookieDomain == Host && cookie.Name.ToLowerInvariant().Contains("usr")) || cookie.Name == "csr")
+                {
+                    siteCookies.Add(cookie);
+                }
+            }
 
-		# endregion
+            var cookies = new CookieContainer();
 
-		# region Incoming message handling methods.
+            cookies.Add(siteCookies);
 
-		private void HandleData(JObject json)
-		{
-			var data = json["r" + ID];
+            return cookies;
+        }
 
-			if (data == null || data.Type == JTokenType.Null) { return; }
+        private int GetGlobalEventCount()
+        {
+            var data = "mode=Events&msgCount=0&fkey=" + fkey;
 
-			data = data["e"];
+            RequestManager.CookiesToPass = GetSiteCookies();
 
-			if (data == null || data.Type == JTokenType.Null) { return; }
+            var res = RequestManager.SendPOSTRequest(chatRoot + "/chats/" + ID + "/events", data);
 
-			data = data[0];
+            if (res == null) { throw new Exception("Could not get eventtime for room " + ID + " on " + Host + ". Do you have an active internet conection?"); }
 
-			if (data == null || data.Type == JTokenType.Null) { return; }
+            var resContent = RequestManager.GetResponseContent(res);
 
-			var eventType = (EventType)(int)(data["event_type"]);
+            return (int)JObject.Parse(resContent)["time"];
+        }
 
-			if ((int)(data["room_id"].Type != JTokenType.Integer ? -1 : data["room_id"]) != ID) { return; }
+        private string GetSocketURL(int eventTime)
+        {
+            var data = "roomid=" + ID + "&fkey=" + fkey;
 
-			switch (eventType)
-			{
-				case EventType.MessagePosted:
-				{
-					HandleNewMessage(data);
+            RequestManager.CookiesToPass = GetSiteCookies();
 
-					return;
-				}
+            var res = RequestManager.SendPOSTRequest(chatRoot + "/ws-auth", data, true, chatRoot + "/rooms/" + ID, chatRoot);
 
-				case EventType.MessageReply:
-				{
-					HandleNewMessage(data);
-					HandleUserMentioned(data);
+            if (res == null) { throw new Exception("Could not get WebSocket URL. Do you haven an active internet connection?"); }
 
-					return;
-				}
+            var resContent = RequestManager.GetResponseContent(res);
 
-				case EventType.UserMentioned:
-				{
-					HandleNewMessage(data);
-					HandleUserMentioned(data);
+            return (string)JObject.Parse(resContent)["url"] + "?l=" + eventTime;
+        }
 
-					return;
-				}
+        private void InitialiseSocket(string socketUrl)
+        {
+            socket = new WebSocket(socketUrl, "", null, null, "", chatRoot);
 
-				case EventType.MessageEdited:
-				{
-					HandleEdit(data);
+            socket.MessageReceived += (o, oo) =>
+            {
+                try
+                {
+                    var json = JObject.Parse(oo.Message);
 
-					return;
-				}
+                    HandleData(json);
+                }
+                catch (Exception)
+                {
 
-				case EventType.MessageStarToggled:
-				{
-					HandleStarToggle(data);
+                }
+            };
 
-					return;
-				}
+            socket.Closed += (o, oo) =>
+            {
+                if (!disposing)
+                {
+                    SetFkey();
 
-				case EventType.UserEntered:
-				{
-					HandleUserJoin(data);
+                    var count = GetGlobalEventCount();
 
-					return;
-				}
+                    var url = GetSocketURL(count);
 
-				case EventType.UserLeft:
-				{
-					HandleUserLeave(data);
+                    InitialiseSocket(url);
+                }
+            };
 
-					return;
-				}
-			}
-		}
+            socket.Open();
+        }
 
-		private void HandleNewMessage(JToken json)
-		{
-			var id = (int)json["message_id"];
-			var content = Message.GetMessageContent(Host, ID, id, StripMentionFromMessages);
-			var authorName = (string)json["user_name"];
-			var authorID = (int)json["user_id"];
-			var parentID = (int)(json["parent_id"] ?? -1);
+        # endregion
 
-			var message = new Message(Host, ID, content, id, authorName, authorID, parentID);
+        # region Incoming message handling methods.
 
-			AllMessages.Add(message);
+        private void HandleData(JObject json)
+        {
+            var data = json["r" + ID];
 
-			if (NewMessage == null || (authorID == Me.ID && IgnoreOwnEvents)) { return; }
+            if (data == null || data.Type == JTokenType.Null) { return; }
 
-			NewMessage(message);
-		}
+            data = data["e"];
 
-		private void HandleUserMentioned(JToken json)
-		{
-			var id = (int)json["message_id"];
-			var content = Message.GetMessageContent(Host, ID, id, StripMentionFromMessages);
-			var authorName = (string)json["user_name"];
-			var authorID = (int)json["user_id"];
-			var parentID = (int)(json["parent_id"] ?? -1);
+            if (data == null || data.Type == JTokenType.Null) { return; }
 
-			var message = new Message(Host, ID, content, id, authorName, authorID, parentID);
+            data = data[0];
 
-			AllMessages.Add(message);
+            if (data == null || data.Type == JTokenType.Null) { return; }
 
-			if (UserMentioned == null || (authorID == Me.ID && IgnoreOwnEvents)) { return; }
+            var eventType = (EventType)(int)(data["event_type"]);
 
-			UserMentioned(message);
-		}
+            if ((int)(data["room_id"].Type != JTokenType.Integer ? -1 : data["room_id"]) != ID) { return; }
 
-		private void HandleEdit(JToken json)
-		{
-			var id = (int)json["message_id"];
-			var content = Message.GetMessageContent(Host, ID, id, StripMentionFromMessages);
-			var authorName = (string)json["user_name"];
-			var authorID = (int)json["user_id"];
-			var parentID = (int)(json["parent_id"] ?? -1);
+            switch (eventType)
+            {
+                case EventType.MessagePosted:
+                {
+                    HandleNewMessage(data);
 
-			var currentMessage = new Message(Host, ID, content, id, authorName, authorID, parentID);
-			var oldMessage = this[id];
+                    return;
+                }
 
-			AllMessages.Remove(oldMessage);
-			AllMessages.Add(currentMessage);
+                case EventType.MessageReply:
+                {
+                    HandleNewMessage(data);
+                    HandleUserMentioned(data);
 
-			if (MessageEdited == null || (authorID == Me.ID && IgnoreOwnEvents)) { return; }
+                    return;
+                }
 
-			MessageEdited(oldMessage, currentMessage);
-		}
+                case EventType.UserMentioned:
+                {
+                    HandleNewMessage(data);
+                    HandleUserMentioned(data);
 
-		private void HandleStarToggle(JToken json)
-		{
-			var id = (int)json["message_id"];
-			var starrerID = (int)json["user_id"];
-			var starCount = (int)(json["message_stars"] ?? 0);
-			var pinCount = (int)(json["message_owner_stars"] ?? 0);
+                    return;
+                }
 
-			var message = this[id];
-			var user = new User(Host, ID, starrerID);
+                case EventType.MessageEdited:
+                {
+                    HandleEdit(data);
 
-			if (MessageStarToggled == null || (starrerID == Me.ID && IgnoreOwnEvents)) { return; }
+                    return;
+                }
 
-			MessageStarToggled(message, user, starCount, pinCount);
-		}
+                case EventType.MessageStarToggled:
+                {
+                    HandleStarToggle(data);
 
-		private void HandleUserJoin(JToken json)
-		{
-			var userID = (int)json["user_id"];
+                    return;
+                }
 
-			var user = new User(Host, ID, userID);
+                case EventType.UserEntered:
+                {
+                    HandleUserJoin(data);
 
-			if (UserJoind == null || (userID == Me.ID && IgnoreOwnEvents)) { return; }
+                    return;
+                }
 
-			UserJoind(user);
-		}
+                case EventType.UserLeft:
+                {
+                    HandleUserLeave(data);
 
-		private void HandleUserLeave(JToken json)
-		{
-			var userID = (int)json["user_id"];
+                    return;
+                }
+            }
+        }
 
-			var user = new User(Host, ID, userID);
+        private void HandleNewMessage(JToken json)
+        {
+            var id = (int)json["message_id"];
+            var content = Message.GetMessageContent(Host, ID, id, StripMentionFromMessages);
+            var authorName = (string)json["user_name"];
+            var authorID = (int)json["user_id"];
+            var parentID = (int)(json["parent_id"] ?? -1);
 
-			if (UserLeft == null || (userID == Me.ID && IgnoreOwnEvents)) { return; }
+            var message = new Message(Host, ID, content, id, authorName, authorID, parentID);
 
-			UserLeft(user);
-		}
+            AllMessages.Add(message);
 
-		# endregion
-	}
+            if (NewMessage == null || (authorID == Me.ID && IgnoreOwnEvents)) { return; }
+
+            NewMessage(message);
+        }
+
+        private void HandleUserMentioned(JToken json)
+        {
+            var id = (int)json["message_id"];
+            var content = Message.GetMessageContent(Host, ID, id, StripMentionFromMessages);
+            var authorName = (string)json["user_name"];
+            var authorID = (int)json["user_id"];
+            var parentID = (int)(json["parent_id"] ?? -1);
+
+            var message = new Message(Host, ID, content, id, authorName, authorID, parentID);
+
+            AllMessages.Add(message);
+
+            if (UserMentioned == null || (authorID == Me.ID && IgnoreOwnEvents)) { return; }
+
+            UserMentioned(message);
+        }
+
+        private void HandleEdit(JToken json)
+        {
+            var id = (int)json["message_id"];
+            var content = Message.GetMessageContent(Host, ID, id, StripMentionFromMessages);
+            var authorName = (string)json["user_name"];
+            var authorID = (int)json["user_id"];
+            var parentID = (int)(json["parent_id"] ?? -1);
+
+            var currentMessage = new Message(Host, ID, content, id, authorName, authorID, parentID);
+            var oldMessage = this[id];
+
+            AllMessages.Remove(oldMessage);
+            AllMessages.Add(currentMessage);
+
+            if (MessageEdited == null || (authorID == Me.ID && IgnoreOwnEvents)) { return; }
+
+            MessageEdited(oldMessage, currentMessage);
+        }
+
+        private void HandleStarToggle(JToken json)
+        {
+            var id = (int)json["message_id"];
+            var starrerID = (int)json["user_id"];
+            var starCount = (int)(json["message_stars"] ?? 0);
+            var pinCount = (int)(json["message_owner_stars"] ?? 0);
+
+            var message = this[id];
+            var user = new User(Host, ID, starrerID);
+
+            if (MessageStarToggled == null || (starrerID == Me.ID && IgnoreOwnEvents)) { return; }
+
+            MessageStarToggled(message, user, starCount, pinCount);
+        }
+
+        private void HandleUserJoin(JToken json)
+        {
+            var userID = (int)json["user_id"];
+
+            var user = new User(Host, ID, userID);
+
+            if (UserJoind == null || (userID == Me.ID && IgnoreOwnEvents)) { return; }
+
+            UserJoind(user);
+        }
+
+        private void HandleUserLeave(JToken json)
+        {
+            var userID = (int)json["user_id"];
+
+            var user = new User(Host, ID, userID);
+
+            if (UserLeft == null || (userID == Me.ID && IgnoreOwnEvents)) { return; }
+
+            UserLeft(user);
+        }
+
+        # endregion
+    }
 }

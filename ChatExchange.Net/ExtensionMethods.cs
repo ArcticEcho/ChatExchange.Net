@@ -11,84 +11,91 @@ using CsQuery;
 
 namespace ChatExchangeDotNet
 {
-	public static class ExtensionMethods
-	{
-		private static readonly Regex hasMention = new Regex(@"^:\d*?\s|@\S{3,}?\b", RegexOptions.Compiled | RegexOptions.CultureInvariant);
-		private static readonly Regex isReply = new Regex(@"^:\d*?\s", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    public static class ExtensionMethods
+    {
+        private static readonly Regex hasMention = new Regex(@"^:\d*?\s|@\S{3,}?\b", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private static readonly Regex isReply = new Regex(@"^:\d*?\s", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
 
 
-		public static List<Cookie> GetCookies(this CookieContainer container)
-		{
-			var cookies = new List<Cookie>();
+        public static List<Cookie> GetCookies(this CookieContainer container)
+        {
+            var cookies = new List<Cookie>();
 
-			var table = (Hashtable)container.GetType().InvokeMember("m_domainTable", BindingFlags.NonPublic | BindingFlags.GetField | BindingFlags.Instance, null, container, new object[] { });
+            var table = (Hashtable)container.GetType().InvokeMember("m_domainTable", BindingFlags.NonPublic | BindingFlags.GetField | BindingFlags.Instance, null, container, new object[] { });
 
-			foreach (var key in table.Keys)
-			{
-				Uri uri;
+            foreach (var key in table.Keys)
+            {
+                Uri uri;
 
-				var domain = key as string;
+                var domain = key as string;
 
-				if (domain == null) { continue; }
+                if (domain == null) { continue; }
 
-				if (domain.StartsWith("."))
-				{
-					domain = domain.Substring(1);
-				}
+                if (domain.StartsWith("."))
+                {
+                    domain = domain.Substring(1);
+                }
 
-				var address = string.Format("http://{0}/", domain);
+                var address = string.Format("http://{0}/", domain);
 
-				if (Uri.TryCreate(address, UriKind.RelativeOrAbsolute, out uri) == false) { continue; }
+                if (Uri.TryCreate(address, UriKind.RelativeOrAbsolute, out uri) == false) { continue; }
 
-				foreach (Cookie cookie in container.GetCookies(uri))
-				{
-					cookies.Add(cookie);
-				}
-			}
-		
-			return cookies;
-		}
+                foreach (Cookie cookie in container.GetCookies(uri))
+                {
+                    cookies.Add(cookie);
+                }
+            }
+        
+            return cookies;
+        }
 
-		public static string GetFkey(this CQ input)
-		{
-			var fkeyE = input["input"].First(e => e.Attributes["name"] != null && e.Attributes["name"] == "fkey");
+        public static string GetFkey(this CQ input)
+        {
+            var fkeyE = input["input"].First(e => e.Attributes["name"] != null && e.Attributes["name"] == "fkey");
 
-			return fkeyE == null ? "" : fkeyE.Attributes["value"];
-		}
+            return fkeyE == null ? "" : fkeyE.Attributes["value"];
+        }
 
-		public static List<Message> GetMessagesByUser(this IEnumerable<Message> messages, User user)
-		{
-			if (user == null) { throw new ArgumentNullException("user"); }
+        //public static string GetAffId(this CQ input)
+        //{
+        //    var fkeyE = input["input"].First(e => e.Attributes["name"] != null && e.Attributes["name"] == "affId");
 
-			return messages.GetMessagesByUser(user.ID);
-		}
+        //    return fkeyE == null ? "" : fkeyE.Attributes["value"];
+        //}
 
-		public static List<Message> GetMessagesByUser(this IEnumerable<Message> messages, int userID)
-		{
-			if (messages == null) { throw new ArgumentNullException("messages"); }
+        public static List<Message> GetMessagesByUser(this IEnumerable<Message> messages, User user)
+        {
+            if (user == null) { throw new ArgumentNullException("user"); }
 
-			var userMessages = new List<Message>();
+            return messages.GetMessagesByUser(user.ID);
+        }
 
-			foreach (var m in messages)
-			{
-				if (m.AuthorID == userID)
-				{
-					userMessages.Add(m);
-				}
-			}
+        public static List<Message> GetMessagesByUser(this IEnumerable<Message> messages, int userID)
+        {
+            if (messages == null) { throw new ArgumentNullException("messages"); }
 
-			return userMessages;
-		}
+            var userMessages = new List<Message>();
 
-		public static string StripMention(this string input, string replaceWith = "")
-		{
-			return hasMention.Replace(input, replaceWith);
-		}
+            foreach (var m in messages)
+            {
+                if (m.AuthorID == userID)
+                {
+                    userMessages.Add(m);
+                }
+            }
 
-		public static bool IsReply(this string message, bool includeMention = false)
-		{
-			return includeMention ? hasMention.IsMatch(message) : isReply.IsMatch(message);
-		}
-	}
+            return userMessages;
+        }
+
+        public static string StripMention(this string input, string replaceWith = "")
+        {
+            return hasMention.Replace(input, replaceWith);
+        }
+
+        public static bool IsReply(this string message, bool includeMention = false)
+        {
+            return includeMention ? hasMention.IsMatch(message) : isReply.IsMatch(message);
+        }
+    }
 }

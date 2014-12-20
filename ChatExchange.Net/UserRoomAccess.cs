@@ -1,10 +1,10 @@
 ﻿namespace ChatExchangeDotNet
 {
-	public enum UserRoomAccess
-	{
-		Normal,
-		ExplicitReadOnly,
-		ExplicitReadWrite,
-		Owner
-	}
+    public enum UserRoomAccess
+    {
+        Normal,
+        ExplicitReadOnly,
+        ExplicitReadWrite,
+        Owner
+    }
 }
