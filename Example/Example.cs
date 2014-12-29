@@ -30,7 +30,7 @@ namespace Example
                 // If the message contains "3... 2... 1...", post "KA-BOOM!".
                 if (message.Content.Contains("3... 2... 1..."))
                 {
-                    var success = sandbox.PostMessage("**KA-BOOM!**");
+                    var success = sandbox.PostMessage("**KA-BOOM!**") != null;
 
                     Console.WriteLine("'KA-BOOM' message successfully posted: " + success);
                 }
