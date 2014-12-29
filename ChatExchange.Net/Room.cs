@@ -559,6 +559,10 @@ namespace ChatExchangeDotNet
 
             var e = dom[".topbar-menu-links a"][0];
 
+            // ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ Temp. For debug purposes only. ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+            var t = e.Attributes["href"];
+            // ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ Temp. For debug purposes only. ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+
             var id = int.Parse(e.Attributes["href"].Split('/')[2]);
 
             return new User(Host, ID, id);
