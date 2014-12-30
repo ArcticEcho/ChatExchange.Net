@@ -57,13 +57,6 @@ namespace ChatExchangeDotNet
             return fkeyE == null ? "" : fkeyE.Attributes["value"];
         }
 
-        //public static string GetAffId(this CQ input)
-        //{
-        //    var fkeyE = input["input"].First(e => e.Attributes["name"] != null && e.Attributes["name"] == "affId");
-
-        //    return fkeyE == null ? "" : fkeyE.Attributes["value"];
-        //}
-
         public static List<Message> GetMessagesByUser(this IEnumerable<Message> messages, User user)
         {
             if (user == null) { throw new ArgumentNullException("user"); }
