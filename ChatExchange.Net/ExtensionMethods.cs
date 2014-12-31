@@ -52,9 +52,9 @@ namespace ChatExchangeDotNet
 
         public static string GetFkey(this CQ input)
         {
-            var fkeyE = input["input"].First(e => e.Attributes["name"] != null && e.Attributes["name"] == "fkey");
+            var fkeyE = input["input"].FirstOrDefault(e => e.Attributes["name"] != null && e.Attributes["name"] == "fkey");
 
-            return fkeyE == null ? "" : fkeyE.Attributes["value"];
+            return fkeyE == null ? null : fkeyE.Attributes["value"];
         }
 
         public static List<Message> GetMessagesByUser(this IEnumerable<Message> messages, User user)

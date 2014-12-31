@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Collections.Generic;
+using System.Net;
 using System.Text.RegularExpressions;
 using CsQuery;
 
@@ -113,9 +114,27 @@ namespace ChatExchangeDotNet
 
             if (postRes == null) { throw new Exception("Could not login into site " + host + ". Have you entered the correct credentials and have an active internet connection?"); }
 
-            // ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ Temp, for debug purposes only ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
-            var resContent = RequestManager.GetResponseContent(postRes);
-            // ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ Temp, for debug purposes only ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+            HandlePrompt(postRes);
+        }
+
+        /// <summary>
+        /// Warning! This method is untested!
+        /// </summary>
+        private void HandlePrompt(HttpWebResponse res)
+        {
+            if (!res.ResponseUri.ToString().StartsWith("https://openid.stackexchange.com/account/prompt")) { return; }
+
+            var resContent = RequestManager.GetResponseContent(res);
+            var dom = CQ.Create(resContent);
+            var session = dom["input"].FirstOrDefault(e => e.Attributes["name"] != null && e.Attributes["name"] == "session");
+            
+            if (session == null) { return; }
+            
+            var fkey = dom.GetFkey();
+
+            var data = "session=" + session + "&fkey=" + fkey;
+
+            RequestManager.SendPOSTRequest("https://openid.stackexchange.com/account/prompt/submit", data);
         }
     }
 }

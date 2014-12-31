@@ -570,13 +570,22 @@ namespace ChatExchangeDotNet
 
         private void SetFkey()
         {
-            var res = RequestManager.SendGETRequest(chatRoot + "/rooms/" + ID);
+            string fk = null;
 
-            if (res == null) { throw new Exception("Could not get fkey. Do you have an active internet connection?"); }
+            for (var i = 0; i < 31; i++) // Loop for a max of 31 mins.
+            {
+                var res = RequestManager.SendGETRequest(chatRoot + "/rooms/" + ID);
 
-            var resContent = RequestManager.GetResponseContent(res);
+                if (res == null) { throw new Exception("Could not get fkey. Do you have an active internet connection?"); }
 
-            var fk = CQ.Create(resContent).GetFkey();
+                var resContent = RequestManager.GetResponseContent(res);
+
+                fk = CQ.Create(resContent).GetFkey();
+
+                if (!String.IsNullOrEmpty(fk)) { break; }
+
+                Thread.Sleep(60000); // 1 min.
+            }
 
             if (String.IsNullOrEmpty(fk)) { throw new Exception("Could not get fkey. Have Do you have an active internet connection?"); }
 
