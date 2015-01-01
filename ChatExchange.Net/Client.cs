@@ -108,48 +108,48 @@ namespace ChatExchangeDotNet
 
         private void SiteLogin(string host)
         {
-            var getRes = RequestManager.SendGETRequest("http://" + host + "/users/login?returnurl = %%2f");
+            //var getRes = RequestManager.SendGETRequest("http://" + host + "/users/login?returnurl = %%2f");
 
-            if (getRes == null) { throw new Exception("Could not get fkey from " + host + ". Do you have an active internet connection?"); }
+            //if (getRes == null) { throw new Exception("Could not get fkey from " + host + ". Do you have an active internet connection?"); }
 
-            var getResContent = RequestManager.GetResponseContent(getRes);
+            //var getResContent = RequestManager.GetResponseContent(getRes);
 
-            var data = "oauth_version=null&oauth_server=null&openid_identifier=" + Uri.EscapeDataString("https://openid.stackexchange.com/") + "&fkey=" + CQ.Create(getResContent).GetFkey();
+            //var data = "oauth_version=null&oauth_server=null&openid_identifier=" + Uri.EscapeDataString("https://openid.stackexchange.com/") + "&fkey=" + CQ.Create(getResContent).GetFkey();
 
-            var postRes = RequestManager.SendPOSTRequest("http://" + host + "/users/authenticate", data);
+            //var postRes = RequestManager.SendPOSTRequest("http://" + host + "/users/authenticate", data);
 
-            if (postRes == null) { throw new Exception("Could not login into site " + host + ". Have you entered the correct credentials and have an active internet connection?"); }
+            //if (postRes == null) { throw new Exception("Could not login into site " + host + ". Have you entered the correct credentials and have an active internet connection?"); }
 
-            if (postRes.ResponseUri.ToString().StartsWith("https://openid.stackexchange.com/account/prompt"))
-            {
-                HandleConfirmationPrompt(postRes);
-                return;
-            }
+            //if (postRes.ResponseUri.ToString().StartsWith("https://openid.stackexchange.com/account/prompt"))
+            //{
+            //    HandleConfirmationPrompt(postRes);
+            //    return;
+            //}
 
-            if (postRes.ResponseUri.ToString().StartsWith("http://" + host + "/users/authenticate"))
-            {
-                HandleNewAccountPrompt(postRes, host);
-            }
+            //if (postRes.ResponseUri.ToString().StartsWith("http://" + host + "/users/authenticate"))
+            //{
+                HandleNewAccountPrompt(/*postRes, */host);
+            //}
         }
 
-        private void HandleConfirmationPrompt(HttpWebResponse res)
+        //private void HandleConfirmationPrompt(HttpWebResponse res)
+        //{
+        //    if (!res.ResponseUri.ToString().StartsWith("https://openid.stackexchange.com/account/prompt")) { return; }
+
+        //    var resContent = RequestManager.GetResponseContent(res);
+        //    var dom = CQ.Create(resContent);
+
+        //    var session = dom["input"].First(e => e.Attributes["name"] != null && e.Attributes["name"] == "session");
+        //    var fkey = dom.GetFkey();
+
+        //    var data = "session=" + session["value"] + "&fkey=" + fkey;
+
+        //    RequestManager.SendPOSTRequest("https://openid.stackexchange.com/account/prompt/submit", data);
+        //}
+
+        private void HandleNewAccountPrompt(/*HttpWebResponse res, */string host)
         {
-            if (!res.ResponseUri.ToString().StartsWith("https://openid.stackexchange.com/account/prompt")) { return; }
-
-            var resContent = RequestManager.GetResponseContent(res);
-            var dom = CQ.Create(resContent);
-
-            var session = dom["input"].First(e => e.Attributes["name"] != null && e.Attributes["name"] == "session");
-            var fkey = dom.GetFkey();
-
-            var data = "session=" + session["value"] + "&fkey=" + fkey;
-
-            RequestManager.SendPOSTRequest("https://openid.stackexchange.com/account/prompt/submit", data);
-        }
-
-        private void HandleNewAccountPrompt(HttpWebResponse res, string host)
-        {
-            if (!res.ResponseUri.ToString().StartsWith("http://" + host + "/users/authenticate")) { return; }
+            //if (!res.ResponseUri.ToString().StartsWith("http://" + host + "/users/authenticate")) { return; }
 
             var em = Uri.EscapeDataString(email);
             var pa = Uri.EscapeDataString(password);
