@@ -117,15 +117,8 @@ namespace ChatExchangeDotNet
             HandlePrompt(postRes);
         }
 
-        /// <summary>
-        /// Warning! This method is untested!
-        /// </summary>
         private void HandlePrompt(HttpWebResponse res)
         {
-            // ~ ~ ~ ~ Temp, for debug purposes only. ~ ~ ~ ~
-            var url = res.ResponseUri.ToString();
-            // ~ ~ ~ ~ Temp, for debug purposes only. ~ ~ ~ ~
-
             if (!res.ResponseUri.ToString().StartsWith("https://openid.stackexchange.com/account/prompt")) { return; }
 
             var resContent = RequestManager.GetResponseContent(res);
@@ -135,8 +128,7 @@ namespace ChatExchangeDotNet
             if (session == null) { return; }
             
             var fkey = dom.GetFkey();
-
-            var data = "session=" + session + "&fkey=" + fkey;
+            var data = "session=" + session["value"] + "&fkey=" + fkey;
 
             RequestManager.SendPOSTRequest("https://openid.stackexchange.com/account/prompt/submit", data);
         }
