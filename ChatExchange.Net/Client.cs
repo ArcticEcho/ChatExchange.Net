@@ -11,7 +11,7 @@ namespace ChatExchangeDotNet
 {
     public class Client : IDisposable
     {
-        private readonly Regex hostParser = new Regex("https?://chat.|/rooms/.*", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private readonly Regex hostParser = new Regex("https?://(chat.)?|/.*", RegexOptions.Compiled | RegexOptions.CultureInvariant);
         private readonly Regex idParser = new Regex(".*/rooms/|/.*", RegexOptions.Compiled | RegexOptions.CultureInvariant);
         private bool disposed;
 
@@ -114,23 +114,48 @@ namespace ChatExchangeDotNet
 
             if (postRes == null) { throw new Exception("Could not login into site " + host + ". Have you entered the correct credentials and have an active internet connection?"); }
 
-            HandlePrompt(postRes);
+            if (postRes.ResponseUri.ToString().StartsWith("https://openid.stackexchange.com/account/prompt"))
+            {
+                HandleConfirmationPrompt(postRes);
+                return;
+            }
+
+            if (postRes.ResponseUri.ToString().StartsWith("http://" + host + "/users/authenticate"))
+            {
+                HandleNewAccountPrompt(postRes, host);
+            }
         }
 
-        private void HandlePrompt(HttpWebResponse res)
+        private void HandleConfirmationPrompt(HttpWebResponse res)
         {
             if (!res.ResponseUri.ToString().StartsWith("https://openid.stackexchange.com/account/prompt")) { return; }
 
             var resContent = RequestManager.GetResponseContent(res);
             var dom = CQ.Create(resContent);
-            var session = dom["input"].FirstOrDefault(e => e.Attributes["name"] != null && e.Attributes["name"] == "session");
-            
-            if (session == null) { return; }
-            
+
+            var session = dom["input"].First(e => e.Attributes["name"] != null && e.Attributes["name"] == "session");
             var fkey = dom.GetFkey();
+
             var data = "session=" + session["value"] + "&fkey=" + fkey;
 
             RequestManager.SendPOSTRequest("https://openid.stackexchange.com/account/prompt/submit", data);
+        }
+
+        private void HandleNewAccountPrompt(HttpWebResponse res, string host)
+        {
+            if (!res.ResponseUri.ToString().StartsWith("http://" + host + "/users/authenticate")) { return; }
+
+            var resContent = RequestManager.GetResponseContent(res);
+            var dom = CQ.Create(resContent);
+
+            var s = dom["input"].First(e => e.Attributes["name"] != null && e.Attributes["name"] == "s").Attributes["value"];
+            var fkey = dom.GetFkey();
+            var referrer = "https://" + host + "/users/signup?returnurl=http://" + host + "%2f";
+            var origin = "https://" + host + ".com";
+
+            var data = "fkey=" + fkey + "s=" + s;
+
+            RequestManager.SendPOSTRequest("https://" + host + "/users/openidconfirm", data, true, referrer, origin);
         }
     }
 }
