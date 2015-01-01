@@ -122,6 +122,10 @@ namespace ChatExchangeDotNet
         /// </summary>
         private void HandlePrompt(HttpWebResponse res)
         {
+            // ~ ~ ~ ~ Temp, for debug purposes only. ~ ~ ~ ~
+            var url = res.ResponseUri.ToString();
+            // ~ ~ ~ ~ Temp, for debug purposes only. ~ ~ ~ ~
+
             if (!res.ResponseUri.ToString().StartsWith("https://openid.stackexchange.com/account/prompt")) { return; }
 
             var resContent = RequestManager.GetResponseContent(res);
