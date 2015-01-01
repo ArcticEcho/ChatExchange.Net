@@ -13,17 +13,23 @@ namespace ChatExchangeDotNet
     {
         private readonly Regex hostParser = new Regex("https?://(chat.)?|/.*", RegexOptions.Compiled | RegexOptions.CultureInvariant);
         private readonly Regex idParser = new Regex(".*/rooms/|/.*", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private readonly string username;
+        private readonly string email;
+        private readonly string password;
         private bool disposed;
 
         public List<Room> Rooms { get; private set; }
 
 
 
-        public Client(string email, string password)
+        public Client(string username, string email, string password)
         {
             if (String.IsNullOrEmpty(email)) { throw new ArgumentException("'email' must not be null or empty.", "email"); }
             if (String.IsNullOrEmpty(password)) { throw new ArgumentException("'password' must not be null or empty.", "password"); }
 
+            this.username = username;
+            this.email = email;
+            this.password = password;
             Rooms = new List<Room>();
 
             SEOpenIDLogin(email, password);
@@ -145,17 +151,32 @@ namespace ChatExchangeDotNet
         {
             if (!res.ResponseUri.ToString().StartsWith("http://" + host + "/users/authenticate")) { return; }
 
-            var resContent = RequestManager.GetResponseContent(res);
-            var dom = CQ.Create(resContent);
-
-            var s = dom["input"].First(e => e.Attributes["name"] != null && e.Attributes["name"] == "s").Attributes["value"];
-            var fkey = dom.GetFkey();
+            var em = Uri.EscapeDataString(email);
+            var pa = Uri.EscapeDataString(password);
+            var na = Uri.EscapeDataString(username);
             var referrer = "https://" + host + "/users/signup?returnurl=http://" + host + "%2f";
             var origin = "https://" + host + ".com";
+            var fkey = CQ.Create(RequestManager.GetResponseContent(RequestManager.SendGETRequest("https://" + host + "/users/signup"))).GetFkey();
 
-            var data = "fkey=" + fkey + "s=" + s;
+            var data = "fkey=" + fkey + "&display-name=" + na + "&email=" + em + "&password=" + pa + "&password2=" + pa + "&legalLinksShown=1";
 
-            RequestManager.SendPOSTRequest("https://" + host + "/users/openidconfirm", data, true, referrer, origin);
+            var postRes = RequestManager.SendPOSTRequest("https://" + host + "/users/signup", data, true, referrer, origin);
+
+            if (postRes == null) { throw new Exception("Could not login/sign-up."); }
+
+            var resContent = RequestManager.GetResponseContent(postRes);
+
+            // We already have an account (and we've been logged in).
+            if (!resContent.Contains("We will automatically link this account with your accounts on other Stack Exchange sites.")) { return; }
+
+            // We don't have an account, so lets create one!
+
+            var dom = CQ.Create(resContent);
+            var s = dom["input"].First(e => e.Attributes["name"] != null && e.Attributes["name"] == "s").Attributes["value"];
+
+            var signUpRes = RequestManager.SendPOSTRequest("https://" + host + "/users/openidconfirm", "fkey=" + fkey + "&s=" + s + "&legalLinksShown=1", true, referrer, origin);
+
+            if (signUpRes == null) { throw new Exception("Could not login/sign-up."); }
         }
     }
 }
