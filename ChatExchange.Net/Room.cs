@@ -200,7 +200,7 @@ namespace ChatExchangeDotNet
 
             var lastestDom = CQ.Create(RequestManager.GetResponseContent(res)).Select(".monologue").Last();
             
-            var content = Message.GetMessageContent(Host, ID, messageID, StripMentionFromMessages);
+            var content = Message.GetMessageContent(Host, ID, messageID);
 
             if (content == null) { throw new Exception("The requested message was not found."); }
 
@@ -208,7 +208,7 @@ namespace ChatExchangeDotNet
             var authorName = lastestDom[".username a"].First().Text();
             var authorID = int.Parse(lastestDom[".username a"].First().Attr("href").Split('/')[2]);
 
-            return new Message(Host, ID, content, messageID, authorName, authorID, parentID);
+            return new Message(Host, ID, messageID, StripMentionFromMessages, authorName, authorID, parentID);
         }
 
         public User GetUser(int userID)
@@ -242,7 +242,7 @@ namespace ChatExchangeDotNet
 
                     if (messageID == -1) { return null; }
 
-                    var m = new Message(Host, ID, message, messageID, Me.Name, Me.ID);
+                    var m = new Message(Host, ID, messageID, StripMentionFromMessages, Me.Name, Me.ID);
 
                     MyMessages.Add(m);
                     AllMessages.Add(m);
@@ -759,12 +759,11 @@ namespace ChatExchangeDotNet
         private void HandleNewMessage(JToken json)
         {
             var id = (int)json["message_id"];
-            var content = Message.GetMessageContent(Host, ID, id, StripMentionFromMessages);
             var authorName = (string)json["user_name"];
             var authorID = (int)json["user_id"];
             var parentID = (int)(json["parent_id"] ?? -1);
 
-            var message = new Message(Host, ID, content, id, authorName, authorID, parentID);
+            var message = new Message(Host, ID, id, StripMentionFromMessages, authorName, authorID, parentID);
 
             AllMessages.Add(message);
 
@@ -776,12 +775,11 @@ namespace ChatExchangeDotNet
         private void HandleUserMentioned(JToken json)
         {
             var id = (int)json["message_id"];
-            var content = Message.GetMessageContent(Host, ID, id, StripMentionFromMessages);
             var authorName = (string)json["user_name"];
             var authorID = (int)json["user_id"];
             var parentID = (int)(json["parent_id"] ?? -1);
 
-            var message = new Message(Host, ID, content, id, authorName, authorID, parentID);
+            var message = new Message(Host, ID, id, StripMentionFromMessages, authorName, authorID, parentID);
 
             AllMessages.Add(message);
 
@@ -793,12 +791,11 @@ namespace ChatExchangeDotNet
         private void HandleEdit(JToken json)
         {
             var id = (int)json["message_id"];
-            var content = Message.GetMessageContent(Host, ID, id, StripMentionFromMessages);
             var authorName = (string)json["user_name"];
             var authorID = (int)json["user_id"];
             var parentID = (int)(json["parent_id"] ?? -1);
 
-            var currentMessage = new Message(Host, ID, content, id, authorName, authorID, parentID);
+            var currentMessage = new Message(Host, ID, id, StripMentionFromMessages, authorName, authorID, parentID);
             var oldMessage = this[id];
 
             AllMessages.Remove(oldMessage);
