@@ -200,13 +200,15 @@ namespace ChatExchangeDotNet
 
             var lastestDom = CQ.Create(RequestManager.GetResponseContent(res)).Select(".monologue").Last();
             
-            var content = Message.GetMessageContent(Host, ID, messageID, false); 
+            var content = Message.GetMessageContent(Host, ID, messageID, StripMentionFromMessages);
+
+            if (content == null) { throw new Exception("The requested message was not found."); }
 
             var parentID = content.IsReply() ? int.Parse(content.Substring(1, content.IndexOf(' '))) : -1;
             var authorName = lastestDom[".username a"].First().Text();
             var authorID = int.Parse(lastestDom[".username a"].First().Attr("href").Split('/')[2]);
 
-            return new Message(Host, ID, StripMentionFromMessages ? content.StripMention() : content, messageID, authorName, authorID, parentID);
+            return new Message(Host, ID, content, messageID, authorName, authorID, parentID);
         }
 
         public User GetUser(int userID)
@@ -227,28 +229,26 @@ namespace ChatExchangeDotNet
             {
                 var data = "text=" + Uri.EscapeDataString(message).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
 
-                var res = RequestManager.SendPOSTRequest(chatRoot + "/chats/" + ID + "/messages/new", data);
-
-                if (res == null) { return null; }
-
-                var resContent = RequestManager.GetResponseContent(res);
-
-                if (HandleThrottling(resContent))
+                using (var res = RequestManager.SendPOSTRequest(chatRoot + "/chats/" + ID + "/messages/new", data))
                 {
-                    continue;
+                    if (res == null) { return null; }
+
+                    var resContent = RequestManager.GetResponseContent(res);
+
+                    if (HandleThrottling(resContent)) { continue; }
+
+                    var json = JObject.Parse(resContent);
+                    var messageID = (int)(json["id"].Type != JTokenType.Integer ? -1 : json["id"]);
+
+                    if (messageID == -1) { return null; }
+
+                    var m = new Message(Host, ID, message, messageID, Me.Name, Me.ID);
+
+                    MyMessages.Add(m);
+                    AllMessages.Add(m);
+
+                    return m;
                 }
-
-                var json = JObject.Parse(resContent);
-                var messageID = (int)(json["id"].Type != JTokenType.Integer ? -1 : json["id"]);
-
-                if (messageID == -1) { return null; }
-
-                var m = new Message(Host, ID, message, messageID, Me.Name, Me.ID);
-
-                MyMessages.Add(m);
-                AllMessages.Add(m);
-
-                return m;
             }
         }
 

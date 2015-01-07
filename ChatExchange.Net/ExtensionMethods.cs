@@ -88,7 +88,7 @@ namespace ChatExchangeDotNet
 
         public static bool IsReply(this string message, bool includeMention = false)
         {
-            return includeMention ? hasMention.IsMatch(message) : isReply.IsMatch(message);
+            return !String.IsNullOrEmpty(message) && (includeMention ? hasMention.IsMatch(message) : isReply.IsMatch(message));
         }
     }
 }
