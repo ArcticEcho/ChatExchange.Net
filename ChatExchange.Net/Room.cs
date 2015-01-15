@@ -19,6 +19,7 @@ namespace ChatExchangeDotNet
         private WebSocket socket;
         private readonly string chatRoot;
         private string fkey;
+        private bool hasLeft;
 
         # region Events.
 
@@ -187,6 +188,15 @@ namespace ChatExchangeDotNet
 
 
 
+        public void Leave()
+        {
+            if (hasLeft) { return; }
+
+            RequestManager.SendPOSTRequest(chatRoot + "/chats/leave/" + ID, "quiet=true&fkey=" + fkey);
+
+            hasLeft = true;
+        }
+
         /// <summary>
         /// Retrieves a message from the room.
         /// </summary>
@@ -225,6 +235,8 @@ namespace ChatExchangeDotNet
         /// <returns>A Message object representing the newly posted message (if successful), otherwise returns null.</returns>
         public Message PostMessage(string message)
         {
+            if (hasLeft) { return null; }
+
             while (true)
             {
                 var data = "text=" + Uri.EscapeDataString(message).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
@@ -269,6 +281,8 @@ namespace ChatExchangeDotNet
 
         public bool EditMessage(int messageID, string newMessage)
         {
+            if (hasLeft) { return false; }
+
             while (true)
             {
                 var data = "text=" + Uri.EscapeDataString(newMessage).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
@@ -295,6 +309,8 @@ namespace ChatExchangeDotNet
 
         public bool DeleteMessage(int messageID)
         {
+            if (hasLeft) { return false; }
+
             while (true)
             {
                 var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/delete", "fkey=" + fkey);
@@ -319,6 +335,8 @@ namespace ChatExchangeDotNet
 
         public bool ToggleStarring(int messageID)
         {
+            if (hasLeft) { return false; }
+
             while (true)
             {
                 var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/star", "fkey=" + fkey);
@@ -349,7 +367,7 @@ namespace ChatExchangeDotNet
         {
             while (true)
             {
-                if (!Me.IsMod && !Me.IsRoomOwner) { return false; }
+                if (!Me.IsMod || !Me.IsRoomOwner || hasLeft) { return false; }
 
                 var data = "fkey=" + fkey;
 
@@ -377,7 +395,7 @@ namespace ChatExchangeDotNet
         {
             while (true)
             {
-                if (!Me.IsMod && !Me.IsRoomOwner) { return false; }
+                if (!Me.IsMod || !Me.IsRoomOwner || hasLeft) { return false; }
 
                 var data = "fkey=" + fkey;
 
@@ -403,7 +421,7 @@ namespace ChatExchangeDotNet
 
         public bool KickMute(int userID)
         {
-            if (!Me.IsMod && !Me.IsRoomOwner) { return false; }
+            if (!Me.IsMod || !Me.IsRoomOwner || hasLeft) { return false; }
 
             var data = "userID=" + userID + "&fkey=" + fkey;
 
@@ -419,7 +437,7 @@ namespace ChatExchangeDotNet
 
         public bool SetUserRoomAccess(UserRoomAccess access, int userID)
         {
-            if (!Me.IsMod && !Me.IsRoomOwner) { return false; }
+            if (!Me.IsMod || !Me.IsRoomOwner || hasLeft) { return false; }
 
             var data = "fkey=" + fkey + "&aclUserId=" + userID + "&userAccess=";
 

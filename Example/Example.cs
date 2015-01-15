@@ -13,7 +13,7 @@ namespace Example
             Console.WriteLine("This is a ChatExchange.Net demonstration. Press the 'Q' key to exit...\n\n");
 
             // Create a client to authenticate the user (which will then allow us to interact with chat).
-            var client = new Client("user0000000", "some-email@address.com", "MySuperStr0ngPa55word");
+            var client = new Client(/*"user0000000", */"some-email@address.com", "MySuperStr0ngPa55word");
 
             // Join a room by specifying its URL (returns a Room object).
             var sandbox = client.JoinRoom("http://chat.meta.stackexchange.com/rooms/651/sandbox");
