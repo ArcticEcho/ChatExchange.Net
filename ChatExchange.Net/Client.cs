@@ -13,9 +13,6 @@ namespace ChatExchangeDotNet
     {
         private readonly Regex hostParser = new Regex("https?://(chat.)?|/.*", RegexOptions.Compiled | RegexOptions.CultureInvariant);
         private readonly Regex idParser = new Regex(".*/rooms/|/.*", RegexOptions.Compiled | RegexOptions.CultureInvariant);
-        //private readonly string username;
-        //private readonly string email;
-        //private readonly string password;
         private string openidUrl;
         private bool disposed;
 
@@ -23,14 +20,11 @@ namespace ChatExchangeDotNet
 
 
 
-        public Client(/*string username, */string email, string password)
+        public Client(string email, string password)
         {
             if (String.IsNullOrEmpty(email)) { throw new ArgumentException("'email' must not be null or empty.", "email"); }
             if (String.IsNullOrEmpty(password)) { throw new ArgumentException("'password' must not be null or empty.", "password"); }
 
-            //this.username = username;
-            //this.email = email;
-            //this.password = password;
             Rooms = new List<Room>();
 
             SEOpenIDLogin(email, password);
@@ -61,10 +55,12 @@ namespace ChatExchangeDotNet
             {
                 if (host.ToLowerInvariant() == "stackexchange.com")
                 {
-                    throw new NotImplementedException();
+                    SEChatLogin();
                 }
-
-                SiteLogin(host);
+                else
+                {
+                    SiteLogin(host);
+                }
             }
 
             var r = new Room(host, id);
@@ -98,7 +94,7 @@ namespace ChatExchangeDotNet
 
             var getResContent = RequestManager.GetResponseContent(getRes);
 
-            var data = "email=" + Uri.EscapeDataString(email) + "&password=" + Uri.EscapeDataString(password) + "&fkey=" + CQ.Create(getResContent).GetFkey();
+            var data = "email=" + Uri.EscapeDataString(email) + "&password=" + Uri.EscapeDataString(password) + "&fkey=" + CQ.Create(getResContent).GetInputValue("fkey");
 
             RequestManager.CookiesToPass = RequestManager.GlobalCookies;
 
@@ -117,30 +113,22 @@ namespace ChatExchangeDotNet
 
         private void SiteLogin(string host)
         {
-            var getRes = RequestManager.SendGETRequest("http://" + host + "/users/login"/*+"?returnurl = %%2f"*/);
+            var getRes = RequestManager.SendGETRequest("http://" + host + "/users/login");
 
             if (getRes == null) { throw new Exception("Could not get fkey from " + host + ". Do you have an active internet connection?"); }
 
             var getResContent = RequestManager.GetResponseContent(getRes);
 
-            var data = "fkey=" + CQ.Create(getResContent).GetFkey() + "&oauth_version=&oauth_server=&openid_username=&openid_identifier=" + Uri.EscapeDataString(openidUrl);//"oauth_version=null&oauth_server=null&openid_identifier=" + Uri.EscapeDataString("https://openid.stackexchange.com/") + "&fkey=" + CQ.Create(getResContent).GetFkey();
+            var data = "fkey=" + CQ.Create(getResContent).GetInputValue("fkey") + "&oauth_version=&oauth_server=&openid_username=&openid_identifier=" + Uri.EscapeDataString(openidUrl);
 
-            var postRes = RequestManager.SendPOSTRequest("http://" + host + /*"/users/login"*/"/users/authenticate", data, true, "https://" + host + "/users/login?returnurl=" + Uri.EscapeDataString("http://" + host + "/"));
+            var postRes = RequestManager.SendPOSTRequest("http://" + host + "/users/authenticate", data, true, "https://" + host + "/users/login?returnurl=" + Uri.EscapeDataString("http://" + host + "/"));
 
             if (postRes == null) { throw new Exception("Could not login into site " + host + ". Have you entered the correct credentials and have an active internet connection?"); }
-
-            //var t = RequestManager.GetResponseContent(postRes);
 
             if (postRes.ResponseUri.ToString().StartsWith("https://openid.stackexchange.com/account/prompt"))
             {
                 HandleConfirmationPrompt(postRes);
-                //return;
             }
-
-            //if (postRes.ResponseUri.ToString().StartsWith("http://" + host + "/users/authenticate"))
-            //{
-            //    HandleNewAccountPrompt(/*postRes, */host);
-            //}
         }
 
         private void HandleConfirmationPrompt(HttpWebResponse res)
@@ -151,43 +139,34 @@ namespace ChatExchangeDotNet
             var dom = CQ.Create(resContent);
 
             var session = dom["input"].First(e => e.Attributes["name"] != null && e.Attributes["name"] == "session");
-            var fkey = dom.GetFkey();
+            var fkey = dom.GetInputValue("fkey");
 
             var data = "session=" + session["value"] + "&fkey=" + fkey;
 
             RequestManager.SendPOSTRequest("https://openid.stackexchange.com/account/prompt/submit", data);
         }
 
-        //private void HandleNewAccountPrompt(/*HttpWebResponse res, */string host)
-        //{
-        //    //if (!res.ResponseUri.ToString().StartsWith("http://" + host + "/users/authenticate")) { return; }
+        private void SEChatLogin()
+        {
+            // Login to SE.
+            RequestManager.SendGETRequest("http://stackexchange.com/users/authenticate?openid_identifier=" + Uri.EscapeDataString(openidUrl));
 
-        //    var em = Uri.EscapeDataString(email);
-        //    var pa = Uri.EscapeDataString(password);
-        //    var na = Uri.EscapeDataString(username);
-        //    var referrer = "https://" + host + "/users/signup?returnurl=http://" + host + "%2f";
-        //    var origin = "https://" + host + ".com";
-        //    var fkey = CQ.Create(RequestManager.GetResponseContent(RequestManager.SendGETRequest("https://" + host + "/users/signup"))).GetFkey();
+            var getRes = RequestManager.SendGETRequest("http://stackexchange.com/users/chat-login");
 
-        //    var data = "fkey=" + fkey + "&display-name=" + na + "&email=" + em + "&password=" + pa + "&password2=" + pa + "&legalLinksShown=1";
+            var html = RequestManager.GetResponseContent(getRes);
+            var dom = CQ.Create(html);
+            var authToken = Uri.EscapeDataString(dom.GetInputValue("authToken"));
+            var nonce = Uri.EscapeDataString(dom.GetInputValue("nonce"));
 
-        //    var postRes = RequestManager.SendPOSTRequest("https://" + host + "/users/signup", data, true, referrer, origin);
+            var data = "authToken=" + authToken + "&nonce=" + nonce;
 
-        //    if (postRes == null) { throw new Exception("Could not login/sign-up."); }
+            // Login to chat.SE.
+            var postRes = RequestManager.SendPOSTRequest("http://chat.stackexchange.com/users/login/global", data, true, "http://chat.stackexchange.com", "http://chat.stackexchange.com");
 
-        //    var resContent = RequestManager.GetResponseContent(postRes);
-
-        //    // We already have an account (and we've been logged in).
-        //    if (!resContent.Contains("We will automatically link this account with your accounts on other Stack Exchange sites.")) { return; }
-
-        //    // We don't have an account, so lets create one!
-
-        //    var dom = CQ.Create(resContent);
-        //    var s = dom["input"].First(e => e.Attributes["name"] != null && e.Attributes["name"] == "s").Attributes["value"];
-
-        //    var signUpRes = RequestManager.SendPOSTRequest("https://" + host + "/users/openidconfirm", "fkey=" + fkey + "&s=" + s + "&legalLinksShown=1", true, referrer, origin);
-
-        //    if (signUpRes == null) { throw new Exception("Could not login/sign-up."); }
-        //}
+            if (postRes == null || !RequestManager.GetResponseContent(postRes).StartsWith("{\"Message\":\"Welcome"))
+            {
+                throw new Exception("Colud not login to (chat) Stack Exchange.");
+            }
+        }
     }
 }

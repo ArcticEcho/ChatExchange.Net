@@ -573,7 +573,8 @@ namespace ChatExchangeDotNet
 
             if (res == null) { throw new Exception("Could not get user information. Do you have an active internet connection?"); }
 
-            var dom = CQ.Create(RequestManager.GetResponseContent(res));
+            var html = RequestManager.GetResponseContent(res);
+            var dom = CQ.Create(html);
 
             var e = dom[".topbar-menu-links a"][0];
 
@@ -598,7 +599,7 @@ namespace ChatExchangeDotNet
 
                 var resContent = RequestManager.GetResponseContent(res);
 
-                fk = CQ.Create(resContent).GetFkey();
+                fk = CQ.Create(resContent).GetInputValue("fkey");
 
                 if (!String.IsNullOrEmpty(fk)) { break; }
 
@@ -610,34 +611,9 @@ namespace ChatExchangeDotNet
             fkey = fk;
         }
 
-        private CookieContainer GetSiteCookies()
-        {
-            var allCookies = RequestManager.GlobalCookies.GetCookies();
-            var siteCookies = new CookieCollection();
-
-            foreach (var cookie in allCookies)
-            {
-                var cookieDomain = cookie.Domain.StartsWith(".") ? cookie.Domain.Substring(1) : cookie.Domain;
-
-                if ((cookieDomain == Host && cookie.Name.ToLowerInvariant().Contains("usr")) || cookie.Name == "csr")
-                {
-                    siteCookies.Add(cookie);
-                }
-            }
-
-            var cookies = new CookieContainer();
-
-            cookies.Add(siteCookies);
-
-            return cookies;
-        }
-
         private int GetGlobalEventCount()
         {
             var data = "mode=Events&msgCount=0&fkey=" + fkey;
-
-            RequestManager.CookiesToPass = GetSiteCookies();
-
             var res = RequestManager.SendPOSTRequest(chatRoot + "/chats/" + ID + "/events", data);
 
             if (res == null) { throw new Exception("Could not get eventtime for room " + ID + " on " + Host + ". Do you have an active internet conection?"); }
@@ -650,9 +626,6 @@ namespace ChatExchangeDotNet
         private string GetSocketURL(int eventTime)
         {
             var data = "roomid=" + ID + "&fkey=" + fkey;
-
-            RequestManager.CookiesToPass = GetSiteCookies();
-
             var res = RequestManager.SendPOSTRequest(chatRoot + "/ws-auth", data, true, chatRoot + "/rooms/" + ID, chatRoot);
 
             if (res == null) { throw new Exception("Could not get WebSocket URL. Do you haven an active internet connection?"); }

@@ -50,9 +50,9 @@ namespace ChatExchangeDotNet
             return cookies;
         }
 
-        public static string GetFkey(this CQ input)
+        public static string GetInputValue(this CQ input, string elementName)
         {
-            var fkeyE = input["input"].FirstOrDefault(e => e.Attributes["name"] != null && e.Attributes["name"] == "fkey");
+            var fkeyE = input["input"].FirstOrDefault(e => e.Attributes["name"] != null && e.Attributes["name"] == elementName);
 
             return fkeyE == null ? null : fkeyE.Attributes["value"];
         }
