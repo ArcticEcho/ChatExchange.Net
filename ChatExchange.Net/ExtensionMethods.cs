@@ -18,7 +18,7 @@ namespace ChatExchangeDotNet
 
 
 
-        public static List<Cookie> GetCookies(this CookieContainer container)
+        internal static List<Cookie> GetCookies(this CookieContainer container)
         {
             var cookies = new List<Cookie>();
 
@@ -50,7 +50,7 @@ namespace ChatExchangeDotNet
             return cookies;
         }
 
-        public static string GetInputValue(this CQ input, string elementName)
+        internal static string GetInputValue(this CQ input, string elementName)
         {
             var fkeyE = input["input"].FirstOrDefault(e => e.Attributes["name"] != null && e.Attributes["name"] == elementName);
 

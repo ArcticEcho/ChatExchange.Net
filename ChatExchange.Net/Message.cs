@@ -29,7 +29,7 @@ namespace ChatExchangeDotNet
         {
             get
             {
-                var res = RequestManager.SendGETRequest("http://chat." + Host + "/messages/" + ID + "/history");
+                var res = RequestManager.SendGETRequest("", "http://chat." + Host + "/messages/" + ID + "/history");
 
                 if (res == null) { return -1; }
 
@@ -56,7 +56,7 @@ namespace ChatExchangeDotNet
         {
             get
             {
-                var res = RequestManager.SendGETRequest("http://chat." + Host + "/messages/" + ID + "/history");
+                var res = RequestManager.SendGETRequest("", "http://chat." + Host + "/messages/" + ID + "/history");
 
                 if (res == null) { return -1; }
 
@@ -102,7 +102,7 @@ namespace ChatExchangeDotNet
 
         public static string GetMessageContent(string host, int roomID, int messageID, bool stripMention = true)
         {
-            var res = RequestManager.SendGETRequest("http://chat." + host + "/messages/" + roomID + "/" + messageID);
+            var res = RequestManager.SendGETRequest("", "http://chat." + host + "/messages/" + roomID + "/" + messageID);
 
             if (res == null || res.StatusCode != HttpStatusCode.OK) { return null; }
 

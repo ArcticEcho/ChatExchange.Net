@@ -20,6 +20,7 @@ namespace ChatExchangeDotNet
         private readonly string chatRoot;
         private string fkey;
         private bool hasLeft;
+        private readonly string cookieKey;
 
         # region Events.
 
@@ -152,16 +153,17 @@ namespace ChatExchangeDotNet
         /// </summary>
         /// <param name="host">The host domain of the room (e.g., meta.stackexchange.com).</param>
         /// <param name="ID">The room's identification number.</param>
-        public Room(string host, int ID)
+        public Room(string cookieKey, string host, int ID)
         {
-            if (String.IsNullOrEmpty(host)) { throw new ArgumentException("'host' can not be null or empty.", "host"); }
+            if (String.IsNullOrEmpty(cookieKey)) { throw new ArgumentNullException("cookieKey"); }
+            if (String.IsNullOrEmpty(host)) { throw new ArgumentNullException("'host' can not be null or empty.", "host"); }
             if (ID < 0) { throw new ArgumentOutOfRangeException("ID", "'ID' can not be negative."); }
 
+            this.ID = ID;
+            this.cookieKey = cookieKey;
             IgnoreOwnEvents = true;
             StripMentionFromMessages = true;
-            this.ID = ID;
             Host = host;
-            //PingableUsers = GetPingableUsers();
             AllMessages = new List<Message>();
             MyMessages = new List<Message>();
             chatRoot = "http://chat." + Host;
@@ -174,8 +176,6 @@ namespace ChatExchangeDotNet
             var url = GetSocketURL(count);
 
             InitialiseSocket(url);
-
-            RequestManager.CookiesToPass = RequestManager.GlobalCookies;
         }
 
         ~Room()
@@ -192,7 +192,7 @@ namespace ChatExchangeDotNet
         {
             if (hasLeft) { return; }
 
-            RequestManager.SendPOSTRequest(chatRoot + "/chats/leave/" + ID, "quiet=true&fkey=" + fkey);
+            RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/chats/leave/" + ID, "quiet=true&fkey=" + fkey);
 
             hasLeft = true;
         }
@@ -204,12 +204,11 @@ namespace ChatExchangeDotNet
         /// <returns>A Message object representing the requested message, or null if the message could not be found.</returns>
         public Message GetMessage(int messageID)
         {
-            var res = RequestManager.SendGETRequest(chatRoot + "/messages/" + messageID + "/history");
+            var res = RequestManager.SendGETRequest(cookieKey, chatRoot + "/messages/" + messageID + "/history");
 
             if (res == null) { throw new Exception("Could not retrieve data of message " + messageID + ". Do you have an active internet connection?"); }
 
-            var lastestDom = CQ.Create(RequestManager.GetResponseContent(res)).Select(".monologue").Last();
-            
+            var lastestDom = CQ.Create(RequestManager.GetResponseContent(res)).Select(".monologue").Last();          
             var content = Message.GetMessageContent(Host, ID, messageID);
 
             if (content == null) { throw new Exception("The requested message was not found."); }
@@ -241,7 +240,7 @@ namespace ChatExchangeDotNet
             {
                 var data = "text=" + Uri.EscapeDataString(message).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
 
-                using (var res = RequestManager.SendPOSTRequest(chatRoot + "/chats/" + ID + "/messages/new", data))
+                using (var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/chats/" + ID + "/messages/new", data))
                 {
                     if (res == null) { return null; }
 
@@ -286,8 +285,7 @@ namespace ChatExchangeDotNet
             while (true)
             {
                 var data = "text=" + Uri.EscapeDataString(newMessage).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
-
-                var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID, data);
+                var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID, data);
 
                 if (res == null) { return false; }
 
@@ -313,7 +311,7 @@ namespace ChatExchangeDotNet
 
             while (true)
             {
-                var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/delete", "fkey=" + fkey);
+                var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID + "/delete", "fkey=" + fkey);
 
                 if (res == null) { return false; }
 
@@ -339,7 +337,7 @@ namespace ChatExchangeDotNet
 
             while (true)
             {
-                var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/star", "fkey=" + fkey);
+                var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID + "/star", "fkey=" + fkey);
 
                 if (res == null) { return false; }
 
@@ -370,8 +368,7 @@ namespace ChatExchangeDotNet
                 if (!Me.IsMod || !Me.IsRoomOwner || hasLeft) { return false; }
 
                 var data = "fkey=" + fkey;
-
-                var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/unstar", data);
+                var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID + "/unstar", data);
 
                 if (res == null) { return false; }
 
@@ -398,8 +395,7 @@ namespace ChatExchangeDotNet
                 if (!Me.IsMod || !Me.IsRoomOwner || hasLeft) { return false; }
 
                 var data = "fkey=" + fkey;
-
-                var res = RequestManager.SendPOSTRequest(chatRoot + "/messages/" + messageID + "/owner-star", data);
+                var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID + "/owner-star", data);
 
                 if (res == null) { return false; }
 
@@ -425,7 +421,7 @@ namespace ChatExchangeDotNet
 
             var data = "userID=" + userID + "&fkey=" + fkey;
 
-            var res = RequestManager.SendPOSTRequest(chatRoot + "/rooms/kickmute/" + ID, data);
+            var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/rooms/kickmute/" + ID, data);
 
             return res != null && RequestManager.GetResponseContent(res).Contains("has been kicked");
         }
@@ -472,7 +468,7 @@ namespace ChatExchangeDotNet
                 }
             }
 
-            return RequestManager.SendPOSTRequest(chatRoot + "/rooms/setuseraccess/" + ID, data) != null;
+            return RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/rooms/setuseraccess/" + ID, data) != null;
         }
 
         #endregion
@@ -558,30 +554,15 @@ namespace ChatExchangeDotNet
 
         # region Instantiation related methods.
 
-        //private List<User> GetPingableUsers()
-        //{
-        //	var users = new List<User>();
-
-        //	// Parse data returned from http://chat.{domain}/rooms/pingable/{room id}
-
-        //	return users;
-        //}
-
         private User GetMe()
         {
-            var res = RequestManager.SendGETRequest(chatRoot + "/chats/join/favorite");
+            var res = RequestManager.SendGETRequest(cookieKey, chatRoot + "/chats/join/favorite");
 
             if (res == null) { throw new Exception("Could not get user information. Do you have an active internet connection?"); }
 
             var html = RequestManager.GetResponseContent(res);
             var dom = CQ.Create(html);
-
             var e = dom[".topbar-menu-links a"][0];
-
-            // ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ Temp. For debug purposes only. ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
-            var t = e.Attributes["href"];
-            // ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ Temp. For debug purposes only. ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
-
             var id = int.Parse(e.Attributes["href"].Split('/')[2]);
 
             return new User(Host, ID, id);
@@ -593,7 +574,7 @@ namespace ChatExchangeDotNet
 
             for (var i = 0; i < 31; i++) // Loop for a max of 31 mins.
             {
-                var res = RequestManager.SendGETRequest(chatRoot + "/rooms/" + ID);
+                var res = RequestManager.SendGETRequest(cookieKey, chatRoot + "/rooms/" + ID);
 
                 if (res == null) { throw new Exception("Could not get fkey. Do you have an active internet connection?"); }
 
@@ -614,7 +595,7 @@ namespace ChatExchangeDotNet
         private int GetGlobalEventCount()
         {
             var data = "mode=Events&msgCount=0&fkey=" + fkey;
-            var res = RequestManager.SendPOSTRequest(chatRoot + "/chats/" + ID + "/events", data);
+            var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/chats/" + ID + "/events", data);
 
             if (res == null) { throw new Exception("Could not get eventtime for room " + ID + " on " + Host + ". Do you have an active internet conection?"); }
 
@@ -626,7 +607,7 @@ namespace ChatExchangeDotNet
         private string GetSocketURL(int eventTime)
         {
             var data = "roomid=" + ID + "&fkey=" + fkey;
-            var res = RequestManager.SendPOSTRequest(chatRoot + "/ws-auth", data, true, chatRoot + "/rooms/" + ID, chatRoot);
+            var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/ws-auth", data, true, chatRoot + "/rooms/" + ID, chatRoot);
 
             if (res == null) { throw new Exception("Could not get WebSocket URL. Do you haven an active internet connection?"); }
 
