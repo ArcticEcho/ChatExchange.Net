@@ -1,4 +1,3 @@
 language: csharp
 solution: ChatExchange.Net.sln
-install:
-  - nuget Update-Package –reinstall
+install: nuget Update-Package –reinstall
