@@ -172,7 +172,6 @@ namespace ChatExchangeDotNet
             SetFkey();
 
             var count = GetGlobalEventCount();
-
             var url = GetSocketURL(count);
 
             InitialiseSocket(url);
