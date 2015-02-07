@@ -2,4 +2,4 @@ language: csharp
 solution: ChatExchange.Net.sln
 install:
   - nuget restore ChatExchange.Net.sln
-  - nuget i packages.config -o Packages
+  - nuget i ./ChatExchange.Net/packages.config -o Packages
