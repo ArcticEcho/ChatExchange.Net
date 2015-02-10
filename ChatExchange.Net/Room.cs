@@ -208,7 +208,7 @@ namespace ChatExchangeDotNet
             if (res == null) { throw new Exception("Could not retrieve data of message " + messageID + ". Do you have an active internet connection?"); }
 
             var lastestDom = CQ.Create(RequestManager.GetResponseContent(res)).Select(".monologue").Last();          
-            var content = Message.GetMessageContent(Host, ID, messageID);
+            var content = Message.GetMessageContent(Host, messageID);
 
             if (content == null) { throw new Exception("The requested message was not found."); }
 

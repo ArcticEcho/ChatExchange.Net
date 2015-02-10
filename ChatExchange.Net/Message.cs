@@ -21,7 +21,7 @@ namespace ChatExchangeDotNet
         {
             get
             {
-                return GetMessageContent(Host, RoomID, ID, stripMention);
+                return GetMessageContent(Host, ID, stripMention);
             }
         }
 
@@ -75,7 +75,7 @@ namespace ChatExchangeDotNet
                     }
                 }
 
-                return count;		
+                return count;
             }
         }
 
@@ -100,9 +100,9 @@ namespace ChatExchangeDotNet
 
 
 
-        public static string GetMessageContent(string host, int roomID, int messageID, bool stripMention = true)
+        public static string GetMessageContent(string host, int messageID, bool stripMention = true)
         {
-            var res = RequestManager.SendGETRequest("", "http://chat." + host + "/messages/" + roomID + "/" + messageID);
+            var res = RequestManager.SendGETRequest("", "http://chat." + host + "/message/" + messageID + "?plain=true");
 
             if (res == null || res.StatusCode != HttpStatusCode.OK) { return null; }
 
