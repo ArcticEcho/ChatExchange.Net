@@ -658,6 +658,10 @@ namespace ChatExchangeDotNet
                 }
             };
 
+            // It seems SE doesn't do pings, by setting this to false
+            // the Socket stays open. If this needs to be true for some
+            // reason set socket.AutoSendPingInterval to a large value.
+            socket.EnableAutoSendPing = false;
             socket.Open();
         }
 
