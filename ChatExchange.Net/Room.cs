@@ -22,7 +22,9 @@ namespace ChatExchangeDotNet
         private bool hasLeft;
         private readonly string cookieKey;
 
-        # region Events.
+        # region Delegates/events.
+
+        # region Delegates.
 
         /// <param name="newMessage">The newly posted message.</param>
         public delegate void NewMessageEventHandler(Message newMessage);
@@ -45,6 +47,12 @@ namespace ChatExchangeDotNet
 
         /// <param name="message">The message that mentions the user.</param>
         public delegate void UserMentiondEventHandler(Message message);
+
+        # endregion
+
+        # region Events.
+
+        private event MessageEditedEventHandler InvalidateMessageContentCache;
 
         /// <summary>
         /// Occurs when a new message is posted. Returns the newly posted message.
@@ -75,6 +83,8 @@ namespace ChatExchangeDotNet
         /// Occurs when the logged in user is (@username) mentioned in a message.
         /// </summary>
         public event UserMentiondEventHandler UserMentioned;
+
+        # endregion
 
         # endregion.
 
@@ -166,6 +176,7 @@ namespace ChatExchangeDotNet
             Host = host;
             AllMessages = new List<Message>();
             MyMessages = new List<Message>();
+            InvalidateMessageContentCache = new MessageEditedEventHandler((a, b) => { }); // Just to make the property not null.
             chatRoot = "http://chat." + Host;
             Me = GetMe();
 
@@ -207,7 +218,7 @@ namespace ChatExchangeDotNet
 
             if (res == null) { throw new Exception("Could not retrieve data of message " + messageID + ". Do you have an active internet connection?"); }
 
-            var lastestDom = CQ.Create(RequestManager.GetResponseContent(res)).Select(".monologue").Last();          
+            var lastestDom = CQ.Create(RequestManager.GetResponseContent(res)).Select(".monologue").Last();
             var content = Message.GetMessageContent(Host, messageID);
 
             if (content == null) { throw new Exception("The requested message was not found."); }
@@ -216,7 +227,7 @@ namespace ChatExchangeDotNet
             var authorName = lastestDom[".username a"].First().Text();
             var authorID = int.Parse(lastestDom[".username a"].First().Attr("href").Split('/')[2]);
 
-            return new Message(Host, ID, messageID, StripMentionFromMessages, authorName, authorID, parentID);
+            return new Message(ref InvalidateMessageContentCache, Host, ID, messageID, authorName, authorID, StripMentionFromMessages, parentID);
         }
 
         public User GetUser(int userID)
@@ -252,7 +263,7 @@ namespace ChatExchangeDotNet
 
                     if (messageID == -1) { return null; }
 
-                    var m = new Message(Host, ID, messageID, StripMentionFromMessages, Me.Name, Me.ID);
+                    var m = new Message(ref InvalidateMessageContentCache, Host, ID, messageID, Me.Name, Me.ID, StripMentionFromMessages, -1);
 
                     MyMessages.Add(m);
                     AllMessages.Add(m);
@@ -734,7 +745,7 @@ namespace ChatExchangeDotNet
             var authorID = (int)json["user_id"];
             var parentID = (int)(json["parent_id"] ?? -1);
 
-            var message = new Message(Host, ID, id, StripMentionFromMessages, authorName, authorID, parentID);
+            var message = new Message(ref InvalidateMessageContentCache, Host, ID, id, authorName, authorID, StripMentionFromMessages, parentID);
 
             AllMessages.Add(message);
 
@@ -750,7 +761,7 @@ namespace ChatExchangeDotNet
             var authorID = (int)json["user_id"];
             var parentID = (int)(json["parent_id"] ?? -1);
 
-            var message = new Message(Host, ID, id, StripMentionFromMessages, authorName, authorID, parentID);
+            var message = new Message(ref InvalidateMessageContentCache, Host, ID, id, authorName, authorID, StripMentionFromMessages, parentID);
 
             AllMessages.Add(message);
 
@@ -766,11 +777,16 @@ namespace ChatExchangeDotNet
             var authorID = (int)json["user_id"];
             var parentID = (int)(json["parent_id"] ?? -1);
 
-            var currentMessage = new Message(Host, ID, id, StripMentionFromMessages, authorName, authorID, parentID);
+            var currentMessage = new Message(ref InvalidateMessageContentCache, Host, ID, id, authorName, authorID, StripMentionFromMessages, parentID);
             var oldMessage = this[id];
 
             AllMessages.Remove(oldMessage);
             AllMessages.Add(currentMessage);
+
+            if (InvalidateMessageContentCache != null)
+            {
+                InvalidateMessageContentCache(oldMessage, currentMessage);
+            }
 
             if (MessageEdited == null || (authorID == Me.ID && IgnoreOwnEvents)) { return; }
 

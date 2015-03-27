@@ -6,9 +6,12 @@ using CsQuery;
 
 namespace ChatExchangeDotNet
 {
+    using MessageEditedEventHandler = ChatExchangeDotNet.Room.MessageEditedEventHandler;
+
     public class Message
     {
-        private readonly bool stripMention;
+        private bool stripMention;
+        private string content;
 
         public int ID { get; private set; }
         public string AuthorName { get; private set; }
@@ -21,7 +24,7 @@ namespace ChatExchangeDotNet
         {
             get
             {
-                return GetMessageContent(Host, ID, stripMention);
+                return content;
             }
         }
 
@@ -81,21 +84,25 @@ namespace ChatExchangeDotNet
 
 
 
-        public Message(string host, int roomID, int messageID, bool stripMention, string authorName, int authorID, int parentID = -1)
+        public Message(string host, int roomID, int messageID, string authorName, int authorID, bool stripMention = true, int parentID = -1)
         {
-            if (String.IsNullOrEmpty(host)) { throw new ArgumentException("'host' can not be null or empty.", "host"); }
-            if (messageID < 0) { throw new ArgumentOutOfRangeException("messageID", "'ID' can not be less than 0."); }
-            if (String.IsNullOrEmpty(authorName)) { throw new ArgumentException("'authorName' can not be null or empty.", "authorName"); }
-            if (authorID < -1) { throw new ArgumentOutOfRangeException("authorID", "'authorID' can not be less than -1."); }
+            MessageEditedEventHandler temp = null;
+            var ex = Initialise(host, roomID, messageID, authorName, authorID, stripMention, parentID, ref temp);
 
-            this.stripMention = stripMention;
+            if (ex != null)
+            {
+                throw ex;
+            }
+        }
 
-            Host = host;
-            RoomID = roomID;
-            ID = messageID;
-            AuthorName = authorName;
-            AuthorID = authorID;
-            ParentID = parentID;
+        public Message(ref MessageEditedEventHandler cacheInvalidatorTrigger, string host, int roomID, int messageID, string authorName, int authorID, bool stripMention = true, int parentID = -1)
+        {
+            var ex = Initialise(host, roomID, messageID, authorName, authorID, stripMention, parentID, ref cacheInvalidatorTrigger);
+
+            if (ex != null)
+            {
+                throw ex;
+            }
         }
 
 
@@ -144,6 +151,38 @@ namespace ChatExchangeDotNet
         public override int GetHashCode()
         {
             return ID;
+        }
+
+
+
+        private Exception Initialise(string host, int roomID, int messageID, string authorName, int authorID, bool stripMention, int parentID, ref MessageEditedEventHandler cacheInvalidatorTrigger)
+        {
+            if (String.IsNullOrEmpty(host)) { return new ArgumentException("'host' can not be null or empty.", "host"); }
+            if (messageID < 0) { return new ArgumentOutOfRangeException("messageID", "'ID' can not be less than 0."); }
+            if (String.IsNullOrEmpty(authorName)) { return new ArgumentException("'authorName' can not be null or empty.", "authorName"); }
+            if (authorID < -1) { return new ArgumentOutOfRangeException("authorID", "'authorID' can not be less than -1."); }
+
+            this.stripMention = stripMention;
+            content = GetMessageContent(host, messageID, stripMention);
+            Host = host;
+            RoomID = roomID;
+            ID = messageID;
+            AuthorName = authorName;
+            AuthorID = authorID;
+            ParentID = parentID;
+
+            if (cacheInvalidatorTrigger != null)
+            {
+                cacheInvalidatorTrigger += (oldMessage, newMessage) =>
+                {
+                    if (oldMessage.ID == messageID)
+                    {
+                        content = newMessage.Content;
+                    }
+                };
+            }
+
+            return null;
         }
     }
 }

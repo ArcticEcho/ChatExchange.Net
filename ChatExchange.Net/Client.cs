@@ -156,7 +156,7 @@ namespace ChatExchangeDotNet
 
             if (postRes == null || !RequestManager.GetResponseContent(postRes).StartsWith("{\"Message\":\"Welcome"))
             {
-                throw new Exception("Colud not login to (chat) Stack Exchange.");
+                throw new Exception("Could not login to (chat) Stack Exchange.");
             }
         }
     }
