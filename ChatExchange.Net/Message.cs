@@ -6,8 +6,6 @@ using CsQuery;
 
 namespace ChatExchangeDotNet
 {
-    using MessageEditedEventHandler = ChatExchangeDotNet.Room.MessageEditedEventHandler;
-
     public class Message
     {
         private bool stripMention;
@@ -86,7 +84,7 @@ namespace ChatExchangeDotNet
 
         public Message(string host, int roomID, int messageID, string authorName, int authorID, bool stripMention = true, int parentID = -1)
         {
-            MessageEditedEventHandler temp = null;
+            EventManager temp = null;
             var ex = Initialise(host, roomID, messageID, authorName, authorID, stripMention, parentID, ref temp);
 
             if (ex != null)
@@ -95,9 +93,9 @@ namespace ChatExchangeDotNet
             }
         }
 
-        public Message(ref MessageEditedEventHandler cacheInvalidatorTrigger, string host, int roomID, int messageID, string authorName, int authorID, bool stripMention = true, int parentID = -1)
+        public Message(ref EventManager evMan, string host, int roomID, int messageID, string authorName, int authorID, bool stripMention = true, int parentID = -1)
         {
-            var ex = Initialise(host, roomID, messageID, authorName, authorID, stripMention, parentID, ref cacheInvalidatorTrigger);
+            var ex = Initialise(host, roomID, messageID, authorName, authorID, stripMention, parentID, ref evMan);
 
             if (ex != null)
             {
@@ -155,7 +153,7 @@ namespace ChatExchangeDotNet
 
 
 
-        private Exception Initialise(string host, int roomID, int messageID, string authorName, int authorID, bool stripMention, int parentID, ref MessageEditedEventHandler cacheInvalidatorTrigger)
+        private Exception Initialise(string host, int roomID, int messageID, string authorName, int authorID, bool stripMention, int parentID, ref EventManager evMan)
         {
             if (String.IsNullOrEmpty(host)) { return new ArgumentException("'host' can not be null or empty.", "host"); }
             if (messageID < 0) { return new ArgumentOutOfRangeException("messageID", "'ID' can not be less than 0."); }
@@ -171,15 +169,15 @@ namespace ChatExchangeDotNet
             AuthorID = authorID;
             ParentID = parentID;
 
-            if (cacheInvalidatorTrigger != null)
+            if (evMan != null)
             {
-                cacheInvalidatorTrigger += (oldMessage, newMessage) =>
+                evMan.ConnectListener(EventType.MessageEdited, new Action<Message, Message>((oldMessage, newMessage) =>
                 {
                     if (oldMessage.ID == messageID)
                     {
                         content = newMessage.Content;
                     }
-                };
+                }));
             }
 
             return null;

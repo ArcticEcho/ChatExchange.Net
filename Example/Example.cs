@@ -21,8 +21,8 @@ namespace Example
             // Posts a new message in the room (if successful, returns a Message object, otherwise returns null).
             var myMessage = sandbox.PostMessage("Hello world!");
 
-            // Listen to the NewMessage event for new messages.
-            sandbox.NewMessage += message =>
+            // Listen to the MessagePosted event for new messages.
+            sandbox.EventManager.ConnectListener(EventType.MessagePosted, new Action<Message>(message =>
             {
                 // Print the new message (with the author's name).
                 Console.WriteLine("Author: " + message.AuthorName + "\nMessage: " + message.Content + "\n");
@@ -34,15 +34,15 @@ namespace Example
 
                     Console.WriteLine("'KA-BOOM' message successfully posted: " + success);
                 }
-            };
+            }));
 
-            // Register to the UserJoined event and post a welcome message when the event occurs.
-            sandbox.UserJoind += user =>
+            // Listen to the UserEntered event and post a welcome message when the event occurs.
+            sandbox.EventManager.ConnectListener(EventType.UserEntered, new Action<User>(user =>
             {
                 var success = sandbox.PostMessage("Welcome " + user.Name + "!") != null;
 
                 Console.WriteLine("'Welcome' message successfully posted: " + success);
-            };
+            }));
 
             // Wait for the user to press the "Q" key before we exit.
             while (Char.ToLower(Console.ReadKey(true).KeyChar) != 'q')

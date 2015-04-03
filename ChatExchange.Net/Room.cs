@@ -16,79 +16,19 @@ namespace ChatExchangeDotNet
     {
         private bool disposing;
         private bool disposed;
-        private WebSocket socket;
-        private readonly string chatRoot;
-        private string fkey;
         private bool hasLeft;
+        private string fkey;
+        private WebSocket socket;
+        private EventManager evMan;
+        private readonly string chatRoot;
         private readonly string cookieKey;
 
-        # region Delegates/events.
-
-        # region Delegates.
-
-        /// <param name="newMessage">The newly posted message.</param>
-        public delegate void NewMessageEventHandler(Message newMessage);
-
-        /// <param name="oldMessage">The previous state of the message.</param>
-        /// <param name="newMessage">The current state of the message.</param>
-        public delegate void MessageEditedEventHandler(Message oldMessage, Message newMessage);
-
-        /// <param name="message">The message that someone has (un)starred.</param>
-        /// <param name="starer">The user that (un)starred the message.</param>
-        /// <param name="starCount">The current star count.</param>
-        /// <param name="starCount">The current pin count.</param>
-        public delegate void MessageStarToggledEventHandler(Message message, User starer, int starCount, int pinCount);
-
-        /// <param name="user">The user that has joined/entered the room.</param>
-        public delegate void UserJoinEventHandler(User user);
-
-        /// <param name="user">The user that has left the room.</param>
-        public delegate void UserLeftEventHandler(User user);
-
-        /// <param name="message">The message that mentions the user.</param>
-        public delegate void UserMentiondEventHandler(Message message);
-
-        # endregion
-
-        # region Events.
-
-        private event MessageEditedEventHandler InvalidateMessageContentCache;
-
-        /// <summary>
-        /// Occurs when a new message is posted. Returns the newly posted message.
-        /// </summary>
-        public event NewMessageEventHandler NewMessage;
-
-        /// <summary>
-        /// Occurs when a message is edited.
-        /// </summary>
-        public event MessageEditedEventHandler MessageEdited;
-
-        /// <summary>
-        /// Occurs when someone stars/pins (or unstars/unpins) a message.
-        /// </summary>
-        public event MessageStarToggledEventHandler MessageStarToggled;
-
-        /// <summary>
-        /// Occurs when a user joins/enters the room.
-        /// </summary>
-        public event UserJoinEventHandler UserJoind;
-
-        /// <summary>
-        /// Occurs when a user leaves the room.
-        /// </summary>
-        public event UserLeftEventHandler UserLeft;
-
-        /// <summary>
-        /// Occurs when the logged in user is (@username) mentioned in a message.
-        /// </summary>
-        public event UserMentiondEventHandler UserMentioned;
-
-        # endregion
-
-        # endregion.
-
         # region Public properties/indexer.
+
+        /// <summary>
+        /// The EventManager object provides an interface to (dis)connect/update chat event listeners.
+        /// </summary>
+        public EventManager EventManager { get { return evMan; } }
 
         /// <summary>
         /// If true, actions by the currently logged in user will not raise any events. Default set to true.
@@ -150,7 +90,7 @@ namespace ChatExchangeDotNet
 
                 AllMessages.Add(message);
 
-                return message;		
+                return message;
             }
         }
 
@@ -171,13 +111,13 @@ namespace ChatExchangeDotNet
 
             this.ID = ID;
             this.cookieKey = cookieKey;
+            evMan = new EventManager();
+            chatRoot = "http://chat." + host;
+            Host = host;
             IgnoreOwnEvents = true;
             StripMentionFromMessages = true;
-            Host = host;
             AllMessages = new List<Message>();
             MyMessages = new List<Message>();
-            InvalidateMessageContentCache = new MessageEditedEventHandler((a, b) => { }); // Just to make the property not null.
-            chatRoot = "http://chat." + Host;
             Me = GetMe();
 
             SetFkey();
@@ -227,7 +167,7 @@ namespace ChatExchangeDotNet
             var authorName = lastestDom[".username a"].First().Text();
             var authorID = int.Parse(lastestDom[".username a"].First().Attr("href").Split('/')[2]);
 
-            return new Message(ref InvalidateMessageContentCache, Host, ID, messageID, authorName, authorID, StripMentionFromMessages, parentID);
+            return new Message(ref evMan, Host, ID, messageID, authorName, authorID, StripMentionFromMessages, parentID);
         }
 
         public User GetUser(int userID)
@@ -263,7 +203,7 @@ namespace ChatExchangeDotNet
 
                     if (messageID == -1) { return null; }
 
-                    var m = new Message(ref InvalidateMessageContentCache, Host, ID, messageID, Me.Name, Me.ID, StripMentionFromMessages, -1);
+                    var m = new Message(ref evMan, Host, ID, messageID, Me.Name, Me.ID, StripMentionFromMessages, -1);
 
                     MyMessages.Add(m);
                     AllMessages.Add(m);
@@ -638,9 +578,9 @@ namespace ChatExchangeDotNet
 
                     HandleData(json);
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-
+                    evMan.CallListeners(EventType.InternalException, ex);
                 }
             };
 
@@ -749,13 +689,13 @@ namespace ChatExchangeDotNet
             var authorID = (int)json["user_id"];
             var parentID = (int)(json["parent_id"] ?? -1);
 
-            var message = new Message(ref InvalidateMessageContentCache, Host, ID, id, authorName, authorID, StripMentionFromMessages, parentID);
+            var message = new Message(ref evMan, Host, ID, id, authorName, authorID, StripMentionFromMessages, parentID);
 
             AllMessages.Add(message);
 
-            if (NewMessage == null || (authorID == Me.ID && IgnoreOwnEvents)) { return; }
+            if (authorID == Me.ID && IgnoreOwnEvents) { return; }
 
-            NewMessage(message);
+            evMan.CallListeners(EventType.MessagePosted, message);
         }
 
         private void HandleUserMentioned(JToken json)
@@ -765,13 +705,13 @@ namespace ChatExchangeDotNet
             var authorID = (int)json["user_id"];
             var parentID = (int)(json["parent_id"] ?? -1);
 
-            var message = new Message(ref InvalidateMessageContentCache, Host, ID, id, authorName, authorID, StripMentionFromMessages, parentID);
+            var message = new Message(ref evMan, Host, ID, id, authorName, authorID, StripMentionFromMessages, parentID);
 
             AllMessages.Add(message);
 
-            if (UserMentioned == null || (authorID == Me.ID && IgnoreOwnEvents)) { return; }
+            if (authorID == Me.ID && IgnoreOwnEvents) { return; }
 
-            UserMentioned(message);
+            evMan.CallListeners(EventType.UserMentioned, message);
         }
 
         private void HandleEdit(JToken json)
@@ -781,20 +721,15 @@ namespace ChatExchangeDotNet
             var authorID = (int)json["user_id"];
             var parentID = (int)(json["parent_id"] ?? -1);
 
-            var currentMessage = new Message(ref InvalidateMessageContentCache, Host, ID, id, authorName, authorID, StripMentionFromMessages, parentID);
+            var currentMessage = new Message(ref evMan, Host, ID, id, authorName, authorID, StripMentionFromMessages, parentID);
             var oldMessage = this[id];
 
             AllMessages.Remove(oldMessage);
             AllMessages.Add(currentMessage);
 
-            if (InvalidateMessageContentCache != null)
-            {
-                InvalidateMessageContentCache(oldMessage, currentMessage);
-            }
+            if (authorID == Me.ID && IgnoreOwnEvents) { return; }
 
-            if (MessageEdited == null || (authorID == Me.ID && IgnoreOwnEvents)) { return; }
-
-            MessageEdited(oldMessage, currentMessage);
+            evMan.CallListeners(EventType.MessageEdited, oldMessage, currentMessage);
         }
 
         private void HandleStarToggle(JToken json)
@@ -807,9 +742,9 @@ namespace ChatExchangeDotNet
             var message = this[id];
             var user = new User(Host, ID, starrerID);
 
-            if (MessageStarToggled == null || (starrerID == Me.ID && IgnoreOwnEvents)) { return; }
+            if (starrerID == Me.ID && IgnoreOwnEvents) { return; }
 
-            MessageStarToggled(message, user, starCount, pinCount);
+            evMan.CallListeners(EventType.MessageStarToggled, message, user, starCount, pinCount);
         }
 
         private void HandleUserJoin(JToken json)
@@ -818,9 +753,9 @@ namespace ChatExchangeDotNet
 
             var user = new User(Host, ID, userID);
 
-            if (UserJoind == null || (userID == Me.ID && IgnoreOwnEvents)) { return; }
+            if (userID == Me.ID && IgnoreOwnEvents) { return; }
 
-            UserJoind(user);
+            evMan.CallListeners(EventType.UserEntered, user);
         }
 
         private void HandleUserLeave(JToken json)
@@ -829,9 +764,9 @@ namespace ChatExchangeDotNet
 
             var user = new User(Host, ID, userID);
 
-            if (UserLeft == null || (userID == Me.ID && IgnoreOwnEvents)) { return; }
+            if (userID == Me.ID && IgnoreOwnEvents) { return; }
 
-            UserLeft(user);
+            evMan.CallListeners(EventType.UserLeft, user);
         }
 
         # endregion

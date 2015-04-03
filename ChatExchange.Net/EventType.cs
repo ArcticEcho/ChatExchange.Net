@@ -3,9 +3,13 @@
     /// <summary>
     /// An enumeration of all known chat events.
     /// </summary>
-    enum EventType
+    public enum EventType
     {
-        None = 0,
+        /// <summary>
+        /// An exception has been raised from within the library.
+        /// </summary>
+        InternalException = -1,
+
         /// <summary>
         /// A new message has been posted.
         /// </summary>
