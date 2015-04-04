@@ -50,6 +50,9 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ActionExecutor.cs" />
+    <Compile Include="ActionType.cs" />
+    <Compile Include="ChatAction.cs" />
     <Compile Include="Client.cs" />
     <Compile Include="EventManager.cs" />
     <Compile Include="EventType.cs" />

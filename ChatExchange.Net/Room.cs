@@ -20,6 +20,7 @@ namespace ChatExchangeDotNet
         private string fkey;
         private WebSocket socket;
         private EventManager evMan;
+        private readonly ActionExecutor actEx;
         private readonly string chatRoot;
         private readonly string cookieKey;
 
@@ -112,6 +113,7 @@ namespace ChatExchangeDotNet
             this.ID = ID;
             this.cookieKey = cookieKey;
             evMan = new EventManager();
+            actEx = new ActionExecutor();
             chatRoot = "http://chat." + host;
             Host = host;
             IgnoreOwnEvents = true;
@@ -130,9 +132,9 @@ namespace ChatExchangeDotNet
 
         ~Room()
         {
-            if (socket != null && socket.State == WebSocketState.Open && !disposed)
+            if (!disposed)
             {
-                socket.Close();
+                Dispose();
             }
         }
 
@@ -186,31 +188,36 @@ namespace ChatExchangeDotNet
         {
             if (hasLeft) { return null; }
 
-            while (true)
+            var action = new ChatAction(ActionType.PostMessage, new Func<object>(() =>
             {
-                var data = "text=" + Uri.EscapeDataString(message).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
-
-                using (var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/chats/" + ID + "/messages/new", data))
+                while (true)
                 {
-                    if (res == null) { return null; }
+                    var data = "text=" + Uri.EscapeDataString(message).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
 
-                    var resContent = RequestManager.GetResponseContent(res);
+                    using (var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/chats/" + ID + "/messages/new", data))
+                    {
+                        if (res == null || hasLeft) { return null; }
 
-                    if (HandleThrottling(resContent)) { continue; }
+                        var resContent = RequestManager.GetResponseContent(res);
 
-                    var json = JObject.Parse(resContent);
-                    var messageID = (int)(json["id"].Type != JTokenType.Integer ? -1 : json["id"]);
+                        if (HandleThrottling(resContent)) { continue; }
 
-                    if (messageID == -1) { return null; }
+                        var json = JObject.Parse(resContent);
+                        var messageID = (int)(json["id"].Type != JTokenType.Integer ? -1 : json["id"]);
 
-                    var m = new Message(ref evMan, Host, ID, messageID, Me.Name, Me.ID, StripMentionFromMessages, -1);
+                        if (messageID == -1) { return null; }
 
-                    MyMessages.Add(m);
-                    AllMessages.Add(m);
+                        var m = new Message(ref evMan, Host, ID, messageID, Me.Name, Me.ID, StripMentionFromMessages, -1);
 
-                    return m;
+                        MyMessages.Add(m);
+                        AllMessages.Add(m);
+
+                        return m;
+                    }
                 }
-            }
+            }));
+
+            return (Message)actEx.ExecuteAction(action);
         }
 
         public Message PostReply(int targetMessageID, string message)
@@ -232,22 +239,23 @@ namespace ChatExchangeDotNet
         {
             if (hasLeft) { return false; }
 
-            while (true)
+            var action = new ChatAction(ActionType.EditMessage, new Func<object>(() =>
             {
-                var data = "text=" + Uri.EscapeDataString(newMessage).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
-                var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID, data);
-
-                if (res == null) { return false; }
-
-                var resContent = RequestManager.GetResponseContent(res);
-
-                if (HandleThrottling(resContent))
+                while (true)
                 {
-                    continue;
-                }
+                    var data = "text=" + Uri.EscapeDataString(newMessage).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
+                    var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID, data);
 
-                return resContent == "\"ok\"";
-            }
+                    if (res == null || hasLeft) { return false; }
+
+                    var resContent = RequestManager.GetResponseContent(res);
+                    if (HandleThrottling(resContent)) { continue; }
+
+                    return resContent == "\"ok\"";
+                }
+            }));
+
+            return (bool)actEx.ExecuteAction(action);
         }
 
         public bool DeleteMessage(Message message)
@@ -259,21 +267,22 @@ namespace ChatExchangeDotNet
         {
             if (hasLeft) { return false; }
 
-            while (true)
+            var action = new ChatAction(ActionType.DeleteMessage, new Func<object>(() =>
             {
-                var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID + "/delete", "fkey=" + fkey);
-
-                if (res == null) { return false; }
-
-                var resContent = RequestManager.GetResponseContent(res);
-
-                if (HandleThrottling(resContent))
+                while (true)
                 {
-                    continue;
-                }
+                    var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID + "/delete", "fkey=" + fkey);
 
-                return resContent == "\"ok\"";
-            }
+                    if (res == null || hasLeft) { return false; }
+
+                    var resContent = RequestManager.GetResponseContent(res);
+                    if (HandleThrottling(resContent)) { continue; }
+
+                    return resContent == "\"ok\"";
+                }
+            }));
+
+            return (bool)actEx.ExecuteAction(action);
         }
 
         public bool ToggleStarring(Message message)
@@ -285,79 +294,82 @@ namespace ChatExchangeDotNet
         {
             if (hasLeft) { return false; }
 
-            while (true)
+            var action = new ChatAction(ActionType.ToggleMessageStar, new Func<object>(() =>
             {
-                var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID + "/star", "fkey=" + fkey);
-
-                if (res == null) { return false; }
-
-                var resContent = RequestManager.GetResponseContent(res);
-
-                if (HandleThrottling(resContent))
+                while (true)
                 {
-                    continue;
-                }
+                    var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID + "/star", "fkey=" + fkey);
 
-                return resContent != "\"ok\"";
-            }
+                    if (res == null || hasLeft) { return false; }
+
+                    var resContent = RequestManager.GetResponseContent(res);
+                    if (HandleThrottling(resContent)) { continue; }
+
+                    return resContent != "\"ok\"";
+                }
+            }));
+
+            return (bool)actEx.ExecuteAction(action);
         }
 
         # endregion
 
         #region Owner chat commands.
 
-        public bool UnstarMessage(Message message)
+        public bool ClearMessageStars(Message message)
         {
-            return UnstarMessage(message.ID);
+            return ClearMessageStars(message.ID);
         }
 
-        public bool UnstarMessage(int messageID)
+        public bool ClearMessageStars(int messageID)
         {
-            while (true)
+            var action = new ChatAction(ActionType.ClearMessageStars, new Func<object>(() =>
             {
-                if (!Me.IsMod || !Me.IsRoomOwner || hasLeft) { return false; }
-
-                var data = "fkey=" + fkey;
-                var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID + "/unstar", data);
-
-                if (res == null) { return false; }
-
-                var resContent = RequestManager.GetResponseContent(res);
-
-                if (HandleThrottling(resContent))
+                while (true)
                 {
-                    continue;
-                }
+                    if (!Me.IsMod || !Me.IsRoomOwner || hasLeft) { return false; }
 
-                return resContent == "\"ok\"";
-            }
+                    var data = "fkey=" + fkey;
+                    var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID + "/unstar", data);
+
+                    if (res == null) { return false; }
+
+                    var resContent = RequestManager.GetResponseContent(res);
+                    if (HandleThrottling(resContent)) { continue; }
+
+                    return resContent == "\"ok\"";
+                }
+            }));
+
+            return (bool)actEx.ExecuteAction(action);
         }
 
         public bool TogglePinning(Message message)
         {
             return TogglePinning(message.ID);
         }
-        
+
         public bool TogglePinning(int messageID)
         {
-            while (true)
+            var action = new ChatAction(ActionType.ToggleMessagePin, new Func<object>(() =>
             {
-                if (!Me.IsMod || !Me.IsRoomOwner || hasLeft) { return false; }
-
-                var data = "fkey=" + fkey;
-                var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID + "/owner-star", data);
-
-                if (res == null) { return false; }
-
-                var resContent = RequestManager.GetResponseContent(res);
-
-                if (HandleThrottling(resContent))
+                while (true)
                 {
-                    continue;
-                }
+                    if (!Me.IsMod || !Me.IsRoomOwner || hasLeft) { return false; }
 
-                return resContent == "\"ok\"";
-            }
+                    var data = "fkey=" + fkey;
+                    var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID + "/owner-star", data);
+
+                    if (res == null) { return false; }
+
+                    var resContent = RequestManager.GetResponseContent(res);
+                    if (HandleThrottling(resContent)) { continue; }
+
+                    return resContent == "\"ok\"";
+                }
+            }));
+
+            return (bool)actEx.ExecuteAction(action);
         }
 
         public bool KickMute(User user)
@@ -367,13 +379,25 @@ namespace ChatExchangeDotNet
 
         public bool KickMute(int userID)
         {
-            if (!Me.IsMod || !Me.IsRoomOwner || hasLeft) { return false; }
+            var action = new ChatAction(ActionType.KickMute, new Func<object>(() =>
+            {
+                while (true)
+                {
+                    if (!Me.IsMod || !Me.IsRoomOwner || hasLeft) { return false; }
 
-            var data = "userID=" + userID + "&fkey=" + fkey;
+                    var data = "userID=" + userID + "&fkey=" + fkey;
+                    var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/rooms/kickmute/" + ID, data);
 
-            var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/rooms/kickmute/" + ID, data);
+                    if (res == null) { return false; }
 
-            return res != null && RequestManager.GetResponseContent(res).Contains("has been kicked");
+                    var resContent = RequestManager.GetResponseContent(res);
+                    if (HandleThrottling(resContent)) { continue; }
+
+                    return res != null && RequestManager.GetResponseContent(res).Contains("has been kicked");
+                }
+            }));
+
+            return (bool)actEx.ExecuteAction(action);
         }
 
         public bool SetUserRoomAccess(UserRoomAccess access, User user)
@@ -383,42 +407,53 @@ namespace ChatExchangeDotNet
 
         public bool SetUserRoomAccess(UserRoomAccess access, int userID)
         {
-            if (!Me.IsMod || !Me.IsRoomOwner || hasLeft) { return false; }
-
-            var data = "fkey=" + fkey + "&aclUserId=" + userID + "&userAccess=";
-
-            switch (access)
+            var action = new ChatAction(ActionType.KickMute, new Func<object>(() =>
             {
-                case UserRoomAccess.Normal:
+                while (true)
                 {
-                    data += "remove";
+                    if (!Me.IsMod || !Me.IsRoomOwner || hasLeft) { return false; }
 
-                    break;
+                    var data = "fkey=" + fkey + "&aclUserId=" + userID + "&userAccess=";
+
+                    switch (access)
+                    {
+                        case UserRoomAccess.Normal:
+                        {
+                            data += "remove";
+                            break;
+                        }
+
+                        case UserRoomAccess.ExplicitReadOnly:
+                        {
+                            data += "read-only";
+                            break;
+                        }
+
+                        case UserRoomAccess.ExplicitReadWrite:
+                        {
+                            data += "read-write";
+                            break;
+                        }
+
+                        case UserRoomAccess.Owner:
+                        {
+                            data += "owner";
+                            break;
+                        }
+                    }
+
+                    var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/rooms/setuseraccess/" + ID, data);
+
+                    if (res == null) { return false; }
+
+                    var resContent = RequestManager.GetResponseContent(res);
+                    if (HandleThrottling(resContent)) { continue; }
+
+                    return true;
                 }
+            }));
 
-                case UserRoomAccess.ExplicitReadOnly:
-                {
-                    data += "read-only";
-
-                    break;
-                }
-
-                case UserRoomAccess.ExplicitReadWrite:
-                {
-                    data += "read-write";
-
-                    break;
-                }
-
-                case UserRoomAccess.Owner:
-                {
-                    data += "owner";
-
-                    break;
-                }
-            }
-
-            return RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/rooms/setuseraccess/" + ID, data) != null;
+            return (bool)actEx.ExecuteAction(action);
         }
 
         #endregion
@@ -431,10 +466,11 @@ namespace ChatExchangeDotNet
 
             disposing = true;
 
-            if (socket.State == WebSocketState.Open)
+            if (socket != null && socket.State == WebSocketState.Open)
             {
                 socket.Close();
             }
+            actEx.Dispose();
 
             GC.SuppressFinalize(this);
 
