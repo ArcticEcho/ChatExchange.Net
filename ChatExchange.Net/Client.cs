@@ -44,7 +44,7 @@ namespace ChatExchangeDotNet
 
 
 
-        public Room JoinRoom(string roomUrl)
+        public Room JoinRoom(string roomUrl, Dictionary<ActionType, uint> actionQueueProcessingPriority = null)
         {
             var host = hostParser.Replace(roomUrl, "");
             var id = int.Parse(idParser.Replace(roomUrl, ""));
@@ -63,7 +63,7 @@ namespace ChatExchangeDotNet
                 }
             }
 
-            var r = new Room(cookieKey, host, id);
+            var r = new Room(cookieKey, host, id, actionQueueProcessingPriority);
 
             Rooms.Add(r);
 

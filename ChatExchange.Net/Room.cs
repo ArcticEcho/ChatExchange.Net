@@ -104,7 +104,7 @@ namespace ChatExchangeDotNet
         /// </summary>
         /// <param name="host">The host domain of the room (e.g., meta.stackexchange.com).</param>
         /// <param name="ID">The room's identification number.</param>
-        public Room(string cookieKey, string host, int ID)
+        public Room(string cookieKey, string host, int ID, Dictionary<ActionType, uint> actionQueueProcessingPriority = null)
         {
             if (String.IsNullOrEmpty(cookieKey)) { throw new ArgumentNullException("cookieKey"); }
             if (String.IsNullOrEmpty(host)) { throw new ArgumentNullException("'host' can not be null or empty.", "host"); }
@@ -113,7 +113,7 @@ namespace ChatExchangeDotNet
             this.ID = ID;
             this.cookieKey = cookieKey;
             evMan = new EventManager();
-            actEx = new ActionExecutor();
+            actEx = new ActionExecutor(actionQueueProcessingPriority);
             chatRoot = "http://chat." + host;
             Host = host;
             IgnoreOwnEvents = true;

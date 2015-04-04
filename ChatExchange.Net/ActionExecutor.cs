@@ -11,17 +11,17 @@ namespace ChatExchangeDotNet
 {
     internal class ActionExecutor : IDisposable
     {
-        private readonly ConcurrentDictionary<int, ChatAction> queuedActions = new ConcurrentDictionary<int, ChatAction>();
-        private readonly Dictionary<ActionType, int> queuePriority = new Dictionary<ActionType, int>();
+        private readonly ConcurrentDictionary<uint, ChatAction> queuedActions = new ConcurrentDictionary<uint, ChatAction>();
+        private readonly Dictionary<ActionType, uint> queuePriority = new Dictionary<ActionType, uint>();
         private readonly Thread consumerThread;
         private bool dispose;
         private bool disposed;
-        private delegate void ActionCompletedEventHandler(int actionKey, object returnedData);
+        private delegate void ActionCompletedEventHandler(uint actionKey, object returnedData);
         private event ActionCompletedEventHandler ActionCompleted;
 
 
 
-        public ActionExecutor(Dictionary<ActionType, int> queueProcessingPriority = null)
+        public ActionExecutor(Dictionary<ActionType, uint> queueProcessingPriority = null)
         {
             if (queueProcessingPriority != null && queueProcessingPriority.Keys.Count != 0)
             {
@@ -85,16 +85,59 @@ namespace ChatExchangeDotNet
                 Thread.Sleep(100);
 
                 if (queuedActions.IsEmpty) { continue; }
-                var key = queuedActions.Keys.Min();
-                var action = queuedActions[key];
+                //var key = queuedActions.Keys.Min();
+                //var action = queuedActions[key];
+                var action = GetNextAction();
 
-                var data = action.Action.DynamicInvoke();
+                var data = action.Value.Action.DynamicInvoke();
 
-                ActionCompleted(key, data);
+                ActionCompleted(action.Key, data);
 
                 ChatAction temp;
-                queuedActions.TryRemove(key, out temp);
+                queuedActions.TryRemove(action.Key, out temp);
             }
+        }
+
+        private KeyValuePair<uint, ChatAction> GetNextAction()
+        {
+            if (queuePriority.Count == 0)
+            {
+                var key = queuedActions.Keys.Min();
+                var action = queuedActions[key];
+                return new KeyValuePair<uint, ChatAction>(key, action);
+            }
+            else
+            {
+                var lowPrty = queuePriority.Values.Max();
+                var highPrty = queuePriority.Values.Min();
+                var priorities = new List<ActionType>();
+                
+                foreach (var p in queuePriority)
+                {
+                    if (priorities.Count == 0 || p.Key > priorities[0])
+                    {
+                        priorities.Add(p.Key);
+                    }
+                    else
+                    {
+                        priorities.IndexOf(p.Key, 0);
+                    }
+                }
+
+                for (var i = 0; i < priorities.Count; i++)
+                {
+                    foreach (var a in queuedActions)
+                    {
+                        if (priorities[i] == a.Value.Type)
+                        {
+                            return a;
+                        }
+                    }
+                }
+            }
+
+            // Something seriously went wrong.
+            throw new Exception("You're so screwed.");
         }
     }
 }
