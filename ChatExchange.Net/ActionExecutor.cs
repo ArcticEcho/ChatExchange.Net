@@ -85,10 +85,8 @@ namespace ChatExchangeDotNet
                 Thread.Sleep(100);
 
                 if (queuedActions.IsEmpty) { continue; }
-                //var key = queuedActions.Keys.Min();
-                //var action = queuedActions[key];
-                var action = GetNextAction();
 
+                var action = GetNextAction();
                 var data = action.Value.Action.DynamicInvoke();
 
                 ActionCompleted(action.Key, data);
@@ -108,10 +106,8 @@ namespace ChatExchangeDotNet
             }
             else
             {
-                var lowPrty = queuePriority.Values.Max();
-                var highPrty = queuePriority.Values.Min();
                 var priorities = new List<ActionType>();
-                
+
                 foreach (var p in queuePriority)
                 {
                     if (priorities.Count == 0 || p.Key > priorities[0])
@@ -125,15 +121,10 @@ namespace ChatExchangeDotNet
                 }
 
                 for (var i = 0; i < priorities.Count; i++)
-                {
                     foreach (var a in queuedActions)
                     {
-                        if (priorities[i] == a.Value.Type)
-                        {
-                            return a;
-                        }
+                        if (priorities[i] == a.Value.Type) { return a; }
                     }
-                }
             }
 
             // Something seriously went wrong.
