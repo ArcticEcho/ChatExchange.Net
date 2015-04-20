@@ -121,10 +121,10 @@ namespace ChatExchangeDotNet
                 }
 
                 for (var i = 0; i < priorities.Count; i++)
-                    foreach (var a in queuedActions)
-                    {
-                        if (priorities[i] == a.Value.Type) { return a; }
-                    }
+                foreach (var a in queuedActions)
+                {
+                    if (priorities[i] == a.Value.Type) { return a; }
+                }
             }
 
             // Something seriously went wrong.
