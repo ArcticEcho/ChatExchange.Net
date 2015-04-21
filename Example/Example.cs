@@ -30,21 +30,22 @@ namespace Example
                 // If the message contains "3... 2... 1...", post "KA-BOOM!".
                 if (message.Content.Contains("3... 2... 1..."))
                 {
+                    // (CE.Net also supports chat markdown.)
                     var success = sandbox.PostMessage("**KA-BOOM!**") != null;
 
                     Console.WriteLine("'KA-BOOM' message successfully posted: " + success);
                 }
             }));
 
-            // Listen to the UserEntered event and post a welcome message when the event occurs.
+            // Listen to the UserEntered event and post a welcome message when the event is fired.
             sandbox.EventManager.ConnectListener(EventType.UserEntered, new Action<User>(user =>
             {
-                var success = sandbox.PostMessage("Welcome " + user.Name + "!") != null;
+                var success = sandbox.PostMessage("Hello " + user.Name + "!") != null;
 
                 Console.WriteLine("'Welcome' message successfully posted: " + success);
             }));
 
-            // Wait for the user to press the "Q" key before we exit.
+            // Wait for the user to press the "Q" key before we exit (not the way to do this, but it'll suffice).
             while (Char.ToLower(Console.ReadKey(true).KeyChar) != 'q')
             {
                 Thread.Sleep(500);
