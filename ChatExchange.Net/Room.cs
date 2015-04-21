@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using CsQuery;
 using Newtonsoft.Json.Linq;
-using WebSocket4Net;
+using WebSocketSharp;
 
 
 
@@ -466,7 +466,7 @@ namespace ChatExchangeDotNet
 
             disposing = true;
 
-            if (socket != null && socket.State == WebSocketState.Open)
+            if (socket != null && socket.ReadyState == WebSocketState.Open)
             {
                 socket.Close();
             }
@@ -604,13 +604,13 @@ namespace ChatExchangeDotNet
 
         private void InitialiseSocket(string socketUrl)
         {
-            socket = new WebSocket(socketUrl, "", null, null, "", chatRoot);
+            socket = new WebSocket(socketUrl/*, "", null, null, "", chatRoot*/) { Origin = chatRoot };
 
-            socket.MessageReceived += (o, oo) =>
+            socket.OnMessage += (o, oo) =>
             {
                 try
                 {
-                    var json = JObject.Parse(oo.Message);
+                    var json = JObject.Parse(oo.Data);
 
                     HandleData(json);
                 }
@@ -620,7 +620,7 @@ namespace ChatExchangeDotNet
                 }
             };
 
-            socket.Closed += (o, oo) =>
+            socket.OnClose += (o, oo) =>
             {
                 if (!disposing)
                 {
@@ -637,8 +637,8 @@ namespace ChatExchangeDotNet
             // It seems SE doesn't do pings, by setting this to false
             // the Socket stays open. If this needs to be true for some
             // reason set socket.AutoSendPingInterval to a large value.
-            socket.EnableAutoSendPing = false;
-            socket.Open();
+            //socket.EnableAutoSendPing = false;
+            socket.Connect();
         }
 
         # endregion
