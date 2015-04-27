@@ -51,7 +51,7 @@ namespace ChatExchangeDotNet
             else
             {
                 if (ConnectedListeners[eventType].Values.Contains(listener)) 
-                { 
+                {
                     throw new Exception("'listener' has already been connected to this event type.");
                 }
                 var index = ConnectedListeners[eventType].Keys.Max() + 1;

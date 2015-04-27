@@ -21,6 +21,9 @@ namespace Example
             // Posts a new message in the room (if successful, returns a Message object, otherwise returns null).
             var myMessage = sandbox.PostMessage("Hello world!");
 
+            // Listen to the InternalException event for anything that may go wrong.
+            sandbox.EventManager.ConnectListener(EventType.InternalException, new Action<Exception>(ex => Console.WriteLine("[ERROR] " + ex)));
+
             // Listen to the MessagePosted event for new messages.
             sandbox.EventManager.ConnectListener(EventType.MessagePosted, new Action<Message>(message =>
             {

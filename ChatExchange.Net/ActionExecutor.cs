@@ -11,18 +11,21 @@ namespace ChatExchangeDotNet
 {
     internal class ActionExecutor : IDisposable
     {
-        private readonly ConcurrentDictionary<uint, ChatAction> queuedActions = new ConcurrentDictionary<uint, ChatAction>();
+        private readonly ConcurrentDictionary<long, ChatAction> queuedActions = new ConcurrentDictionary<long, ChatAction>();
         private readonly Dictionary<ActionType, uint> queuePriority = new Dictionary<ActionType, uint>();
         private readonly Thread consumerThread;
+        private readonly EventManager evMan;
         private bool dispose;
         private bool disposed;
-        private delegate void ActionCompletedEventHandler(uint actionKey, object returnedData);
+        private delegate void ActionCompletedEventHandler(long actionKey, object returnedData);
         private event ActionCompletedEventHandler ActionCompleted;
 
 
 
-        public ActionExecutor(Dictionary<ActionType, uint> queueProcessingPriority = null)
+        public ActionExecutor(ref EventManager evMan, Dictionary<ActionType, uint> queueProcessingPriority = null)
         {
+            this.evMan = evMan;
+
             if (queueProcessingPriority != null && queueProcessingPriority.Keys.Count != 0)
             {
                 queuePriority = queueProcessingPriority;
@@ -58,21 +61,21 @@ namespace ChatExchangeDotNet
 
             var key = queuedActions.Keys.Count == 0 ? 0 : queuedActions.Keys.Max() + 1;
 
-            var dataReady = false;
+            var reset = new ManualResetEvent(false);
             var data = new object();
             ActionCompleted += (k, d) =>
             {
                 if (k == key)
                 {
                     data = d;
-                    dataReady = true;
+                    reset.Set();
                 }
             };
 
             queuedActions[key] = action;
-
-            while (!dataReady) { Thread.Sleep(100); }
-
+            reset.WaitOne();
+            ChatAction temp;
+            queuedActions.TryRemove(key, out temp);
             return data;
         }
 
@@ -86,23 +89,44 @@ namespace ChatExchangeDotNet
 
                 if (queuedActions.IsEmpty) { continue; }
 
-                var action = GetNextAction();
-                var data = action.Value.Action.DynamicInvoke();
+                var action = new KeyValuePair<long, ChatAction>(long.MinValue, null);
+                object data = null;
+                try
+                {
+                    action = GetNextAction();
+                    data = action.Value.Action.DynamicInvoke();
+                }
+                catch (Exception ex)
+                {
+                    evMan.CallListeners(EventType.InternalException, ex);
+                }
+                finally
+                {
+                    if (action.Key == long.MinValue)
+                    {
+                        // Something really (REALLY) bad happened, clear the queue and log the error.
+                        foreach (var item in queuedActions)
+                        {
+                            ActionCompleted(item.Key, null);
+                        }
 
-                ActionCompleted(action.Key, data);
-
-                ChatAction temp;
-                queuedActions.TryRemove(action.Key, out temp);
+                        evMan.CallListeners(EventType.InternalException, new Exception("An unknown has occurred; all queued actions have been cleared."));
+                    }
+                    else
+                    {
+                        ActionCompleted(action.Key, data);
+                    }
+                }
             }
         }
 
-        private KeyValuePair<uint, ChatAction> GetNextAction()
+        private KeyValuePair<long, ChatAction> GetNextAction()
         {
             if (queuePriority.Count == 0)
             {
                 var key = queuedActions.Keys.Min();
                 var action = queuedActions[key];
-                return new KeyValuePair<uint, ChatAction>(key, action);
+                return new KeyValuePair<long, ChatAction>(key, action);
             }
             else
             {
@@ -128,7 +152,7 @@ namespace ChatExchangeDotNet
             }
 
             // Something seriously went wrong.
-            throw new Exception("You're so screwed.");
+            throw new Exception("Congratulations! You've broke my library!.");
         }
     }
 }

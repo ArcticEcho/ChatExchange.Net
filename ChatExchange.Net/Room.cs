@@ -113,7 +113,7 @@ namespace ChatExchangeDotNet
             this.ID = ID;
             this.cookieKey = cookieKey;
             evMan = new EventManager();
-            actEx = new ActionExecutor(actionQueueProcessingPriority);
+            actEx = new ActionExecutor(ref evMan, actionQueueProcessingPriority);
             chatRoot = "http://chat." + host;
             Host = host;
             IgnoreOwnEvents = true;
@@ -604,7 +604,7 @@ namespace ChatExchangeDotNet
 
         private void InitialiseSocket(string socketUrl)
         {
-            socket = new WebSocket(socketUrl/*, "", null, null, "", chatRoot*/) { Origin = chatRoot };
+            socket = new WebSocket(socketUrl) { Origin = chatRoot };
 
             socket.OnMessage += (o, oo) =>
             {
@@ -619,6 +619,8 @@ namespace ChatExchangeDotNet
                     evMan.CallListeners(EventType.InternalException, ex);
                 }
             };
+
+            socket.OnError += (o, oo) => evMan.CallListeners(EventType.InternalException, oo.Exception);
 
             socket.OnClose += (o, oo) =>
             {
