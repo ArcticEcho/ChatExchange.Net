@@ -1,18 +1,39 @@
-﻿using System;
+﻿/*
+ * ChatExchange.Net. A .Net (4.0) API for interacting with Stack Exchange chat.
+ * Copyright © 2015, ArcticEcho.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+
+
+
+
+using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Text;
 using System.Threading;
 
-
-
 namespace ChatExchangeDotNet
 {
+    using ActionPair = KeyValuePair<long, ChatAction>;
+
     internal class ActionExecutor : IDisposable
     {
         private readonly ConcurrentDictionary<long, ChatAction> queuedActions = new ConcurrentDictionary<long, ChatAction>();
-        private readonly Dictionary<ActionType, uint> queuePriority = new Dictionary<ActionType, uint>();
         private readonly Thread consumerThread;
         private readonly EventManager evMan;
         private bool dispose;
@@ -22,14 +43,9 @@ namespace ChatExchangeDotNet
 
 
 
-        public ActionExecutor(ref EventManager evMan, Dictionary<ActionType, uint> queueProcessingPriority = null)
+        public ActionExecutor(ref EventManager evMan)
         {
             this.evMan = evMan;
-
-            if (queueProcessingPriority != null && queueProcessingPriority.Keys.Count != 0)
-            {
-                queuePriority = queueProcessingPriority;
-            }
 
             consumerThread = new Thread(ProcessQueue) { IsBackground = true };
             consumerThread.Start();
@@ -72,10 +88,16 @@ namespace ChatExchangeDotNet
                 }
             };
 
+            // Add the action to the queue for processing.
             queuedActions[key] = action;
+
+            // Wait for the action to be processed.
             reset.WaitOne();
+
+            // The action's been processed; remove it from the queue.
             ChatAction temp;
             queuedActions.TryRemove(key, out temp);
+
             return data;
         }
 
@@ -89,7 +111,7 @@ namespace ChatExchangeDotNet
 
                 if (queuedActions.IsEmpty) { continue; }
 
-                var action = new KeyValuePair<long, ChatAction>(long.MinValue, null);
+                var action = new ActionPair(long.MinValue, null);
                 object data = null;
                 try
                 {
@@ -102,57 +124,35 @@ namespace ChatExchangeDotNet
                 }
                 finally
                 {
-                    if (action.Key == long.MinValue)
-                    {
-                        // Something really (REALLY) bad happened, clear the queue and log the error.
-                        foreach (var item in queuedActions)
-                        {
-                            ActionCompleted(item.Key, null);
-                        }
-
-                        evMan.CallListeners(EventType.InternalException, new Exception("An unknown has occurred; all queued actions have been cleared."));
-                    }
-                    else
-                    {
-                        ActionCompleted(action.Key, data);
-                    }
+                    NotifyCaller(action, data);
                 }
             }
         }
 
-        private KeyValuePair<long, ChatAction> GetNextAction()
+        private void NotifyCaller(ActionPair action, object data)
         {
-            if (queuePriority.Count == 0)
+            if (action.Key == long.MinValue)
             {
-                var key = queuedActions.Keys.Min();
-                var action = queuedActions[key];
-                return new KeyValuePair<long, ChatAction>(key, action);
+                // A catastrophic failure occurred, clear the queue and log the error.
+                foreach (var item in queuedActions)
+                {
+                    ActionCompleted(item.Key, null);
+                }
+
+                evMan.CallListeners(EventType.InternalException, new Exception("An unknown error has occurred; all queued actions have been cleared."));
             }
             else
             {
-                var priorities = new List<ActionType>();
-
-                foreach (var p in queuePriority)
-                {
-                    if (priorities.Count == 0 || p.Key > priorities[0])
-                    {
-                        priorities.Add(p.Key);
-                    }
-                    else
-                    {
-                        priorities.IndexOf(p.Key, 0);
-                    }
-                }
-
-                for (var i = 0; i < priorities.Count; i++)
-                foreach (var a in queuedActions)
-                {
-                    if (priorities[i] == a.Value.Type) { return a; }
-                }
+                ActionCompleted(action.Key, data);
             }
+        }
 
-            // Something seriously went wrong.
-            throw new Exception("Congratulations! You've broke my library!.");
+        private ActionPair GetNextAction()
+        {
+            var key = queuedActions.Keys.Min();
+            var action = queuedActions[key];
+
+            return new ActionPair(key, action);
         }
     }
 }

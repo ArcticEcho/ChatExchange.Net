@@ -1,4 +1,26 @@
-﻿namespace ChatExchangeDotNet
+﻿/*
+ * ChatExchange.Net. A .Net (4.0) API for interacting with Stack Exchange chat.
+ * Copyright © 2015, ArcticEcho.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+
+
+
+
+namespace ChatExchangeDotNet
 {
     /// <summary>
     /// An enumeration of all known chat events.
@@ -9,6 +31,11 @@
         /// An exception has been raised from within the library.
         /// </summary>
         InternalException = -1,
+
+        /// <summary>
+        /// Meaningful (unparsed) data has been received (as JSON).
+        /// </summary>
+        DataReceived = 0,
 
         /// <summary>
         /// A new message has been posted.
@@ -61,7 +88,7 @@
         MessageDeleted = 10,
 
         /// <summary>
-        /// I'll eventually get round to figuring this event out...
+        /// 
         /// </summary>
         FileAdded = 11,
 
@@ -71,12 +98,12 @@
         ModeratorFlag = 12,
 
         /// <summary>
-        /// Erm, not sure about this one, too...
+        /// 
         /// </summary>
         UserSettingsChanged = 13,
 
         /// <summary>
-        /// Sounds pretty self-explanatory, right?
+        /// 
         /// </summary>
         GlobalNotification = 14,
 
@@ -86,7 +113,7 @@
         AccessLevelChanged = 15,
 
         /// <summary>
-        /// I just dunno...
+        ///  
         /// </summary>
         UserNotification = 16,
 
@@ -111,7 +138,7 @@
         MessageMovedIn = 20,
 
         /// <summary>
-        /// This is, a, well... something.
+        /// 
         /// </summary>
         TimeBreak = 21,
 

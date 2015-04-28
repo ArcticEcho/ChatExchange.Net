@@ -1,16 +1,38 @@
-﻿using System;
+﻿/*
+ * ChatExchange.Net. A .Net (4.0) API for interacting with Stack Exchange chat.
+ * Copyright © 2015, ArcticEcho.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+
+
+
+
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-
-
 namespace ChatExchangeDotNet
 {
-    public class EventManager
+    public class EventManager : IDisposable
     {
+        private bool disposed;
+
         public ConcurrentDictionary<EventType, ConcurrentDictionary<int, Delegate>> ConnectedListeners { get; private set; }
 
 
@@ -20,10 +42,19 @@ namespace ChatExchangeDotNet
             ConnectedListeners = new ConcurrentDictionary<EventType, ConcurrentDictionary<int, Delegate>>();
         }
 
+        ~EventManager()
+        {
+            if (!disposed)
+            {
+                Dispose();
+            }
+        }
+
 
 
         internal void CallListeners(EventType eventType, params object[] args)
         {
+            if (disposed) { return; }
             if (!ConnectedListeners.ContainsKey(eventType)) { return; }
             if (ConnectedListeners[eventType].Keys.Count == 0) { return; }
 
@@ -41,8 +72,18 @@ namespace ChatExchangeDotNet
             }
         }
 
+        public void Dispose()
+        {
+            if (disposed) { return; }
+
+            GC.SuppressFinalize(this);
+            ConnectedListeners.Clear();
+            disposed = true;
+        }
+
         public void ConnectListener(EventType eventType, Delegate listener)
         {
+            if (disposed) { return; }
             if (!ConnectedListeners.ContainsKey(eventType))
             {
                 ConnectedListeners[eventType] = new ConcurrentDictionary<int, Delegate>();
@@ -61,6 +102,7 @@ namespace ChatExchangeDotNet
 
         public void UpdateListener(EventType eventType, Delegate oldListener, Delegate newListener)
         {
+            if (disposed) { return; }
             if (!ConnectedListeners.ContainsKey(eventType)) { throw new KeyNotFoundException(); }
             if (!ConnectedListeners[eventType].Values.Contains(oldListener)) { throw new KeyNotFoundException(); }
 
@@ -70,6 +112,7 @@ namespace ChatExchangeDotNet
 
         public void DisconnectListener(EventType eventType, Delegate listener)
         {
+            if (disposed) { return; }
             if (!ConnectedListeners.ContainsKey(eventType)) { throw new KeyNotFoundException(); }
             if (!ConnectedListeners[eventType].Values.Contains(listener)) { throw new KeyNotFoundException(); }
 

@@ -1,3 +1,25 @@
+/*
+ * ChatExchange.Net. A .Net (4.0) API for interacting with Stack Exchange chat.
+ * Copyright © 2015, ArcticEcho.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+
+
+
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,13 +30,10 @@ using CsQuery;
 using Newtonsoft.Json.Linq;
 using WebSocketSharp;
 
-
-
 namespace ChatExchangeDotNet
 {
     public class Room : IDisposable
     {
-        private bool disposing;
         private bool disposed;
         private bool hasLeft;
         private string fkey;
@@ -104,7 +123,7 @@ namespace ChatExchangeDotNet
         /// </summary>
         /// <param name="host">The host domain of the room (e.g., meta.stackexchange.com).</param>
         /// <param name="ID">The room's identification number.</param>
-        public Room(string cookieKey, string host, int ID, Dictionary<ActionType, uint> actionQueueProcessingPriority = null)
+        public Room(string cookieKey, string host, int ID)
         {
             if (String.IsNullOrEmpty(cookieKey)) { throw new ArgumentNullException("cookieKey"); }
             if (String.IsNullOrEmpty(host)) { throw new ArgumentNullException("'host' can not be null or empty.", "host"); }
@@ -113,7 +132,7 @@ namespace ChatExchangeDotNet
             this.ID = ID;
             this.cookieKey = cookieKey;
             evMan = new EventManager();
-            actEx = new ActionExecutor(ref evMan, actionQueueProcessingPriority);
+            actEx = new ActionExecutor(ref evMan);
             chatRoot = "http://chat." + host;
             Host = host;
             IgnoreOwnEvents = true;
@@ -464,18 +483,24 @@ namespace ChatExchangeDotNet
         {
             if (disposed) { return; }
 
-            disposing = true;
+            GC.SuppressFinalize(this);
 
             if (socket != null && socket.ReadyState == WebSocketState.Open)
             {
-                socket.Close();
+                try
+                {
+                    socket.Close(CloseStatusCode.Normal);
+                }
+                catch (Exception ex)
+                {
+                    evMan.CallListeners(EventType.InternalException, ex);
+                }
             }
-            actEx.Dispose();
 
-            GC.SuppressFinalize(this);
+            actEx.Dispose();
+            evMan.Dispose();
 
             disposed = true;
-            disposing = false;
         }
 
         public static bool operator ==(Room a, Room b)
@@ -611,7 +636,6 @@ namespace ChatExchangeDotNet
                 try
                 {
                     var json = JObject.Parse(oo.Data);
-
                     HandleData(json);
                 }
                 catch (Exception ex)
@@ -624,22 +648,33 @@ namespace ChatExchangeDotNet
 
             socket.OnClose += (o, oo) =>
             {
-                if (!disposing)
+                if (!oo.WasClean || oo.Code != (ushort)CloseStatusCode.Normal)
                 {
-                    SetFkey();
+                    // The socket closed abnormally, probably best to restart it (try for 15 minuets, at 10 second intervals).
+                    for (var i = 0; i < 90; i++)
+                    {
+                        try
+                        {
+                            SetFkey();
+                            var count = GetGlobalEventCount();
+                            var url = GetSocketURL(count);
+                            InitialiseSocket(url);
+                            return;
+                        }
+                        catch (Exception ex)
+                        {
+                            evMan.CallListeners(EventType.InternalException, ex);
+                        }
 
-                    var count = GetGlobalEventCount();
+                        Thread.Sleep(10000);
+                    }
 
-                    var url = GetSocketURL(count);
-
-                    InitialiseSocket(url);
+                    // We failed to restart the socket; dispose of the object and log the error.
+                    evMan.CallListeners(EventType.InternalException, new Exception("Could not restart WebSocket after 15 minutes of failed attempts, now disposing this Room object."));
+                    Dispose();
                 }
             };
 
-            // It seems SE doesn't do pings, by setting this to false
-            // the Socket stays open. If this needs to be true for some
-            // reason set socket.AutoSendPingInterval to a large value.
-            //socket.EnableAutoSendPing = false;
             socket.Connect();
         }
 
@@ -647,30 +682,35 @@ namespace ChatExchangeDotNet
 
         # region Incoming message handling methods.
 
+        private bool IsRealData(JObject json, out JToken data, out EventType eventType)
+        {
+            eventType = EventType.InternalException;
+
+            data = json["r" + ID];
+            if (data == null || data.Type == JTokenType.Null) { return false; }
+            data = data["e"];
+            if (data == null || data.Type == JTokenType.Null) { return false; }
+            data = data[0];
+            if (data == null || data.Type == JTokenType.Null) { return false; }
+            eventType = (EventType)(int)(data["event_type"]);
+            if ((int)(data["room_id"].Type != JTokenType.Integer ? -1 : data["room_id"]) != ID) { return false; }
+
+            return true;
+        }
+
         private void HandleData(JObject json)
         {
-            var data = json["r" + ID];
+            EventType eventType;
+            JToken data;
+            if (!IsRealData(json, out data, out eventType)) { return; }
 
-            if (data == null || data.Type == JTokenType.Null) { return; }
-
-            data = data["e"];
-
-            if (data == null || data.Type == JTokenType.Null) { return; }
-
-            data = data[0];
-
-            if (data == null || data.Type == JTokenType.Null) { return; }
-
-            var eventType = (EventType)(int)(data["event_type"]);
-
-            if ((int)(data["room_id"].Type != JTokenType.Integer ? -1 : data["room_id"]) != ID) { return; }
+            evMan.CallListeners(EventType.DataReceived, data.ToString());
 
             switch (eventType)
             {
                 case EventType.MessagePosted:
                 {
                     HandleNewMessage(data);
-
                     return;
                 }
 
@@ -678,7 +718,6 @@ namespace ChatExchangeDotNet
                 {
                     HandleNewMessage(data);
                     HandleUserMentioned(data);
-
                     return;
                 }
 
@@ -686,35 +725,30 @@ namespace ChatExchangeDotNet
                 {
                     HandleNewMessage(data);
                     HandleUserMentioned(data);
-
                     return;
                 }
 
                 case EventType.MessageEdited:
                 {
                     HandleEdit(data);
-
                     return;
                 }
 
                 case EventType.MessageStarToggled:
                 {
                     HandleStarToggle(data);
-
                     return;
                 }
 
                 case EventType.UserEntered:
                 {
                     HandleUserJoin(data);
-
                     return;
                 }
 
                 case EventType.UserLeft:
                 {
                     HandleUserLeave(data);
-
                     return;
                 }
             }
