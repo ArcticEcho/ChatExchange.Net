@@ -34,9 +34,10 @@ namespace ChatExchangeDotNet
     internal class ActionExecutor : IDisposable
     {
         private readonly ConcurrentDictionary<long, ChatAction> queuedActions = new ConcurrentDictionary<long, ChatAction>();
+        private readonly ManualResetEvent consumerClosed = new ManualResetEvent(false);
+        private readonly object lck = new object();
         private readonly Thread consumerThread;
         private readonly EventManager evMan;
-        private bool dispose;
         private bool disposed;
         private delegate void ActionCompletedEventHandler(long actionKey, object returnedData);
         private event ActionCompletedEventHandler ActionCompleted;
@@ -66,33 +67,33 @@ namespace ChatExchangeDotNet
             if (disposed) { return; }
 
             GC.SuppressFinalize(this);
-            dispose = true;
-            while (consumerThread.IsAlive) { Thread.Sleep(100); }
             disposed = true;
+            consumerClosed.WaitOne();
+            consumerClosed.Dispose();
         }
 
         public object ExecuteAction(ChatAction action)
         {
-            if (dispose || disposed) { return null; }
+            if (disposed) { return null; }
 
             var key = queuedActions.Keys.Count == 0 ? 0 : queuedActions.Keys.Max() + 1;
-
-            var reset = new ManualResetEvent(false);
             var data = new object();
+
             ActionCompleted += (k, d) =>
             {
                 if (k == key)
                 {
                     data = d;
-                    reset.Set();
+                    // Action completed, notify the waiting thread.
+                    lock (lck) { Monitor.Pulse(lck); }
                 }
             };
 
             // Add the action to the queue for processing.
             queuedActions[key] = action;
 
-            // Wait for the action to be processed.
-            reset.WaitOne();
+            // Wait for the action to be completed.
+            lock (lck) { Monitor.Wait(lck); }
 
             // The action's been processed; remove it from the queue.
             ChatAction temp;
@@ -105,9 +106,9 @@ namespace ChatExchangeDotNet
 
         private void ProcessQueue()
         {
-            while (!dispose)
+            while (!disposed)
             {
-                Thread.Sleep(100);
+                Thread.Sleep(50);
 
                 if (queuedActions.IsEmpty) { continue; }
 
@@ -127,6 +128,8 @@ namespace ChatExchangeDotNet
                     NotifyCaller(action, data);
                 }
             }
+
+            consumerClosed.Set();
         }
 
         private void NotifyCaller(ActionPair action, object data)

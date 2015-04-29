@@ -94,15 +94,14 @@ namespace ChatExchangeDotNet
         {
             if (disposed) { return; }
 
+            GC.SuppressFinalize(this);
+
             for (var i = 0; i < Rooms.Count; i++)
             {
                 Rooms[i].Dispose(); 
             }
-            
+
             RequestManager.Cookies.Remove(cookieKey);
-
-            GC.SuppressFinalize(this);
-
             disposed = true;
         }
 

@@ -37,18 +37,15 @@ namespace ChatExchangeDotNet
         private bool disposed;
         private bool hasLeft;
         private string fkey;
+        private TimeSpan socketRecTimeout;
         private WebSocket socket;
         private EventManager evMan;
+        private readonly AutoResetEvent throttleARE;
         private readonly ActionExecutor actEx;
         private readonly string chatRoot;
         private readonly string cookieKey;
 
         # region Public properties/indexer.
-
-        /// <summary>
-        /// The EventManager object provides an interface to (dis)connect/update chat event listeners.
-        /// </summary>
-        public EventManager EventManager { get { return evMan; } }
 
         /// <summary>
         /// If true, actions by the currently logged in user will not raise any events. Default set to true.
@@ -59,6 +56,23 @@ namespace ChatExchangeDotNet
         /// If true, removes (@Username) mentions and the message reply prefix (:012345) from all messages. Default set to true.
         /// </summary>
         public bool StripMentionFromMessages { get; set; }
+
+        /// <summary>
+        /// Specifies how long to attempt to recovery the WebSocket after the connection closed;
+        /// after which, an error is passed to the InternalException event and the room self-destructs.
+        /// (Default set to 15 minutes.)
+        /// </summary>
+        public TimeSpan WebSocketRecoveryTimeout
+        {
+            get { return socketRecTimeout; }
+
+            set
+            {
+                if (value.TotalSeconds < 10) { throw new ArgumentOutOfRangeException("value", "Must be more then 10 seconds."); }
+
+                socketRecTimeout = value;
+            }
+        }
 
         /// <summary>
         /// The host domain of the room.
@@ -86,9 +100,9 @@ namespace ChatExchangeDotNet
         public List<Message> MyMessages { get; private set; }
 
         /// <summary>
-        /// A list of all the "pingable" users in the room.
+        /// The EventManager object provides an interface to (dis)connect/update chat event listeners.
         /// </summary>
-        //public List<User> PingableUsers { get; private set; }
+        public EventManager EventManager { get { return evMan; } }
 
         /// <summary>
         /// Gets the Message object associated with the specified message ID.
@@ -134,6 +148,8 @@ namespace ChatExchangeDotNet
             evMan = new EventManager();
             actEx = new ActionExecutor(ref evMan);
             chatRoot = "http://chat." + host;
+            throttleARE = new AutoResetEvent(false);
+            socketRecTimeout = TimeSpan.FromMinutes(15);
             Host = host;
             IgnoreOwnEvents = true;
             StripMentionFromMessages = true;
@@ -209,7 +225,7 @@ namespace ChatExchangeDotNet
 
             var action = new ChatAction(ActionType.PostMessage, new Func<object>(() =>
             {
-                while (true)
+                while (!disposed)
                 {
                     var data = "text=" + Uri.EscapeDataString(message).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
 
@@ -234,6 +250,8 @@ namespace ChatExchangeDotNet
                         return m;
                     }
                 }
+
+                return null;
             }));
 
             return (Message)actEx.ExecuteAction(action);
@@ -260,7 +278,7 @@ namespace ChatExchangeDotNet
 
             var action = new ChatAction(ActionType.EditMessage, new Func<object>(() =>
             {
-                while (true)
+                while (!disposed)
                 {
                     var data = "text=" + Uri.EscapeDataString(newMessage).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
                     var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID, data);
@@ -272,6 +290,8 @@ namespace ChatExchangeDotNet
 
                     return resContent == "\"ok\"";
                 }
+
+                return false;
             }));
 
             return (bool)actEx.ExecuteAction(action);
@@ -288,7 +308,7 @@ namespace ChatExchangeDotNet
 
             var action = new ChatAction(ActionType.DeleteMessage, new Func<object>(() =>
             {
-                while (true)
+                while (!disposed)
                 {
                     var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID + "/delete", "fkey=" + fkey);
 
@@ -299,6 +319,8 @@ namespace ChatExchangeDotNet
 
                     return resContent == "\"ok\"";
                 }
+
+                return false;
             }));
 
             return (bool)actEx.ExecuteAction(action);
@@ -315,7 +337,7 @@ namespace ChatExchangeDotNet
 
             var action = new ChatAction(ActionType.ToggleMessageStar, new Func<object>(() =>
             {
-                while (true)
+                while (!disposed)
                 {
                     var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID + "/star", "fkey=" + fkey);
 
@@ -326,6 +348,8 @@ namespace ChatExchangeDotNet
 
                     return resContent != "\"ok\"";
                 }
+
+                return false;
             }));
 
             return (bool)actEx.ExecuteAction(action);
@@ -485,6 +509,8 @@ namespace ChatExchangeDotNet
 
             GC.SuppressFinalize(this);
 
+            disposed = true;
+
             if (socket != null && socket.ReadyState == WebSocketState.Open)
             {
                 try
@@ -497,10 +523,10 @@ namespace ChatExchangeDotNet
                 }
             }
 
+            throttleARE.Set(); // Release any threads currently being throttled.
+            throttleARE.Dispose();
             actEx.Dispose();
             evMan.Dispose();
-
-            disposed = true;
         }
 
         public static bool operator ==(Room a, Room b)
@@ -551,11 +577,10 @@ namespace ChatExchangeDotNet
 
         private bool HandleThrottling(string res)
         {
-            if (Regex.IsMatch(res, @"(?i)^you can perform this action again in \d*"))
+            if (Regex.IsMatch(res, @"(?i)^you can perform this action again in \d*") && !disposed)
             {
                 var delay = Regex.Replace(res, @"\D", "");
-
-                Thread.Sleep(int.Parse(delay) * 1000);
+                throttleARE.WaitOne(int.Parse(delay) * 1000);
 
                 return true;
             }
@@ -608,7 +633,7 @@ namespace ChatExchangeDotNet
             var data = "mode=Events&msgCount=0&fkey=" + fkey;
             var res = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/chats/" + ID + "/events", data);
 
-            if (res == null) { throw new Exception("Could not get eventtime for room " + ID + " on " + Host + ". Do you have an active internet conection?"); }
+            if (res == null) { throw new Exception("Could not get 'eventtime' for room " + ID + " on " + Host + ". Do you have an active internet conection?"); }
 
             var resContent = RequestManager.GetResponseContent(res);
 
@@ -650,9 +675,11 @@ namespace ChatExchangeDotNet
             {
                 if (!oo.WasClean || oo.Code != (ushort)CloseStatusCode.Normal)
                 {
-                    // The socket closed abnormally, probably best to restart it (try for 15 minuets, at 10 second intervals).
-                    for (var i = 0; i < 90; i++)
+                    // The socket closed abnormally, probably best to restart it.
+                    for (var i = 0; i < socketRecTimeout.TotalMinutes * 6; i++)
                     {
+                        Thread.Sleep(10000);
+
                         try
                         {
                             SetFkey();
@@ -665,12 +692,10 @@ namespace ChatExchangeDotNet
                         {
                             evMan.CallListeners(EventType.InternalException, ex);
                         }
-
-                        Thread.Sleep(10000);
                     }
 
                     // We failed to restart the socket; dispose of the object and log the error.
-                    evMan.CallListeners(EventType.InternalException, new Exception("Could not restart WebSocket after 15 minutes of failed attempts, now disposing this Room object."));
+                    evMan.CallListeners(EventType.InternalException, new Exception("Could not restart WebSocket; now disposing this Room object."));
                     Dispose();
                 }
             };

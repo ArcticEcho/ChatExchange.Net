@@ -50,7 +50,7 @@ namespace Example
                 // Print the new message (with the author's name).
                 Console.WriteLine("Author: " + message.AuthorName + "\nMessage: " + message.Content + "\n");
 
-                // If the message contains "3... 2... 1...", post "KA-BOOM!".
+                // If the message contains "3... 2... 1...", post "KA-BOOM!" (this is simply an example).
                 if (message.Content.Contains("3... 2... 1..."))
                 {
                     // (CE.Net also supports chat markdown.)
@@ -68,7 +68,7 @@ namespace Example
                 Console.WriteLine("'Welcome' message successfully posted: " + success);
             }));
 
-            // Wait for the user to press the "Q" key before we exit (not the way to do this, but it'll suffice).
+            // Wait for the user to press the "Q" key before we exit (not the best way to do this, but it'll suffice).
             while (Char.ToLower(Console.ReadKey(true).KeyChar) != 'q')
             {
                 Thread.Sleep(500);

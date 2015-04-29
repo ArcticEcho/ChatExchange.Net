@@ -33,7 +33,7 @@ namespace ChatExchangeDotNet
         InternalException = -1,
 
         /// <summary>
-        /// Meaningful (unparsed) data has been received (as JSON).
+        /// Meaningful (unparsed) data has been received via the WebSocket (as JSON).
         /// </summary>
         DataReceived = 0,
 
@@ -48,7 +48,7 @@ namespace ChatExchangeDotNet
         MessageEdited = 2,
 
         /// <summary>
-        /// A user has entered/joined the room.
+        /// A user has entered the room.
         /// </summary>
         UserEntered = 3,
 
