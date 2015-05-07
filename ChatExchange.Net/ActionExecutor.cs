@@ -54,10 +54,7 @@ namespace ChatExchangeDotNet
 
         ~ActionExecutor()
         {
-            if (!disposed)
-            {
-                Dispose();
-            }
+            Dispose();
         }
 
 
@@ -66,10 +63,13 @@ namespace ChatExchangeDotNet
         {
             if (disposed) { return; }
 
-            GC.SuppressFinalize(this);
             disposed = true;
-            consumerClosed.WaitOne();
-            consumerClosed.Dispose();
+            if (consumerClosed != null)
+            {
+                consumerClosed.WaitOne();
+                consumerClosed.Dispose();
+            }
+            GC.SuppressFinalize(this);
         }
 
         public object ExecuteAction(ChatAction action)

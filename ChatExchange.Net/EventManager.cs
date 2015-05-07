@@ -44,10 +44,7 @@ namespace ChatExchangeDotNet
 
         ~EventManager()
         {
-            if (!disposed)
-            {
-                Dispose();
-            }
+            Dispose();
         }
 
 
@@ -76,9 +73,12 @@ namespace ChatExchangeDotNet
         {
             if (disposed) { return; }
 
-            GC.SuppressFinalize(this);
-            ConnectedListeners.Clear();
             disposed = true;
+            if (ConnectedListeners != null)
+            {
+                ConnectedListeners.Clear();
+            }
+            GC.SuppressFinalize(this);
         }
 
         public void ConnectListener(EventType eventType, Delegate listener)

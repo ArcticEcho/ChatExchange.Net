@@ -45,9 +45,9 @@ namespace ChatExchangeDotNet
         {
             if (String.IsNullOrEmpty(email) || !email.Contains("@")) { throw new ArgumentException("'email' must be a valid email address.", "email"); }
             if (String.IsNullOrEmpty(password)) { throw new ArgumentException("'password' must not be null or empty.", "password"); }
-            
+
             cookieKey = email.Split('@')[0];
-            
+
             if (RequestManager.Cookies.ContainsKey(cookieKey)) { throw new Exception("Can not create duplicate instances of the same user."); }
 
             RequestManager.Cookies.Add(cookieKey, new CookieContainer());
@@ -93,16 +93,22 @@ namespace ChatExchangeDotNet
         public void Dispose()
         {
             if (disposed) { return; }
+            disposed = true;
 
-            GC.SuppressFinalize(this);
-
-            for (var i = 0; i < Rooms.Count; i++)
+            if (Rooms != null && Rooms.Count > 0)
             {
-                Rooms[i].Dispose(); 
+                foreach (var room in Rooms)
+                {
+                    room.Dispose();
+                }
             }
 
-            RequestManager.Cookies.Remove(cookieKey);
-            disposed = true;
+            if (!String.IsNullOrEmpty(cookieKey))
+            {
+                RequestManager.Cookies.Remove(cookieKey);
+            }
+
+            GC.SuppressFinalize(this);
         }
 
 

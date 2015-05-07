@@ -167,10 +167,7 @@ namespace ChatExchangeDotNet
 
         ~Room()
         {
-            if (!disposed)
-            {
-                Dispose();
-            }
+            Dispose();
         }
 
 
@@ -507,8 +504,6 @@ namespace ChatExchangeDotNet
         {
             if (disposed) { return; }
 
-            GC.SuppressFinalize(this);
-
             disposed = true;
 
             if (socket != null && socket.ReadyState == WebSocketState.Open)
@@ -523,10 +518,20 @@ namespace ChatExchangeDotNet
                 }
             }
 
-            throttleARE.Set(); // Release any threads currently being throttled.
-            throttleARE.Dispose();
-            actEx.Dispose();
-            evMan.Dispose();
+            if (throttleARE != null)
+            {
+                throttleARE.Set(); // Release any threads currently being throttled.
+                throttleARE.Dispose();
+            }
+            if (actEx != null)
+            {
+                actEx.Dispose();
+            }
+            if (evMan != null)
+            {
+                evMan.Dispose();
+            }
+            GC.SuppressFinalize(this);
         }
 
         public static bool operator ==(Room a, Room b)
