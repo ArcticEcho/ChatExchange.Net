@@ -77,7 +77,7 @@ namespace ChatExchangeDotNet
             if (disposed) { return null; }
 
             var key = queuedActions.Keys.Count == 0 ? 0 : queuedActions.Keys.Max() + 1;
-            var data = new object();
+            object data = null;
 
             ActionCompleted += (k, d) =>
             {
@@ -134,9 +134,8 @@ namespace ChatExchangeDotNet
 
         private void NotifyCaller(ActionPair action, object data)
         {
-            if (action.Key == long.MinValue)
+            if (action.Key == long.MinValue) // A catastrophic failure occurred, clear the queue and log the error.
             {
-                // A catastrophic failure occurred, clear the queue and log the error.
                 foreach (var item in queuedActions)
                 {
                     ActionCompleted(item.Key, null);

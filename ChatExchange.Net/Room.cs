@@ -294,7 +294,7 @@ namespace ChatExchangeDotNet
                 return false;
             }));
 
-            return (bool)actEx.ExecuteAction(action);
+            return (bool?)actEx.ExecuteAction(action) ?? false;
         }
 
         public bool DeleteMessage(Message message)
@@ -323,7 +323,7 @@ namespace ChatExchangeDotNet
                 return false;
             }));
 
-            return (bool)actEx.ExecuteAction(action);
+            return (bool?)actEx.ExecuteAction(action) ?? false;
         }
 
         public bool ToggleStarring(Message message)
@@ -352,7 +352,7 @@ namespace ChatExchangeDotNet
                 return false;
             }));
 
-            return (bool)actEx.ExecuteAction(action);
+            return (bool?)actEx.ExecuteAction(action) ?? false;
         }
 
         # endregion
@@ -384,7 +384,7 @@ namespace ChatExchangeDotNet
                 }
             }));
 
-            return (bool)actEx.ExecuteAction(action);
+            return (bool?)actEx.ExecuteAction(action) ?? false;
         }
 
         public bool TogglePinning(Message message)
@@ -412,7 +412,7 @@ namespace ChatExchangeDotNet
                 }
             }));
 
-            return (bool)actEx.ExecuteAction(action);
+            return (bool?)actEx.ExecuteAction(action) ?? false;
         }
 
         public bool KickMute(User user)
@@ -440,7 +440,7 @@ namespace ChatExchangeDotNet
                 }
             }));
 
-            return (bool)actEx.ExecuteAction(action);
+            return (bool?)actEx.ExecuteAction(action) ?? false;
         }
 
         public bool SetUserRoomAccess(UserRoomAccess access, User user)
@@ -496,7 +496,7 @@ namespace ChatExchangeDotNet
                 }
             }));
 
-            return (bool)actEx.ExecuteAction(action);
+            return (bool?)actEx.ExecuteAction(action) ?? false;
         }
 
         #endregion
