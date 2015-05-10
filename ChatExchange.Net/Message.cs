@@ -136,38 +136,6 @@ namespace ChatExchangeDotNet
             return String.IsNullOrEmpty(content) ? null : WebUtility.HtmlDecode(stripMention ? content.StripMention() : content);
         }
 
-        public static bool operator ==(Message a, Message b)
-        {
-            if ((object)a == null || (object)b == null) { return false; }
-            if (ReferenceEquals(a, b)) { return true; }
-
-            return a.GetHashCode() == b.GetHashCode();
-        }
-
-        public static bool operator !=(Message a, Message b)
-        {
-            return !(a == b);
-        }
-
-        public bool Equals(Message message)
-        {
-            if (message == null) { return false; }
-            return message.GetHashCode() == GetHashCode();
-        }
-
-        public override bool Equals(object obj)
-        {
-            if (obj == null) { return false; }
-            if (!(obj is Message)) { return false; }
-
-            return obj.GetHashCode() == GetHashCode();
-        }
-
-        public override int GetHashCode()
-        {
-            return ID;
-        }
-
 
 
         private Exception Initialise(string host, int roomID, int messageID, string authorName, int authorID, bool stripMention, int parentID, ref EventManager evMan)

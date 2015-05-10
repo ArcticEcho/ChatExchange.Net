@@ -172,6 +172,40 @@ namespace ChatExchangeDotNet
 
 
 
+        public void Dispose()
+        {
+            if (disposed) { return; }
+
+            disposed = true;
+
+            if (socket != null && socket.ReadyState == WebSocketState.Open)
+            {
+                try
+                {
+                    socket.Close(CloseStatusCode.Normal);
+                }
+                catch (Exception ex)
+                {
+                    evMan.CallListeners(EventType.InternalException, ex);
+                }
+            }
+
+            if (throttleARE != null)
+            {
+                throttleARE.Set(); // Release any threads currently being throttled.
+                throttleARE.Dispose();
+            }
+            if (actEx != null)
+            {
+                actEx.Dispose();
+            }
+            if (evMan != null)
+            {
+                evMan.Dispose();
+            }
+            GC.SuppressFinalize(this);
+        }
+
         public void Leave()
         {
             if (hasLeft) { return; }
@@ -494,86 +528,6 @@ namespace ChatExchangeDotNet
             }));
 
             return (bool?)actEx.ExecuteAction(action) ?? false;
-        }
-
-        #endregion
-
-        #region Inherited/overridden methods.
-
-        public void Dispose()
-        {
-            if (disposed) { return; }
-
-            disposed = true;
-
-            if (socket != null && socket.ReadyState == WebSocketState.Open)
-            {
-                try
-                {
-                    socket.Close(CloseStatusCode.Normal);
-                }
-                catch (Exception ex)
-                {
-                    evMan.CallListeners(EventType.InternalException, ex);
-                }
-            }
-
-            if (throttleARE != null)
-            {
-                throttleARE.Set(); // Release any threads currently being throttled.
-                throttleARE.Dispose();
-            }
-            if (actEx != null)
-            {
-                actEx.Dispose();
-            }
-            if (evMan != null)
-            {
-                evMan.Dispose();
-            }
-            GC.SuppressFinalize(this);
-        }
-
-        public static bool operator ==(Room a, Room b)
-        {
-            if ((object)a == null || (object)b == null) { return false; }
-
-            if (ReferenceEquals(a, b)) { return true; }
-
-            return a.GetHashCode() == b.GetHashCode();
-        }
-
-        public static bool operator !=(Room a, Room b)
-        {
-            return !(a == b);
-        }
-
-        public bool Equals(Room room)
-        {
-            if (room == null) { return false; }
-
-            return room.GetHashCode() == GetHashCode();
-        }
-
-        public bool Equals(string host, int id)
-        {
-            if (String.IsNullOrEmpty(host) || id < 0) { return false; }
-
-            return String.Equals(host, Host, StringComparison.InvariantCultureIgnoreCase) && ID == id;
-        }
-
-        public override bool Equals(object obj)
-        {
-            if (obj == null) { return false; }
-
-            if (!(obj is Room)) { return false; }
-
-            return obj.GetHashCode() == GetHashCode();
-        }
-
-        public override int GetHashCode()
-        {
-            return Host.GetHashCode() + ID.GetHashCode();
         }
 
         #endregion
