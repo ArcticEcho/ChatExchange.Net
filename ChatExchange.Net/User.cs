@@ -20,6 +20,7 @@
 
 
 
+using System;
 using Newtonsoft.Json.Linq;
 
 namespace ChatExchangeDotNet
@@ -42,15 +43,14 @@ namespace ChatExchangeDotNet
             RoomID = roomID;
             Host = host;
 
-            var res = RequestManager.SendPOSTRequest("", "http://chat." + host + "/user/info", "ids=" + id + "&roomid=" + roomID);
+            var resContent = RequestManager.SendPOSTRequest("", "http://chat." + host + "/user/info", "ids=" + id + "&roomid=" + roomID);
 
-            if (res == null)
+            if (String.IsNullOrEmpty(resContent))
             {
                 Reputation = -1;
             }
             else
             {
-                var resContent = RequestManager.GetResponseContent(res);
                 var json = JObject.Parse(resContent);
                 var name = json["users"][0]["name"];
                 var isMod = json["users"][0]["is_moderator"];

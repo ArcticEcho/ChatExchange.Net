@@ -50,11 +50,11 @@ namespace ChatExchangeDotNet
         {
             get
             {
-                var res = RequestManager.SendGETRequest("", "http://chat." + Host + "/messages/" + ID + "/history");
+                var resContent = RequestManager.SendGETRequest("", "http://chat." + Host + "/messages/" + ID + "/history");
 
-                if (res == null) { return -1; }
+                if (String.IsNullOrEmpty(resContent)) { return -1; }
 
-                var dom = CQ.Create(RequestManager.GetResponseContent(res))[".stars"];
+                var dom = CQ.Create(resContent)[".stars"];
                 var count = 0;
 
                 if (dom != null && dom.Length != 0)
@@ -77,11 +77,11 @@ namespace ChatExchangeDotNet
         {
             get
             {
-                var res = RequestManager.SendGETRequest("", "http://chat." + Host + "/messages/" + ID + "/history");
+                var resContent = RequestManager.SendGETRequest("", "http://chat." + Host + "/messages/" + ID + "/history");
 
-                if (res == null) { return -1; }
+                if (String.IsNullOrEmpty(resContent)) { return -1; }
 
-                var dom = CQ.Create(RequestManager.GetResponseContent(res))[".owner-star"];
+                var dom = CQ.Create(resContent)[".owner-star"];
                 var count = 0;
 
                 if (dom != null && dom.Length != 0)
@@ -127,14 +127,14 @@ namespace ChatExchangeDotNet
 
         public static string GetMessageContent(string host, int messageID, bool stripMention = true)
         {
-            var res = RequestManager.SendGETRequest("", "http://chat." + host + "/message/" + messageID + "?plain=true");
+            using (var res = RequestManager.SendGETRequestRaw("", "http://chat." + host + "/message/" + messageID + "?plain=true"))
+            {
+                if (res == null || res.StatusCode != HttpStatusCode.OK) { return null; }
 
-            if (res == null || res.StatusCode != HttpStatusCode.OK) { return null; }
+                var content = RequestManager.GetResponseContent(res);
 
-            var content = RequestManager.GetResponseContent(res);
-
-            return String.IsNullOrEmpty(content) ? null : WebUtility.HtmlDecode(stripMention ? content.StripMention() : content);
-        }
+                return String.IsNullOrEmpty(content) ? null : WebUtility.HtmlDecode(stripMention ? content.StripMention() : content);
+            }        }
 
 
 

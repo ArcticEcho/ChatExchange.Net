@@ -115,38 +115,42 @@ namespace ChatExchangeDotNet
 
         private void SEOpenIDLogin(string email, string password)
         {
-            var getRes = RequestManager.SendGETRequest(cookieKey, "https://openid.stackexchange.com/account/login");
+            var getResContent = RequestManager.SendGETRequest(cookieKey, "https://openid.stackexchange.com/account/login");
 
-            if (getRes == null) { throw new Exception("Could not get OpenID fkey. Do you have an active internet connection?"); }
+            if (String.IsNullOrEmpty(getResContent)) { throw new Exception("Could not get OpenID fkey. Do you have an active internet connection?"); }
 
-            var getResContent = RequestManager.GetResponseContent(getRes);
             var data = "email=" + Uri.EscapeDataString(email) + "&password=" + Uri.EscapeDataString(password) + "&fkey=" + CQ.Create(getResContent).GetInputValue("fkey");
-            var res = RequestManager.SendPOSTRequest(cookieKey, "https://openid.stackexchange.com/account/login/submit", data);
+            
+            using (var res = RequestManager.SendPOSTRequestRaw(cookieKey, "https://openid.stackexchange.com/account/login/submit", data))
+            {
+                if (res == null || !String.IsNullOrEmpty(res.Headers["p3p"])) { throw new Exception("Could not login using the specified OpenID credentials. Have you entered the correct credentials, and have an active internet connection?"); }
 
-            if (res == null || !String.IsNullOrEmpty(res.Headers["p3p"])) { throw new Exception("Could not login using the specified OpenID credentials. Have you entered the correct credentials, and have an active internet connection?"); }
+                var postResContent = RequestManager.GetResponseContent(res);
+                var dom = CQ.Create(postResContent);
 
-            var postResContent = RequestManager.GetResponseContent(res);
-            var dom = CQ.Create(postResContent);
-
-            openidUrl = WebUtility.HtmlDecode(dom["#delegate"][0].InnerHTML);
-            openidUrl = openidUrl.Remove(0, openidUrl.LastIndexOf("href", StringComparison.Ordinal) + 6);
-            openidUrl = openidUrl.Remove(openidUrl.IndexOf("\"", StringComparison.Ordinal));
+                openidUrl = WebUtility.HtmlDecode(dom["#delegate"][0].InnerHTML);
+                openidUrl = openidUrl.Remove(0, openidUrl.LastIndexOf("href", StringComparison.Ordinal) + 6);
+                openidUrl = openidUrl.Remove(openidUrl.IndexOf("\"", StringComparison.Ordinal));
+            }
         }
 
         private void SiteLogin(string host)
         {
-            var getRes = RequestManager.SendGETRequest(cookieKey, "http://" + host + "/users/login");
+            var getResContent = RequestManager.SendGETRequest(cookieKey, "http://" + host + "/users/login");
 
-            if (getRes == null) { throw new Exception("Could not get fkey from " + host + ". Do you have an active internet connection?"); }
+            if (String.IsNullOrEmpty(getResContent)) { throw new Exception("Could not get fkey from " + host + ". Do you have an active internet connection?"); }
 
-            var getResContent = RequestManager.GetResponseContent(getRes);
-            var data = "fkey=" + CQ.Create(getResContent).GetInputValue("fkey") + "&oauth_version=&oauth_server=&openid_username=&openid_identifier=" + Uri.EscapeDataString(openidUrl);
-            var postRes = RequestManager.SendPOSTRequest(cookieKey, "http://" + host + "/users/authenticate", data, true, "https://" + host + "/users/login?returnurl=" + Uri.EscapeDataString("http://" + host + "/"));
+            var fkey = CQ.Create(getResContent).GetInputValue("fkey");
+            var data = "fkey=" + fkey + "&oauth_version=&oauth_server=&openid_username=&openid_identifier=" + Uri.EscapeDataString(openidUrl);
+            var referrer = "https://" + host + "/users/login?returnurl=" + Uri.EscapeDataString("http://" + host + "/");
 
-            if (postRes == null) { throw new Exception("Could not login into site " + host + ". Have you entered the correct credentials, and have an active internet connection?"); }
-
-            if (postRes.ResponseUri.ToString().StartsWith("https://openid.stackexchange.com/account/prompt"))
+            using (var postRes = RequestManager.SendPOSTRequestRaw(cookieKey, "http://" + host + "/users/authenticate", data, referrer))
             {
+                if (postRes == null)
+                {
+                    throw new Exception("Could not login into site " + host + ". Have you entered the correct credentials, and have an active internet connection?");
+                }
+
                 HandleConfirmationPrompt(postRes);
             }
         }
@@ -169,17 +173,17 @@ namespace ChatExchangeDotNet
             // Login to SE.
             RequestManager.SendGETRequest(cookieKey, "http://stackexchange.com/users/authenticate?openid_identifier=" + Uri.EscapeDataString(openidUrl));
 
-            var getRes = RequestManager.SendGETRequest(cookieKey, "http://stackexchange.com/users/chat-login");
-            var html = RequestManager.GetResponseContent(getRes);
+            var html = RequestManager.SendGETRequest(cookieKey, "http://stackexchange.com/users/chat-login");
             var dom = CQ.Create(html);
             var authToken = Uri.EscapeDataString(dom.GetInputValue("authToken"));
             var nonce = Uri.EscapeDataString(dom.GetInputValue("nonce"));
             var data = "authToken=" + authToken + "&nonce=" + nonce;
+            var refOrigin = "http://chat.stackexchange.com";
 
             // Login to chat.SE.
-            var postRes = RequestManager.SendPOSTRequest(cookieKey, "http://chat.stackexchange.com/users/login/global", data, true, "http://chat.stackexchange.com", "http://chat.stackexchange.com");
+            var postResContent = RequestManager.SendPOSTRequest(cookieKey, "http://chat.stackexchange.com/users/login/global", data, refOrigin, refOrigin);
 
-            if (postRes == null || !RequestManager.GetResponseContent(postRes).StartsWith("{\"Message\":\"Welcome"))
+            if (postResContent == null || !postResContent.StartsWith("{\"Message\":\"Welcome"))
             {
                 throw new Exception("Could not login to (chat) Stack Exchange.");
             }
