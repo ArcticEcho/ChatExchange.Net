@@ -638,74 +638,60 @@ namespace ChatExchangeDotNet
 
         # region Incoming message handling methods.
 
-        private bool IsRealData(JObject json, out JToken data, out EventType eventType)
-        {
-            eventType = EventType.InternalException;
-
-            data = json["r" + ID];
-            if (data == null || data.Type == JTokenType.Null) { return false; }
-            data = data["e"];
-            if (data == null || data.Type == JTokenType.Null) { return false; }
-            data = data[0];
-            if (data == null || data.Type == JTokenType.Null) { return false; }
-            eventType = (EventType)(int)(data["event_type"]);
-            if ((int)(data["room_id"].Type != JTokenType.Integer ? -1 : data["room_id"]) != ID) { return false; }
-
-            return true;
-        }
-
         private void HandleData(JObject json)
         {
-            EventType eventType;
-            JToken data;
-            if (!IsRealData(json, out data, out eventType)) { return; }
+            var data = json["r" + ID];
+            if (data == null || data.Type == JTokenType.Null) { return; }
+            data = data["e"];
+            if (data == null || data.Type == JTokenType.Null) { return; }
 
-            evMan.CallListeners(EventType.DataReceived, data.ToString());
-
-            switch (eventType)
+            foreach (var message in data)
             {
-                case EventType.MessagePosted:
-                {
-                    HandleNewMessage(data);
-                    return;
-                }
+                if (message == null || message.Type == JTokenType.Null) { continue; }
+                var eventType = (EventType)(int)(message["event_type"]);
+                if ((int)(message["room_id"].Type != JTokenType.Integer ? -1 : message["room_id"]) != ID) { continue; }
 
-                case EventType.MessageReply:
-                {
-                    HandleNewMessage(data);
-                    HandleUserMentioned(data);
-                    return;
-                }
+                evMan.CallListeners(EventType.DataReceived, message.ToString());
 
-                case EventType.UserMentioned:
+                switch (eventType)
                 {
-                    HandleNewMessage(data);
-                    HandleUserMentioned(data);
-                    return;
-                }
-
-                case EventType.MessageEdited:
-                {
-                    HandleEdit(data);
-                    return;
-                }
-
-                case EventType.MessageStarToggled:
-                {
-                    HandleStarToggle(data);
-                    return;
-                }
-
-                case EventType.UserEntered:
-                {
-                    HandleUserJoin(data);
-                    return;
-                }
-
-                case EventType.UserLeft:
-                {
-                    HandleUserLeave(data);
-                    return;
+                    case EventType.MessagePosted:
+                    {
+                        HandleNewMessage(message);
+                        continue;
+                    }
+                    case EventType.MessageReply:
+                    {
+                        HandleNewMessage(message);
+                        HandleUserMentioned(message);
+                        continue;
+                    }
+                    case EventType.UserMentioned:
+                    {
+                        HandleNewMessage(message);
+                        HandleUserMentioned(message);
+                        continue;
+                    }
+                    case EventType.MessageEdited:
+                    {
+                        HandleEdit(message);
+                        continue;
+                    }
+                    case EventType.MessageStarToggled:
+                    {
+                        HandleStarToggle(message);
+                        continue;
+                    }
+                    case EventType.UserEntered:
+                    {
+                        HandleUserJoin(message);
+                        continue;
+                    }
+                    case EventType.UserLeft:
+                    {
+                        HandleUserLeave(message);
+                        continue;
+                    }
                 }
             }
         }
