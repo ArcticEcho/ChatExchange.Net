@@ -662,13 +662,11 @@ namespace ChatExchangeDotNet
                     }
                     case EventType.MessageReply:
                     {
-                        HandleNewMessage(message);
-                        HandleUserMentioned(message);
+                        HandleMessageReply(message);
                         continue;
                     }
                     case EventType.UserMentioned:
                     {
-                        HandleNewMessage(message);
                         HandleUserMentioned(message);
                         continue;
                     }
@@ -712,6 +710,23 @@ namespace ChatExchangeDotNet
             evMan.CallListeners(EventType.MessagePosted, message);
         }
 
+        private void HandleMessageReply(JToken json)
+        {
+            var id = (int)json["message_id"];
+            var authorName = (string)json["user_name"];
+            var authorID = (int)json["user_id"];
+            var parentID = (int)(json["parent_id"] ?? -1);
+
+            var parent = this[parentID];
+            var message = new Message(ref evMan, Host, ID, id, authorName, authorID, StripMentionFromMessages, parentID);
+
+            AllMessages.Add(message);
+
+            if (authorID == Me.ID && IgnoreOwnEvents) { return; }
+
+            evMan.CallListeners(EventType.MessageReply, parent, message);
+        }
+
         private void HandleUserMentioned(JToken json)
         {
             var id = (int)json["message_id"];
@@ -736,14 +751,10 @@ namespace ChatExchangeDotNet
             var parentID = (int)(json["parent_id"] ?? -1);
 
             var currentMessage = new Message(ref evMan, Host, ID, id, authorName, authorID, StripMentionFromMessages, parentID);
-            var oldMessage = this[id];
-
-            AllMessages.Remove(oldMessage);
-            AllMessages.Add(currentMessage);
 
             if (authorID == Me.ID && IgnoreOwnEvents) { return; }
 
-            evMan.CallListeners(EventType.MessageEdited, oldMessage, currentMessage);
+            evMan.CallListeners(EventType.MessageEdited, currentMessage);
         }
 
         private void HandleStarToggle(JToken json)
