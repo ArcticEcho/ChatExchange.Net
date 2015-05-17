@@ -33,7 +33,7 @@ namespace ChatExchangeDotNet
 {
     public static class ExtensionMethods
     {
-        private static readonly Regex hasMention = new Regex(@"^:\d+\s|\s@\S{3,}(\s|\Z)", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private static readonly Regex hasMention = new Regex(@"^:\d+\s|(\A|\s)@\S{3,}(\s|\Z)", RegexOptions.Compiled | RegexOptions.CultureInvariant);
         private static readonly Regex isReply = new Regex(@"^:\d+\s", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
 
@@ -98,9 +98,10 @@ namespace ChatExchangeDotNet
             return userMessages;
         }
 
-        public static string StripMention(this string input, string replaceWith = "")
+        public static string StripMention(this string input, bool trim = true, string replaceWith = " ")
         {
-            return hasMention.Replace(input, replaceWith);
+            var stripped = hasMention.Replace(input, replaceWith);
+            return trim ? stripped.Trim() : stripped;
         }
 
         public static bool IsReply(this string message, bool includeMention = false)
