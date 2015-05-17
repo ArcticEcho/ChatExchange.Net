@@ -33,7 +33,7 @@ namespace ChatExchangeDotNet
 {
     public static class ExtensionMethods
     {
-        private static readonly Regex hasMention = new Regex(@"^:\d+\s|@\S{3,}(\W|\Z)", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private static readonly Regex hasMention = new Regex(@"^:\d+\s|\s@\S{3,}(\s|\Z)", RegexOptions.Compiled | RegexOptions.CultureInvariant);
         private static readonly Regex isReply = new Regex(@"^:\d+\s", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
 
