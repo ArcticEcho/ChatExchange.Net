@@ -21,7 +21,8 @@
 
 
 using System;
-using Newtonsoft.Json.Linq;
+using System.Collections.Generic;
+using ServiceStack.Text;
 
 namespace ChatExchangeDotNet
 {
@@ -45,23 +46,28 @@ namespace ChatExchangeDotNet
 
             var resContent = RequestManager.SendPOSTRequest("", "http://chat." + host + "/user/info", "ids=" + id + "&roomid=" + roomID);
 
-            if (String.IsNullOrEmpty(resContent))
+            if (!String.IsNullOrEmpty(resContent) && resContent.StartsWith("{\"users\":[{"))
             {
-                Reputation = -1;
-            }
-            else
-            {
-                var json = JObject.Parse(resContent);
-                var name = json["users"][0]["name"];
-                var isMod = json["users"][0]["is_moderator"];
-                var isOwner = json["users"][0]["is_owner"];
-                var rep = json["users"][0]["reputation"];
+                var json = JsonObject.Parse(resContent);
+                var data = json.Get<List<Dictionary<string, object>>>("users");
 
-                Name = name != null && name.Type == JTokenType.String ? (string)name : "";
-                IsMod = isMod != null && isMod.Type == JTokenType.Boolean && (bool)isMod;
-                IsRoomOwner = isOwner != null && isOwner.Type == JTokenType.Boolean && (bool)isOwner;
-                Reputation = rep == null || rep.Type != JTokenType.Integer ? 1 : (int)rep;
+                if (data.Count != 0)
+                {
+                    Name = (string)data[0]["name"];
+                    Reputation = int.Parse(data[0]["reputation"].ToString());
+                    if (data[0].ContainsKey("is_moderator") && data[0]["is_moderator"] != null)
+                    {
+                        IsMod = bool.Parse(data[0]["is_moderator"].ToString());
+                    }
+                    if (data[0].ContainsKey("is_owner") && data[0]["is_owner"] != null)
+                    {
+                        IsRoomOwner = bool.Parse(data[0]["is_owner"].ToString());
+                    }
+                    return;
+                }
             }
+
+            throw new Exception("Unable to fetch data for user: " + id);
         }
     }
 }

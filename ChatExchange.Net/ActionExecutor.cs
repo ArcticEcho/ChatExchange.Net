@@ -24,7 +24,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Linq;
-using System.Text;
 using System.Threading;
 
 namespace ChatExchangeDotNet
@@ -35,7 +34,6 @@ namespace ChatExchangeDotNet
     {
         private readonly ConcurrentDictionary<long, ChatAction> queuedActions = new ConcurrentDictionary<long, ChatAction>();
         private readonly ManualResetEvent consumerClosed = new ManualResetEvent(false);
-        private readonly object lck = new object();
         private readonly Thread consumerThread;
         private readonly EventManager evMan;
         private bool disposed;
@@ -62,13 +60,14 @@ namespace ChatExchangeDotNet
         public void Dispose()
         {
             if (disposed) { return; }
-
             disposed = true;
+
             if (consumerClosed != null)
             {
                 consumerClosed.WaitOne();
                 consumerClosed.Dispose();
             }
+
             GC.SuppressFinalize(this);
         }
 
@@ -85,7 +84,7 @@ namespace ChatExchangeDotNet
                 {
                     data = d;
                     // Action completed, notify the waiting thread.
-                    lock (lck) { Monitor.Pulse(lck); }
+                    lock (queuedActions[key]) { Monitor.Pulse(queuedActions[key]); }
                 }
             };
 
@@ -93,7 +92,7 @@ namespace ChatExchangeDotNet
             queuedActions[key] = action;
 
             // Wait for the action to be completed.
-            lock (lck) { Monitor.Wait(lck); }
+            lock (queuedActions[key]) { Monitor.Wait(queuedActions[key]); }
 
             // The action's been processed; remove it from the queue.
             ChatAction temp;

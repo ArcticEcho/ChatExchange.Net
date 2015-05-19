@@ -27,7 +27,8 @@ using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading;
 using CsQuery;
-using Newtonsoft.Json.Linq;
+using ServiceStack;
+using ServiceStack.Text;
 using WebSocketSharp;
 
 namespace ChatExchangeDotNet
@@ -90,16 +91,6 @@ namespace ChatExchangeDotNet
         public User Me { get; private set; }
 
         /// <summary>
-        /// Messages posted by all users from when this object was first instantiated.
-        /// </summary>
-        public List<Message> AllMessages { get; private set; }
-
-        /// <summary>
-        /// All successfully posted messages by the currently logged in user.
-        /// </summary>
-        public List<Message> MyMessages { get; private set; }
-
-        /// <summary>
         /// The EventManager object provides an interface to (dis)connect/update chat event listeners.
         /// </summary>
         public EventManager EventManager { get { return evMan; } }
@@ -115,16 +106,18 @@ namespace ChatExchangeDotNet
             {
                 if (messageID < 0) { throw new IndexOutOfRangeException(); }
 
-                if (AllMessages.Any(m => m.ID == messageID))
-                {
-                    return AllMessages.First(m => m.ID == messageID);
-                }
+                //if (AllMessages.Any(m => m.ID == messageID))
+                //{
+                //    return AllMessages.First(m => m.ID == messageID);
+                //}
 
-                var message = GetMessage(messageID);
+                //var message = GetMessage(messageID);
 
-                AllMessages.Add(message);
+                //AllMessages.Add(message);
 
-                return message;
+                //return message;
+
+                return GetMessage(messageID);
             }
         }
 
@@ -140,8 +133,8 @@ namespace ChatExchangeDotNet
         public Room(string cookieKey, string host, int ID)
         {
             if (String.IsNullOrEmpty(cookieKey)) { throw new ArgumentNullException("cookieKey"); }
-            if (String.IsNullOrEmpty(host)) { throw new ArgumentNullException("'host' can not be null or empty.", "host"); }
-            if (ID < 0) { throw new ArgumentOutOfRangeException("ID", "'ID' can not be negative."); }
+            if (String.IsNullOrEmpty(host)) { throw new ArgumentNullException("'host' must not be null or empty.", "host"); }
+            if (ID < 0) { throw new ArgumentOutOfRangeException("ID", "'ID' must not be negative."); }
 
             this.ID = ID;
             this.cookieKey = cookieKey;
@@ -153,8 +146,6 @@ namespace ChatExchangeDotNet
             Host = host;
             IgnoreOwnEvents = true;
             StripMentionFromMessages = true;
-            AllMessages = new List<Message>();
-            MyMessages = new List<Message>();
             Me = GetMe();
 
             SetFkey();
@@ -267,17 +258,18 @@ namespace ChatExchangeDotNet
                     if (String.IsNullOrEmpty(resContent) || hasLeft) { return null; }
                     if (HandleThrottling(resContent)) { continue; }
 
-                    var json = JObject.Parse(resContent);
-                    var messageID = (int)(json["id"].Type != JTokenType.Integer ? -1 : json["id"]);
+                    var json = JsonObject.Parse(resContent);
+                    var messageID = -1;
+                    if (json.ContainsKey("id"))
+                    {
+                        messageID = json.Get<int>("id");
+                    }
+                    else
+                    {
+                        return null;
+                    }
 
-                    if (messageID == -1) { return null; }
-
-                    var m = new Message(ref evMan, Host, ID, messageID, Me.Name, Me.ID, StripMentionFromMessages, -1);
-
-                    MyMessages.Add(m);
-                    AllMessages.Add(m);
-
-                    return m;
+                    return new Message(ref evMan, Host, ID, messageID, Me.Name, Me.ID, StripMentionFromMessages, -1);
                 }
 
                 return null;
@@ -570,7 +562,7 @@ namespace ChatExchangeDotNet
                 throw new Exception("Could not get 'eventtime' for room " + ID + " on " + Host + ". Do you have an active internet conection?");
             }
 
-            return (int)JObject.Parse(resContent)["time"];
+            return JsonObject.Parse(resContent).Get<int>("time");
         }
 
         private string GetSocketURL(int eventTime)
@@ -580,7 +572,7 @@ namespace ChatExchangeDotNet
 
             if (String.IsNullOrEmpty(resContent)) { throw new Exception("Could not get WebSocket URL. Do you haven an active internet connection?"); }
 
-            return (string)JObject.Parse(resContent)["url"] + "?l=" + eventTime;
+            return JsonObject.Parse(resContent).Get<string>("url") + "?l=" + eventTime;
         }
 
         private void InitialiseSocket(string socketUrl)
@@ -591,8 +583,7 @@ namespace ChatExchangeDotNet
             {
                 try
                 {
-                    var json = JObject.Parse(oo.Data);
-                    HandleData(json);
+                    HandleData(oo.Data);
                 }
                 catch (Exception ex)
                 {
@@ -638,18 +629,17 @@ namespace ChatExchangeDotNet
 
         # region Incoming message handling methods.
 
-        private void HandleData(JObject json)
+        private void HandleData(string json)
         {
-            var data = json["r" + ID];
-            if (data == null || data.Type == JTokenType.Null) { return; }
-            data = data["e"];
-            if (data == null || data.Type == JTokenType.Null) { return; }
+            var obj = JsonObject.Parse(json);
+            var data = obj.Get<Dictionary<string, List<Dictionary<string, object>>>>("r" + ID);
 
-            foreach (var message in data)
+            if (!data.ContainsKey("e") || data["e"] == null) { return; }
+
+            foreach (var message in data["e"])
             {
-                if (message == null || message.Type == JTokenType.Null) { continue; }
-                var eventType = (EventType)(int)(message["event_type"]);
-                if ((int)(message["room_id"].Type != JTokenType.Integer ? -1 : message["room_id"]) != ID) { continue; }
+                var eventType = (EventType)int.Parse(message["event_type"].ToString());
+                if (int.Parse(message["room_id"].ToString()) != ID) { continue; }
 
                 evMan.CallListeners(EventType.DataReceived, message.ToString());
 
@@ -694,61 +684,66 @@ namespace ChatExchangeDotNet
             }
         }
 
-        private void HandleNewMessage(JToken json)
+        private void HandleNewMessage(Dictionary<string, object> data)
         {
-            var id = (int)json["message_id"];
-            var authorName = (string)json["user_name"];
-            var authorID = (int)json["user_id"];
-            var parentID = (int)(json["parent_id"] ?? -1);
+            var id = int.Parse(data["message_id"].ToString());
+            var authorName = (string)data["user_name"];
+            var authorID = int.Parse(data["user_id"].ToString());
+            var parentID = -1;
+            if (data.ContainsKey("parent_id") && data["parent_id"] != null)
+            {
+                parentID = int.Parse(data["parent_id"].ToString());
+            }
 
             var message = new Message(ref evMan, Host, ID, id, authorName, authorID, StripMentionFromMessages, parentID);
-
-            AllMessages.Add(message);
 
             if (authorID == Me.ID && IgnoreOwnEvents) { return; }
 
             evMan.CallListeners(EventType.MessagePosted, message);
         }
 
-        private void HandleMessageReply(JToken json)
+        private void HandleMessageReply(Dictionary<string, object> data)
         {
-            var id = (int)json["message_id"];
-            var authorName = (string)json["user_name"];
-            var authorID = (int)json["user_id"];
-            var parentID = (int)(json["parent_id"] ?? -1);
-
+            var id = int.Parse(data["message_id"].ToString());
+            var authorName = (string)data["user_name"];
+            var authorID = int.Parse(data["user_id"].ToString());
+            var parentID = int.Parse(data["parent_id"].ToString());
             var parent = this[parentID];
             var message = new Message(ref evMan, Host, ID, id, authorName, authorID, StripMentionFromMessages, parentID);
-
-            AllMessages.Add(message);
 
             if (authorID == Me.ID && IgnoreOwnEvents) { return; }
 
             evMan.CallListeners(EventType.MessageReply, parent, message);
         }
 
-        private void HandleUserMentioned(JToken json)
+        private void HandleUserMentioned(Dictionary<string, object> data)
         {
-            var id = (int)json["message_id"];
-            var authorName = (string)json["user_name"];
-            var authorID = (int)json["user_id"];
-            var parentID = (int)(json["parent_id"] ?? -1);
+            var id = int.Parse(data["message_id"].ToString());
+            var authorName = (string)data["user_name"];
+            var authorID = int.Parse(data["user_id"].ToString());
+            var parentID = -1;
+            if (data.ContainsKey("parent_id") && data["parent_id"] != null)
+            {
+                parentID = int.Parse(data["parent_id"].ToString());
+            }
 
             var message = new Message(ref evMan, Host, ID, id, authorName, authorID, StripMentionFromMessages, parentID);
-
-            AllMessages.Add(message);
 
             if (authorID == Me.ID && IgnoreOwnEvents) { return; }
 
             evMan.CallListeners(EventType.UserMentioned, message);
         }
 
-        private void HandleEdit(JToken json)
+        private void HandleEdit(Dictionary<string, object> data)
         {
-            var id = (int)json["message_id"];
-            var authorName = (string)json["user_name"];
-            var authorID = (int)json["user_id"];
-            var parentID = (int)(json["parent_id"] ?? -1);
+            var id = int.Parse(data["message_id"].ToString());
+            var authorName = (string)data["user_name"];
+            var authorID = int.Parse(data["user_id"].ToString());
+            var parentID = -1;
+            if (data.ContainsKey("parent_id") && data["parent_id"] != null)
+            {
+                parentID = int.Parse(data["parent_id"].ToString());
+            }
 
             var currentMessage = new Message(ref evMan, Host, ID, id, authorName, authorID, StripMentionFromMessages, parentID);
 
@@ -757,12 +752,22 @@ namespace ChatExchangeDotNet
             evMan.CallListeners(EventType.MessageEdited, currentMessage);
         }
 
-        private void HandleStarToggle(JToken json)
+        private void HandleStarToggle(Dictionary<string, object> data)
         {
-            var id = (int)json["message_id"];
-            var starrerID = (int)json["user_id"];
-            var starCount = (int)(json["message_stars"] ?? 0);
-            var pinCount = (int)(json["message_owner_stars"] ?? 0);
+            var id = int.Parse(data["message_id"].ToString());
+            var starrerID = int.Parse(data["user_id"].ToString());
+            var starCount = 0;
+            var pinCount = 0;
+
+            if (data.ContainsKey("message_stars") && data["message_stars"] != null)
+            {
+                starCount = int.Parse(data["message_stars"].ToString());
+            }
+
+            if (data.ContainsKey("message_owner_stars") && data["message_owner_stars"] != null)
+            {
+                pinCount = int.Parse(data["message_owner_stars"].ToString());
+            }
 
             var message = this[id];
             var user = new User(Host, ID, starrerID);
@@ -772,10 +777,9 @@ namespace ChatExchangeDotNet
             evMan.CallListeners(EventType.MessageStarToggled, message, user, starCount, pinCount);
         }
 
-        private void HandleUserJoin(JToken json)
+        private void HandleUserJoin(Dictionary<string, object> data)
         {
-            var userID = (int)json["user_id"];
-
+            var userID = int.Parse(data["user_id"].ToString());
             var user = new User(Host, ID, userID);
 
             if (userID == Me.ID && IgnoreOwnEvents) { return; }
@@ -783,10 +787,9 @@ namespace ChatExchangeDotNet
             evMan.CallListeners(EventType.UserEntered, user);
         }
 
-        private void HandleUserLeave(JToken json)
+        private void HandleUserLeave(Dictionary<string, object> data)
         {
-            var userID = (int)json["user_id"];
-
+            var userID = int.Parse(data["user_id"].ToString());
             var user = new User(Host, ID, userID);
 
             if (userID == Me.ID && IgnoreOwnEvents) { return; }
