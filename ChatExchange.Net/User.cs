@@ -30,21 +30,58 @@ namespace ChatExchangeDotNet
     {
         public string Name { get; private set; }
         public int ID { get; private set; }
+        public int Reputation { get; private set; }
+        public bool IsPingable { get; private set; }
         public bool IsMod { get; private set; }
         public bool IsRoomOwner { get; private set; }
-        public int Reputation { get; private set; }
         public int RoomID { get; private set; }
         public string Host { get; private set; }
 
 
 
-        public User(string host, int roomID, int id)
+        public User(string host, int roomID, int userID, bool? isPingable = null)
         {
-            ID = id;
+            FetchUserData(host, roomID, userID, isPingable);
+        }
+
+
+
+        public static bool CanPing(string host, int roomID, int userID)
+        {
+            var json = RequestManager.SendGETRequest("", "http://chat." + host + "/rooms/pingable/" + roomID);
+            if (String.IsNullOrEmpty(json)) { return false; }
+            var data = JsonSerializer.DeserializeFromString<HashSet<List<object>>>(json);
+
+            foreach (var user in data)
+            {
+                if (int.Parse(user[0].ToString()) == userID)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return ID;
+        }
+
+        public void InvalidateCache()
+        {
+            FetchUserData(Host, RoomID, ID, null);
+        }
+
+
+
+        private void FetchUserData(string host, int roomID, int userID, bool? isPingable)
+        {
+            ID = userID;
             RoomID = roomID;
             Host = host;
 
-            var resContent = RequestManager.SendPOSTRequest("", "http://chat." + host + "/user/info", "ids=" + id + "&roomid=" + roomID);
+            var resContent = RequestManager.SendPOSTRequest("", "http://chat." + host + "/user/info", "ids=" + userID + "&roomid=" + roomID);
 
             if (!String.IsNullOrEmpty(resContent) && resContent.StartsWith("{\"users\":[{"))
             {
@@ -63,11 +100,12 @@ namespace ChatExchangeDotNet
                     {
                         IsRoomOwner = bool.Parse(data[0]["is_owner"].ToString());
                     }
+                    this.IsPingable = (bool)(isPingable ?? User.CanPing(host, roomID, userID));
                     return;
                 }
             }
 
-            throw new Exception("Unable to fetch data for user: " + id);
+            throw new Exception("Unable to fetch data for user: " + userID);
         }
     }
 }

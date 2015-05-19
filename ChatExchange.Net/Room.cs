@@ -106,17 +106,6 @@ namespace ChatExchangeDotNet
             {
                 if (messageID < 0) { throw new IndexOutOfRangeException(); }
 
-                //if (AllMessages.Any(m => m.ID == messageID))
-                //{
-                //    return AllMessages.First(m => m.ID == messageID);
-                //}
-
-                //var message = GetMessage(messageID);
-
-                //AllMessages.Add(message);
-
-                //return message;
-
                 return GetMessage(messageID);
             }
         }
@@ -232,9 +221,32 @@ namespace ChatExchangeDotNet
             return new Message(ref evMan, Host, ID, messageID, authorName, authorID, StripMentionFromMessages, parentID);
         }
 
+        /// <summary>
+        /// Fetches user data for the specified user ID.
+        /// </summary>
+        /// <param name="userID">The user ID to look up.</param>
         public User GetUser(int userID)
         {
             return new User(Host, ID, userID);
+        }
+
+        /// <summary>
+        /// Fetches a list of all users that are currently able to receive "ping"s.
+        /// </summary>
+        public HashSet<User> GetPingableUsers()
+        {
+            var json = RequestManager.SendGETRequest(cookieKey, "http://chat." + Host + "/rooms/pingable/" + ID);
+            if (String.IsNullOrEmpty(json)) { return null; }
+            var data = JsonSerializer.DeserializeFromString<HashSet<List<object>>>(json);
+            var users = new HashSet<User>();
+
+            foreach (var user in data)
+            {
+                var userID = int.Parse(user[0].ToString());
+                users.Add(new User(Host, ID, userID, true));
+            }
+
+            return users;
         }
 
         # region Normal user chat commands.
