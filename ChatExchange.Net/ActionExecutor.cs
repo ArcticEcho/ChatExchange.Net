@@ -76,6 +76,7 @@ namespace ChatExchangeDotNet
             if (disposed) { return null; }
 
             var key = queuedActions.Keys.Count == 0 ? 0 : queuedActions.Keys.Max() + 1;
+            var mre = new ManualResetEvent(false);
             object data = null;
 
             ActionCompleted += (k, d) =>
@@ -84,7 +85,7 @@ namespace ChatExchangeDotNet
                 {
                     data = d;
                     // Action completed, notify the waiting thread.
-                    lock (queuedActions[key]) { Monitor.Pulse(queuedActions[key]); }
+                    mre.Set();
                 }
             };
 
@@ -92,7 +93,7 @@ namespace ChatExchangeDotNet
             queuedActions[key] = action;
 
             // Wait for the action to be completed.
-            lock (queuedActions[key]) { Monitor.Wait(queuedActions[key]); }
+            mre.WaitOne();
 
             // The action's been processed; remove it from the queue.
             ChatAction temp;

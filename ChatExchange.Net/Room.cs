@@ -355,12 +355,12 @@ namespace ChatExchangeDotNet
             return (bool?)actEx.ExecuteAction(action) ?? false;
         }
 
-        public bool ToggleStarring(Message message)
+        public bool ToggleStar(Message message)
         {
-            return ToggleStarring(message.ID);
+            return ToggleStar(message.ID);
         }
 
-        public bool ToggleStarring(int messageID)
+        public bool ToggleStar(int messageID)
         {
             if (hasLeft) { return false; }
 
@@ -412,12 +412,12 @@ namespace ChatExchangeDotNet
             return (bool?)actEx.ExecuteAction(action) ?? false;
         }
 
-        public bool TogglePinning(Message message)
+        public bool TogglePin(Message message)
         {
-            return TogglePinning(message.ID);
+            return TogglePin(message.ID);
         }
 
-        public bool TogglePinning(int messageID)
+        public bool TogglePin(int messageID)
         {
             var action = new ChatAction(ActionType.ToggleMessagePin, new Func<object>(() =>
             {
