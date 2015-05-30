@@ -49,7 +49,7 @@ namespace ChatExchangeDotNet
         public static bool CanPing(string host, int roomID, int userID)
         {
             var json = RequestManager.SendGETRequest("", "http://chat." + host + "/rooms/pingable/" + roomID);
-            if (String.IsNullOrEmpty(json)) { return false; }
+            if (string.IsNullOrEmpty(json)) { return false; }
             var data = JsonSerializer.DeserializeFromString<HashSet<List<object>>>(json);
 
             foreach (var user in data)
@@ -83,7 +83,7 @@ namespace ChatExchangeDotNet
 
             var resContent = RequestManager.SendPOSTRequest("", "http://chat." + host + "/user/info", "ids=" + userID + "&roomid=" + roomID);
 
-            if (!String.IsNullOrEmpty(resContent) && resContent.StartsWith("{\"users\":[{"))
+            if (!string.IsNullOrEmpty(resContent) && resContent.StartsWith("{\"users\":[{"))
             {
                 var json = JsonObject.Parse(resContent);
                 var data = json.Get<List<Dictionary<string, object>>>("users");
@@ -100,7 +100,7 @@ namespace ChatExchangeDotNet
                     {
                         IsRoomOwner = bool.Parse(data[0]["is_owner"].ToString());
                     }
-                    this.IsPingable = (bool)(isPingable ?? User.CanPing(host, roomID, userID));
+                    IsPingable = isPingable ?? CanPing(host, roomID, userID);
                     return;
                 }
             }

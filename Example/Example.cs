@@ -69,7 +69,7 @@ namespace Example
             }));
 
             // Wait for the user to press the "Q" key before we exit (not the best way to do this, but it'll suffice).
-            while (Char.ToLower(Console.ReadKey(true).KeyChar) != 'q')
+            while (char.ToLower(Console.ReadKey(true).KeyChar) != 'q')
             {
                 Thread.Sleep(500);
             }

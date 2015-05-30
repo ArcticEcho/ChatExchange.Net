@@ -52,14 +52,14 @@ namespace ChatExchangeDotNet
             {
                 var resContent = RequestManager.SendGETRequest("", "http://chat." + Host + "/messages/" + ID + "/history");
 
-                if (String.IsNullOrEmpty(resContent)) { return -1; }
+                if (string.IsNullOrEmpty(resContent)) { return -1; }
 
                 var dom = CQ.Create(resContent)[".stars"];
                 var count = 0;
 
                 if (dom != null && dom.Length != 0)
                 {
-                    if (dom[".times"] != null && !String.IsNullOrEmpty(dom[".times"].First().Text()))
+                    if (dom[".times"] != null && !string.IsNullOrEmpty(dom[".times"].First().Text()))
                     {
                         count = int.Parse(dom[".times"].First().Text());
                     }
@@ -79,14 +79,14 @@ namespace ChatExchangeDotNet
             {
                 var resContent = RequestManager.SendGETRequest("", "http://chat." + Host + "/messages/" + ID + "/history");
 
-                if (String.IsNullOrEmpty(resContent)) { return -1; }
+                if (string.IsNullOrEmpty(resContent)) { return -1; }
 
                 var dom = CQ.Create(resContent)[".owner-star"];
                 var count = 0;
 
                 if (dom != null && dom.Length != 0)
                 {
-                    if (dom[".times"] != null && !String.IsNullOrEmpty(dom[".times"].First().Text()))
+                    if (dom[".times"] != null && !string.IsNullOrEmpty(dom[".times"].First().Text()))
                     {
                         count = int.Parse(dom[".times"].First().Text());
                     }
@@ -133,16 +133,17 @@ namespace ChatExchangeDotNet
 
                 var content = RequestManager.GetResponseContent(res);
 
-                return String.IsNullOrEmpty(content) ? null : WebUtility.HtmlDecode(stripMention ? content.StripMention() : content);
-            }        }
+                return string.IsNullOrEmpty(content) ? null : WebUtility.HtmlDecode(stripMention ? content.StripMention() : content);
+            }
+        }
 
 
 
         private Exception Initialise(string host, int roomID, int messageID, string authorName, int authorID, bool stripMention, int parentID, ref EventManager evMan)
         {
-            if (String.IsNullOrEmpty(host)) { return new ArgumentException("'host' can not be null or empty.", "host"); }
+            if (string.IsNullOrEmpty(host)) { return new ArgumentException("'host' can not be null or empty.", "host"); }
             if (messageID < 0) { return new ArgumentOutOfRangeException("messageID", "'ID' can not be less than 0."); }
-            if (String.IsNullOrEmpty(authorName)) { return new ArgumentException("'authorName' can not be null or empty.", "authorName"); }
+            if (string.IsNullOrEmpty(authorName)) { return new ArgumentException("'authorName' can not be null or empty.", "authorName"); }
             if (authorID < -1) { return new ArgumentOutOfRangeException("authorID", "'authorID' can not be less than -1."); }
 
             this.stripMention = stripMention;

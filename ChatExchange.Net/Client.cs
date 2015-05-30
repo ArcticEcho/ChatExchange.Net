@@ -43,8 +43,8 @@ namespace ChatExchangeDotNet
 
         public Client(string email, string password)
         {
-            if (String.IsNullOrEmpty(email) || !email.Contains("@")) { throw new ArgumentException("'email' must be a valid email address.", "email"); }
-            if (String.IsNullOrEmpty(password)) { throw new ArgumentException("'password' must not be null or empty.", "password"); }
+            if (string.IsNullOrEmpty(email) || !email.Contains("@")) { throw new ArgumentException("'email' must be a valid email address.", "email"); }
+            if (string.IsNullOrEmpty(password)) { throw new ArgumentException("'password' must not be null or empty.", "password"); }
 
             cookieKey = email.Split('@')[0];
 
@@ -103,7 +103,7 @@ namespace ChatExchangeDotNet
                 }
             }
 
-            if (!String.IsNullOrEmpty(cookieKey))
+            if (!string.IsNullOrEmpty(cookieKey))
             {
                 RequestManager.Cookies.Remove(cookieKey);
             }
@@ -117,13 +117,13 @@ namespace ChatExchangeDotNet
         {
             var getResContent = RequestManager.SendGETRequest(cookieKey, "https://openid.stackexchange.com/account/login");
 
-            if (String.IsNullOrEmpty(getResContent)) { throw new Exception("Could not get OpenID fkey. Do you have an active internet connection?"); }
+            if (string.IsNullOrEmpty(getResContent)) { throw new Exception("Could not get OpenID fkey. Do you have an active internet connection?"); }
 
             var data = "email=" + Uri.EscapeDataString(email) + "&password=" + Uri.EscapeDataString(password) + "&fkey=" + CQ.Create(getResContent).GetInputValue("fkey");
             
             using (var res = RequestManager.SendPOSTRequestRaw(cookieKey, "https://openid.stackexchange.com/account/login/submit", data))
             {
-                if (res == null || !String.IsNullOrEmpty(res.Headers["p3p"])) { throw new Exception("Could not login using the specified OpenID credentials. Have you entered the correct credentials, and have an active internet connection?"); }
+                if (res == null || !string.IsNullOrEmpty(res.Headers["p3p"])) { throw new Exception("Could not login using the specified OpenID credentials. Have you entered the correct credentials, and have an active internet connection?"); }
 
                 var postResContent = RequestManager.GetResponseContent(res);
                 var dom = CQ.Create(postResContent);
@@ -138,7 +138,7 @@ namespace ChatExchangeDotNet
         {
             var getResContent = RequestManager.SendGETRequest(cookieKey, "http://" + host + "/users/login");
 
-            if (String.IsNullOrEmpty(getResContent)) { throw new Exception("Could not get fkey from " + host + ". Do you have an active internet connection?"); }
+            if (string.IsNullOrEmpty(getResContent)) { throw new Exception("Could not get fkey from " + host + ". Do you have an active internet connection?"); }
 
             var fkey = CQ.Create(getResContent).GetInputValue("fkey");
             var data = "fkey=" + fkey + "&oauth_version=&oauth_server=&openid_username=&openid_identifier=" + Uri.EscapeDataString(openidUrl);

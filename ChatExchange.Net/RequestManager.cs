@@ -130,11 +130,11 @@ namespace ChatExchangeDotNet
             var req = (HttpWebRequest)WebRequest.Create(uri);
 
             req.Method = method;
-            req.CookieContainer = String.IsNullOrEmpty(cookieKey) ? null : Cookies[cookieKey];
+            req.CookieContainer = string.IsNullOrEmpty(cookieKey) ? null : Cookies[cookieKey];
             req.Timeout = TimeoutMilliseconds;
             req.Referer = referer;
 
-            if (!String.IsNullOrEmpty(origin))
+            if (!string.IsNullOrEmpty(origin))
             {
                 req.Headers.Add("Origin", origin);
             }
@@ -165,7 +165,7 @@ namespace ChatExchangeDotNet
             {
                 res = (HttpWebResponse)req.GetResponse();
 
-                if (!String.IsNullOrEmpty(cookieKey))
+                if (!string.IsNullOrEmpty(cookieKey))
                 {
                     Cookies[cookieKey].Add(res.Cookies);
                 }
