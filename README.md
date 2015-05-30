@@ -1,4 +1,4 @@
-ChatExchange.Net [![Build Status](https://travis-ci.org/ArcticEcho/ChatExchange.Net.svg)](https://travis-ci.org/ArcticEcho/ChatExchange.Net) [![NuGet Package](https://img.shields.io/badge/NuGet Package-v2.2.2 (beta)-blue.svg)](https://www.nuget.org/packages/ChatExchange.Net/2.2.2-beta)
+ChatExchange.Net [![Build Status](https://travis-ci.org/ArcticEcho/ChatExchange.Net.svg)](https://travis-ci.org/ArcticEcho/ChatExchange.Net) [![NuGet Package](https://img.shields.io/badge/NuGet Package-v2.2.3 (beta)-blue.svg)](https://www.nuget.org/packages/ChatExchange.Net/2.2.3-beta)
 ================
 
 A .Net library (requires .Net 4.0, or the Mono equivalent) for interacting with [Stack Exchange](http://stackexchange.com/) chat.
