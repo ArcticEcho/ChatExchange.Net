@@ -57,10 +57,14 @@
     <Compile Include="ExtensionMethods.cs" />
     <Compile Include="Message.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="MessageBuilder.cs" />
+    <Compile Include="MultiLineMessageType.cs" />
+    <Compile Include="TextFormattingOptions.cs" />
     <Compile Include="RequestManager.cs" />
     <Compile Include="Room.cs" />
     <Compile Include="User.cs" />
     <Compile Include="UserRoomAccess.cs" />
+    <Compile Include="WhiteSpace.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

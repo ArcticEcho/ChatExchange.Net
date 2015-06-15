@@ -50,11 +50,17 @@ namespace Example
                 // Print the new message (with the author's name).
                 Console.WriteLine("Author: " + message.AuthorName + "\nMessage: " + message.Content + "\n");
 
-                // If the message contains "3... 2... 1...", post "KA-BOOM!" (this is simply an example).
+                // If the message contains "3... 2... 1...", post "KA-BOOM!" (this is simply an [awful] example).
                 if (message.Content.Contains("3... 2... 1..."))
                 {
-                    // (CE.Net also supports chat markdown.)
-                    var success = sandbox.PostMessage("**KA-BOOM!**") != null;
+                    // Create a new MessageBuilder to format out message.
+                    var msgBuilder = new MessageBuilder();
+
+                    // Append the text "KA-BOOM!" (formatted in bold).
+                    msgBuilder.AppendText("KA-BOOM!", TextFormattingOptions.Bold);
+
+                    // Finally post the formatted message.
+                    var success = sandbox.PostMessage(msgBuilder.Message) != null;
 
                     Console.WriteLine("'KA-BOOM' message successfully posted: " + success);
                 }
