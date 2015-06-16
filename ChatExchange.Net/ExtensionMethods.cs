@@ -89,7 +89,7 @@ namespace ChatExchangeDotNet
 
             foreach (var m in messages)
             {
-                if (m.AuthorID == userID)
+                if (m.Author.ID == userID)
                 {
                     userMessages.Add(m);
                 }

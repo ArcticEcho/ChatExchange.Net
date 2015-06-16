@@ -183,6 +183,9 @@ namespace ChatExchangeDotNet
             GC.SuppressFinalize(this);
         }
 
+        /// <summary>
+        /// Leave the room.
+        /// </summary>
         public void Leave()
         {
             if (hasLeft) { return; }
@@ -190,6 +193,14 @@ namespace ChatExchangeDotNet
             RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/chats/leave/" + ID, "quiet=true&fkey=" + fkey);
 
             hasLeft = true;
+        }
+
+        /// <summary>
+        /// Refreshes the 'Me' property with fresh data.
+        /// </summary>
+        public void RefreshMe()
+        {
+            Me = GetUser(Me.ID);
         }
 
         /// <summary>
@@ -215,7 +226,7 @@ namespace ChatExchangeDotNet
             var authorName = lastestDom[".username a"].First().Text();
             var authorID = int.Parse(lastestDom[".username a"].First().Attr("href").Split('/')[2]);
 
-            return new Message(ref evMan, Host, ID, messageID, authorName, authorID, StripMentionFromMessages, parentID);
+            return new Message(ref evMan, Host, ID, messageID, GetUser(authorID), StripMentionFromMessages, parentID);
         }
 
         /// <summary>
@@ -224,7 +235,7 @@ namespace ChatExchangeDotNet
         /// <param name="userID">The user ID to look up.</param>
         public User GetUser(int userID)
         {
-            return new User(Host, ID, userID);
+            return new User(ref evMan, Host, ID, userID);
         }
 
         /// <summary>
@@ -278,7 +289,7 @@ namespace ChatExchangeDotNet
                         return null;
                     }
 
-                    return new Message(ref evMan, Host, ID, messageID, Me.Name, Me.ID, StripMentionFromMessages, -1);
+                    return new Message(ref evMan, Host, ID, messageID, Me, StripMentionFromMessages, -1);
                 }
 
                 return null;
@@ -659,19 +670,19 @@ namespace ChatExchangeDotNet
                         HandleNewMessage(message);
                         continue;
                     }
-                    case EventType.MessageReply:
-                    {
-                        HandleMessageReply(message);
-                        continue;
-                    }
-                    case EventType.UserMentioned:
-                    {
-                        HandleUserMentioned(message);
-                        continue;
-                    }
                     case EventType.MessageEdited:
                     {
-                        HandleEdit(message);
+                        HandleMessageEdit(message);
+                        continue;
+                    }
+                    case EventType.UserEntered:
+                    {
+                        HandleUserJoinLeave(message, EventType.UserEntered);
+                        continue;
+                    }
+                    case EventType.UserLeft:
+                    {
+                        HandleUserJoinLeave(message, EventType.UserLeft);
                         continue;
                     }
                     case EventType.MessageStarToggled:
@@ -679,14 +690,19 @@ namespace ChatExchangeDotNet
                         HandleStarToggle(message);
                         continue;
                     }
-                    case EventType.UserEntered:
+                    case EventType.UserMentioned:
                     {
-                        HandleUserJoin(message);
+                        HandleUserMentioned(message);
                         continue;
                     }
-                    case EventType.UserLeft:
+                    case EventType.UserAccessLevelChanged:
                     {
-                        HandleUserLeave(message);
+                        HandleUserAccessChange(message);
+                        continue;
+                    }
+                    case EventType.MessageReply:
+                    {
+                        HandleMessageReply(message);
                         continue;
                     }
                 }
@@ -695,76 +711,56 @@ namespace ChatExchangeDotNet
 
         private void HandleNewMessage(Dictionary<string, object> data)
         {
-            var id = int.Parse(data["message_id"].ToString());
-            var authorName = (string)data["user_name"];
             var authorID = int.Parse(data["user_id"].ToString());
+
+            if (authorID == Me.ID && IgnoreOwnEvents) { return; }
+
+            var id = int.Parse(data["message_id"].ToString());
             var parentID = -1;
             if (data.ContainsKey("parent_id") && data["parent_id"] != null)
             {
                 parentID = int.Parse(data["parent_id"].ToString());
             }
 
-            var message = new Message(ref evMan, Host, ID, id, authorName, authorID, StripMentionFromMessages, parentID);
-
-            if (authorID == Me.ID && IgnoreOwnEvents) { return; }
+            var message = new Message(ref evMan, Host, ID, id, GetUser(authorID), StripMentionFromMessages, parentID);
 
             evMan.CallListeners(EventType.MessagePosted, message);
         }
 
-        private void HandleMessageReply(Dictionary<string, object> data)
+        private void HandleMessageEdit(Dictionary<string, object> data)
         {
-            var id = int.Parse(data["message_id"].ToString());
-            var authorName = (string)data["user_name"];
             var authorID = int.Parse(data["user_id"].ToString());
-            var parentID = int.Parse(data["parent_id"].ToString());
-            var parent = this[parentID];
-            var message = new Message(ref evMan, Host, ID, id, authorName, authorID, StripMentionFromMessages, parentID);
 
             if (authorID == Me.ID && IgnoreOwnEvents) { return; }
 
-            evMan.CallListeners(EventType.MessageReply, parent, message);
-        }
-
-        private void HandleUserMentioned(Dictionary<string, object> data)
-        {
             var id = int.Parse(data["message_id"].ToString());
-            var authorName = (string)data["user_name"];
-            var authorID = int.Parse(data["user_id"].ToString());
             var parentID = -1;
             if (data.ContainsKey("parent_id") && data["parent_id"] != null)
             {
                 parentID = int.Parse(data["parent_id"].ToString());
             }
 
-            var message = new Message(ref evMan, Host, ID, id, authorName, authorID, StripMentionFromMessages, parentID);
-
-            if (authorID == Me.ID && IgnoreOwnEvents) { return; }
-
-            evMan.CallListeners(EventType.UserMentioned, message);
-        }
-
-        private void HandleEdit(Dictionary<string, object> data)
-        {
-            var id = int.Parse(data["message_id"].ToString());
-            var authorName = (string)data["user_name"];
-            var authorID = int.Parse(data["user_id"].ToString());
-            var parentID = -1;
-            if (data.ContainsKey("parent_id") && data["parent_id"] != null)
-            {
-                parentID = int.Parse(data["parent_id"].ToString());
-            }
-
-            var currentMessage = new Message(ref evMan, Host, ID, id, authorName, authorID, StripMentionFromMessages, parentID);
-
-            if (authorID == Me.ID && IgnoreOwnEvents) { return; }
+            var currentMessage = new Message(ref evMan, Host, ID, id, GetUser(authorID), StripMentionFromMessages, parentID);
 
             evMan.CallListeners(EventType.MessageEdited, currentMessage);
         }
 
+        private void HandleUserJoinLeave(Dictionary<string, object> data, EventType type)
+        {
+            var userID = int.Parse(data["user_id"].ToString());
+
+            if (userID == Me.ID && IgnoreOwnEvents) { return; }
+
+            evMan.CallListeners(type, GetUser(userID));
+        }
+
         private void HandleStarToggle(Dictionary<string, object> data)
         {
-            var id = int.Parse(data["message_id"].ToString());
             var starrerID = int.Parse(data["user_id"].ToString());
+
+            if (starrerID == Me.ID && IgnoreOwnEvents) { return; }
+
+            var id = int.Parse(data["message_id"].ToString());
             var starCount = 0;
             var pinCount = 0;
 
@@ -781,29 +777,73 @@ namespace ChatExchangeDotNet
             var message = this[id];
             var user = new User(Host, ID, starrerID);
 
-            if (starrerID == Me.ID && IgnoreOwnEvents) { return; }
-
             evMan.CallListeners(EventType.MessageStarToggled, message, user, starCount, pinCount);
         }
 
-        private void HandleUserJoin(Dictionary<string, object> data)
+        private void HandleUserMentioned(Dictionary<string, object> data)
         {
-            var userID = int.Parse(data["user_id"].ToString());
-            var user = new User(Host, ID, userID);
+            var authorID = int.Parse(data["user_id"].ToString());
 
-            if (userID == Me.ID && IgnoreOwnEvents) { return; }
+            if (authorID == Me.ID && IgnoreOwnEvents) { return; }
 
-            evMan.CallListeners(EventType.UserEntered, user);
+            var id = int.Parse(data["message_id"].ToString());
+            var parentID = -1;
+            if (data.ContainsKey("parent_id") && data["parent_id"] != null)
+            {
+                parentID = int.Parse(data["parent_id"].ToString());
+            }
+
+            var message = new Message(ref evMan, Host, ID, id, GetUser(authorID), StripMentionFromMessages, parentID);
+
+            evMan.CallListeners(EventType.UserMentioned, message);
         }
 
-        private void HandleUserLeave(Dictionary<string, object> data)
+        private void HandleUserAccessChange(Dictionary<string, object> data)
         {
-            var userID = int.Parse(data["user_id"].ToString());
-            var user = new User(Host, ID, userID);
+            var granterID = int.Parse(data["user_id"].ToString());
 
-            if (userID == Me.ID && IgnoreOwnEvents) { return; }
+            if (granterID == Me.ID && IgnoreOwnEvents) { return; }
 
-            evMan.CallListeners(EventType.UserLeft, user);
+            var targetUserID = int.Parse(data["target_user_id"].ToString());
+            var content = (string)data["content"];
+            var granter = GetUser(granterID);
+            var targetUser = GetUser(targetUserID);
+            var newAccessLevel = UserRoomAccess.Normal;
+
+            switch (content)
+            {
+                case "Access now owner":
+                {
+                    newAccessLevel = UserRoomAccess.Owner;
+                    break;
+                }
+                case "Access now read-write":
+                {
+                    newAccessLevel = UserRoomAccess.ExplicitReadWrite;
+                    break;
+                }
+                case "Access now read-only":
+                {
+                    newAccessLevel = UserRoomAccess.ExplicitReadOnly;
+                    break;
+                }
+            }
+
+            evMan.CallListeners(EventType.UserAccessLevelChanged, granter, targetUser, newAccessLevel);
+        }
+
+        private void HandleMessageReply(Dictionary<string, object> data)
+        {
+            var authorID = int.Parse(data["user_id"].ToString());
+
+            if (authorID == Me.ID && IgnoreOwnEvents) { return; }
+
+            var id = int.Parse(data["message_id"].ToString());
+            var parentID = int.Parse(data["parent_id"].ToString());
+            var parent = this[parentID];
+            var message = new Message(ref evMan, Host, ID, id, GetUser(authorID), StripMentionFromMessages, parentID);
+
+            evMan.CallListeners(EventType.MessageReply, parent, message);
         }
 
         # endregion

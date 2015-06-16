@@ -32,5 +32,6 @@ namespace ChatExchangeDotNet
         Italic = 2,
         InLineCode = 4,
         Tag = 8,
+        Strikethrough = 16
     }
 }

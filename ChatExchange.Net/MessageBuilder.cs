@@ -144,9 +144,14 @@ namespace ChatExchangeDotNet
 
             var mdChars = "";
 
+            if ((formattingOptions & TextFormattingOptions.Strikethrough) == TextFormattingOptions.Strikethrough)
+            {
+                mdChars = "---";
+            }
+
             if ((formattingOptions & TextFormattingOptions.Bold) == TextFormattingOptions.Bold)
             {
-                mdChars = "**";
+                mdChars += "**";
             }
 
             if ((formattingOptions & TextFormattingOptions.Italic) == TextFormattingOptions.Italic)

@@ -35,32 +35,32 @@ namespace ChatExchangeDotNet
         /// <summary>
         /// Meaningful (unparsed) data has been received via the WebSocket (as JSON).
         /// </summary>
-        DataReceived = 0,
+        DataReceived,
 
         /// <summary>
         /// A new message has been posted.
         /// </summary>
-        MessagePosted = 1,
+        MessagePosted,
 
         /// <summary>
         /// A message has been edited.
         /// </summary>
-        MessageEdited = 2,
+        MessageEdited,
 
         /// <summary>
         /// A user has entered the room.
         /// </summary>
-        UserEntered = 3,
+        UserEntered,
 
         /// <summary>
         /// A user has left the room.
         /// </summary>
-        UserLeft = 4,
+        UserLeft,
 
         /// <summary>
         /// The room's name (and/or description) has been changed.
         /// </summary>
-        RoomNameChanged = 5,
+        //RoomNameChanged,
 
         /// <summary>
         /// Someone has (un)starred a message.
@@ -70,7 +70,7 @@ namespace ChatExchangeDotNet
         /// <summary>
         /// Still have no idea what this is...
         /// </summary>
-        DebugMessage = 7,
+        //DebugMessage,
 
         /// <summary>
         /// You have been mentioned (@Username) in a message.
@@ -80,47 +80,47 @@ namespace ChatExchangeDotNet
         /// <summary>
         /// A message has been flagged as spam/offensive.
         /// </summary>
-        MessageFlagged = 9,
+        MessageFlagged,
 
         /// <summary>
         /// A message has been deleted.
         /// </summary>
-        MessageDeleted = 10,
+        MessageDeleted,
 
         /// <summary>
         /// 
         /// </summary>
-        FileAdded = 11,
+        //FileAdded,
 
         /// <summary>
         /// A message has been flagged for moderator attention.
         /// </summary>
-        ModeratorFlag = 12,
+        //ModeratorFlag,
 
         /// <summary>
         /// 
         /// </summary>
-        UserSettingsChanged = 13,
+        //UserSettingsChanged,
 
         /// <summary>
         /// 
         /// </summary>
-        GlobalNotification = 14,
+        //GlobalNotification,
 
         /// <summary>
         /// A user's room access level has been changed.
         /// </summary>
-        AccessLevelChanged = 15,
+        UserAccessLevelChanged = 15,
 
         /// <summary>
         ///  
         /// </summary>
-        UserNotification = 16,
+        //UserNotification,
 
         /// <summary>
         /// You have been invited to join another room.
         /// </summary>
-        Invitation = 17,
+        //Invitation,
 
         /// <summary>
         /// Someone has posted a reply to one of your messages.
@@ -130,22 +130,22 @@ namespace ChatExchangeDotNet
         /// <summary>
         /// A room owner (or moderator) has moved messages (or a message) out of the room.
         /// </summary>
-        MessageMovedOut = 19,
+        //MessageMovedOut,
 
         /// <summary>
         /// A room owner (or moderator) has moved messages (or a message) into the room.
         /// </summary>
-        MessageMovedIn = 20,
+        //MessageMovedIn,
 
         /// <summary>
         /// 
         /// </summary>
-        TimeBreak = 21,
+        //TimeBreak,
 
         /// <summary>
-        /// Occurs when a new feed ticker message appears. 
+        /// Occurs when a new feed ticker message is posted.
         /// </summary>
-        FeedTicker = 22,
+        //FeedTicker,
 
         /// <summary>
         /// A user has been suspended.
@@ -155,6 +155,6 @@ namespace ChatExchangeDotNet
         /// <summary>
         /// Two user accounts have been merged.
         /// </summary>
-        UserMerged = 30
+        //UserMerged
     }
 }

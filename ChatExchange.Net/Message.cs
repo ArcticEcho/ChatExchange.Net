@@ -32,9 +32,10 @@ namespace ChatExchangeDotNet
         private string content;
 
         public int ID { get; private set; }
-        public string AuthorName { get; private set; }
-        public int AuthorID { get; private set; }
+        //public string AuthorName { get; private set; }
+        //public int AuthorID { get; private set; }
         public int ParentID { get; private set; }
+        public User Author { get; private set; }
         public string Host { get; private set; }
         public int RoomID { get; private set; }
 
@@ -102,10 +103,10 @@ namespace ChatExchangeDotNet
 
 
 
-        public Message(string host, int roomID, int messageID, string authorName, int authorID, bool stripMention = true, int parentID = -1)
+        public Message(string host, int roomID, int messageID, User author, bool stripMention = true, int parentID = -1)
         {
             EventManager temp = null;
-            var ex = Initialise(host, roomID, messageID, authorName, authorID, stripMention, parentID, ref temp);
+            var ex = Initialise(host, roomID, messageID, author, stripMention, parentID, ref temp);
 
             if (ex != null)
             {
@@ -113,9 +114,9 @@ namespace ChatExchangeDotNet
             }
         }
 
-        public Message(ref EventManager evMan, string host, int roomID, int messageID, string authorName, int authorID, bool stripMention = true, int parentID = -1)
+        public Message(ref EventManager evMan, string host, int roomID, int messageID, User author, bool stripMention = true, int parentID = -1)
         {
-            var ex = Initialise(host, roomID, messageID, authorName, authorID, stripMention, parentID, ref evMan);
+            var ex = Initialise(host, roomID, messageID, author, stripMention, parentID, ref evMan);
 
             if (ex != null)
             {
@@ -139,29 +140,27 @@ namespace ChatExchangeDotNet
 
 
 
-        private Exception Initialise(string host, int roomID, int messageID, string authorName, int authorID, bool stripMention, int parentID, ref EventManager evMan)
+        private Exception Initialise(string host, int roomID, int messageID, User author, bool stripMention, int parentID, ref EventManager evMan)
         {
             if (string.IsNullOrEmpty(host)) { return new ArgumentException("'host' can not be null or empty.", "host"); }
             if (messageID < 0) { return new ArgumentOutOfRangeException("messageID", "'ID' can not be less than 0."); }
-            if (string.IsNullOrEmpty(authorName)) { return new ArgumentException("'authorName' can not be null or empty.", "authorName"); }
-            if (authorID < -1) { return new ArgumentOutOfRangeException("authorID", "'authorID' can not be less than -1."); }
+            if (author == null) { return new ArgumentNullException("author"); }
 
             this.stripMention = stripMention;
             content = GetMessageContent(host, messageID, stripMention);
             Host = host;
             RoomID = roomID;
             ID = messageID;
-            AuthorName = authorName;
-            AuthorID = authorID;
+            Author = author;
             ParentID = parentID;
 
             if (evMan != null)
             {
-                evMan.ConnectListener(EventType.MessageEdited, new Action<Message, Message>((oldMessage, newMessage) =>
+                evMan.ConnectListener(EventType.MessageEdited, new Action<Message>(editedMessage =>
                 {
-                    if (oldMessage.ID == messageID)
+                    if (editedMessage.ID == ID)
                     {
-                        content = newMessage.Content;
+                        content = editedMessage.Content;
                     }
                 }));
             }

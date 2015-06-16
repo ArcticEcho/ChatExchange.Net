@@ -48,7 +48,7 @@ namespace Example
             sandbox.EventManager.ConnectListener(EventType.MessagePosted, new Action<Message>(message =>
             {
                 // Print the new message (with the author's name).
-                Console.WriteLine("Author: " + message.AuthorName + "\nMessage: " + message.Content + "\n");
+                Console.WriteLine("Author: " + message.Author.Name + "\nMessage: " + message.Content + "\n");
 
                 // If the message contains "3... 2... 1...", post "KA-BOOM!" (this is simply an [awful] example).
                 if (message.Content.Contains("3... 2... 1..."))
