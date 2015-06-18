@@ -30,6 +30,10 @@ using WebSocketSharp;
 
 namespace ChatExchangeDotNet
 {
+    /// <summary>
+    /// Provides access to chat room functions, such as, message posting/editing/deleting/starring,
+    /// user kick-muting/access level changing, basic message/user retrieval and the ability to subscribe to events.
+    /// </summary>
     public class Room : IDisposable
     {
         private bool disposed;
@@ -112,7 +116,8 @@ namespace ChatExchangeDotNet
 
 
         /// <summary>
-        /// Provides access to chat room functions, such as, message posting/editing/deleting/starring, user kick-muting/access level changing, basic message/user retrieval and the ability to subscribe to events.
+        /// Provides access to chat room functions, such as, message posting/editing/deleting/starring,
+        /// user kick-muting/access level changing, basic message/user retrieval and the ability to subscribe to events.
         /// </summary>
         /// <param name="host">The host domain of the room (e.g., meta.stackexchange.com).</param>
         /// <param name="ID">The room's identification number.</param>
@@ -196,7 +201,7 @@ namespace ChatExchangeDotNet
         }
 
         /// <summary>
-        /// Refreshes the 'Me' property with fresh data.
+        /// Resets the 'Me' property with fresh data.
         /// </summary>
         public void RefreshMe()
         {
@@ -711,6 +716,9 @@ namespace ChatExchangeDotNet
 
         private void HandleNewMessage(Dictionary<string, object> data)
         {
+            // No point parsing all this data if no one's listening.
+            if (!evMan.ConnectedListeners.ContainsKey(EventType.MessagePosted)) { return; }
+
             var authorID = int.Parse(data["user_id"].ToString());
 
             if (authorID == Me.ID && IgnoreOwnEvents) { return; }
@@ -729,6 +737,9 @@ namespace ChatExchangeDotNet
 
         private void HandleMessageEdit(Dictionary<string, object> data)
         {
+            // No point parsing all this data if no one's listening.
+            if (!evMan.ConnectedListeners.ContainsKey(EventType.MessageEdited)) { return; }
+
             var authorID = int.Parse(data["user_id"].ToString());
 
             if (authorID == Me.ID && IgnoreOwnEvents) { return; }
@@ -747,6 +758,9 @@ namespace ChatExchangeDotNet
 
         private void HandleUserJoinLeave(Dictionary<string, object> data, EventType type)
         {
+            // No point parsing all this data if no one's listening.
+            if (!evMan.ConnectedListeners.ContainsKey(type)) { return; }
+
             var userID = int.Parse(data["user_id"].ToString());
 
             if (userID == Me.ID && IgnoreOwnEvents) { return; }
@@ -756,6 +770,9 @@ namespace ChatExchangeDotNet
 
         private void HandleStarToggle(Dictionary<string, object> data)
         {
+            // No point parsing all this data if no one's listening.
+            if (!evMan.ConnectedListeners.ContainsKey(EventType.MessageStarToggled)) { return; }
+
             var starrerID = int.Parse(data["user_id"].ToString());
 
             if (starrerID == Me.ID && IgnoreOwnEvents) { return; }
@@ -782,6 +799,9 @@ namespace ChatExchangeDotNet
 
         private void HandleUserMentioned(Dictionary<string, object> data)
         {
+            // No point parsing all this data if no one's listening.
+            if (!evMan.ConnectedListeners.ContainsKey(EventType.UserMentioned)) { return; }
+
             var authorID = int.Parse(data["user_id"].ToString());
 
             if (authorID == Me.ID && IgnoreOwnEvents) { return; }
@@ -800,6 +820,9 @@ namespace ChatExchangeDotNet
 
         private void HandleUserAccessChange(Dictionary<string, object> data)
         {
+            // No point parsing all this data if no one's listening.
+            if (!evMan.ConnectedListeners.ContainsKey(EventType.UserAccessLevelChanged)) { return; }
+
             var granterID = int.Parse(data["user_id"].ToString());
 
             if (granterID == Me.ID && IgnoreOwnEvents) { return; }
@@ -834,6 +857,9 @@ namespace ChatExchangeDotNet
 
         private void HandleMessageReply(Dictionary<string, object> data)
         {
+            // No point parsing all this data if no one's listening.
+            if (!evMan.ConnectedListeners.ContainsKey(EventType.MessageReply)) { return; }
+
             var authorID = int.Parse(data["user_id"].ToString());
 
             if (authorID == Me.ID && IgnoreOwnEvents) { return; }
