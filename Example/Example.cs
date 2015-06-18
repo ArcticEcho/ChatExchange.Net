@@ -80,6 +80,10 @@ namespace Example
                 Thread.Sleep(500);
             }
 
+            // Not necessary for safe disposal, but still, it's nice to "physically"
+            // leave the room rather than letting timeouts figure out that we've gone.
+            sandbox.Leave();
+
             // Safely dispose of the client object (which will also clean up all created room instances).
             client.Dispose();
         }
