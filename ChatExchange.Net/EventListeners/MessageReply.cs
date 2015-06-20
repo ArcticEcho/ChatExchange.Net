@@ -33,9 +33,11 @@ namespace ChatExchangeDotNet.EventListeners
 
             var listenerParams = listener.Method.GetParameters();
 
-            if (listenerParams == null || listenerParams.Length != 1 || listenerParams[0].ParameterType != typeof(Message))
+            if (listenerParams == null || listenerParams.Length != 2 ||
+                listenerParams[0].ParameterType != typeof(Message) ||
+                listenerParams[0].ParameterType != typeof(Message))
             {
-                return new TargetException("This chat event takes a single argument of type 'Message'.");
+                return new TargetException("This chat event takes two arguments (both) of type 'Message'.");
             }
 
             return null;
