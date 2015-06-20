@@ -24,12 +24,15 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
+using ChatExchangeDotNet.EventListeners;
 
 namespace ChatExchangeDotNet
 {
     public class EventManager : IDisposable
     {
+        private readonly ConcurrentDictionary<EventType, IEventListener> listenerCheckers;
         private bool disposed;
 
         public ConcurrentDictionary<EventType, ConcurrentDictionary<int, Delegate>> ConnectedListeners { get; private set; }
@@ -38,6 +41,20 @@ namespace ChatExchangeDotNet
 
         public EventManager()
         {
+            listenerCheckers = new ConcurrentDictionary<EventType, IEventListener>();
+
+            var types = Assembly.GetExecutingAssembly().GetTypes();
+            var eventCheckers = types.Where(t => t.Namespace == "ChatExchangeDotNet.EventListeners");
+
+            foreach (EventType chatEvent in Enum.GetValues(typeof(EventType)))
+            {
+                var eventName = Enum.GetName(typeof(EventType), chatEvent);
+                var type = eventCheckers.First(t => t.Name == eventName);
+                var instance = (IEventListener)Activator.CreateInstance(type);
+
+                listenerCheckers[chatEvent] = instance;
+            }
+
             ConnectedListeners = new ConcurrentDictionary<EventType, ConcurrentDictionary<int, Delegate>>();
         }
 
@@ -83,6 +100,11 @@ namespace ChatExchangeDotNet
         public void ConnectListener(EventType eventType, Delegate listener)
         {
             if (disposed) { return; }
+            var ex = listenerCheckers[eventType].CheckListener(listener);
+            if (ex != null)
+            {
+                throw ex;
+            }
 
             if (!ConnectedListeners.ContainsKey(eventType))
             {
@@ -90,7 +112,7 @@ namespace ChatExchangeDotNet
             }
             else if (ConnectedListeners[eventType].Values.Contains(listener))
             {
-                throw new Exception("'listener' has already been connected to this event type.");
+                throw new ArgumentException("'listener' has already been connected to this event type.", "listener");
             }
 
             if (ConnectedListeners[eventType].Count == 0)
@@ -102,16 +124,6 @@ namespace ChatExchangeDotNet
                 var index = ConnectedListeners[eventType].Keys.Max() + 1;
                 ConnectedListeners[eventType][index] = listener;
             }
-        }
-
-        public void UpdateListener(EventType eventType, Delegate oldListener, Delegate newListener)
-        {
-            if (disposed) { return; }
-            if (!ConnectedListeners.ContainsKey(eventType)) { throw new KeyNotFoundException(); }
-            if (!ConnectedListeners[eventType].Values.Contains(oldListener)) { throw new KeyNotFoundException(); }
-
-            var index = ConnectedListeners[eventType].Where(kv => kv.Value == oldListener).First().Key;
-            ConnectedListeners[eventType][index] = newListener;
         }
 
         public void DisconnectListener(EventType eventType, Delegate listener)

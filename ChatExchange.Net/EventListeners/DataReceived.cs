@@ -21,20 +21,24 @@
 
 
 using System;
+using System.Reflection;
 
-namespace ChatExchangeDotNet
+namespace ChatExchangeDotNet.EventListeners
 {
-    public class ChatAction
+    internal class DataReceived : IEventListener
     {
-        public Delegate Action { get; private set; }
-        public ActionType Type { get; private set; }
-
-
-
-        public ChatAction(ActionType type, Delegate action)
+        public Exception CheckListener(Delegate listener)
         {
-            Action = action;
-            Type = type;
+            if (listener == null) { return new ArgumentNullException("listener"); }
+
+            var listenerParams = listener.Method.GetParameters();
+
+            if (listenerParams == null || listenerParams.Length != 1 || listenerParams[0].ParameterType != typeof(string))
+            {
+                return new TargetException("This chat event takes a single argument of type 'string'.");
+            }
+
+            return null;
         }
     }
 }

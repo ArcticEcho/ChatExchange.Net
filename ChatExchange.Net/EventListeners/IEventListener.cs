@@ -22,19 +22,10 @@
 
 using System;
 
-namespace ChatExchangeDotNet
+namespace ChatExchangeDotNet.EventListeners
 {
-    public class ChatAction
+    internal interface IEventListener
     {
-        public Delegate Action { get; private set; }
-        public ActionType Type { get; private set; }
-
-
-
-        public ChatAction(ActionType type, Delegate action)
-        {
-            Action = action;
-            Type = type;
-        }
+        Exception CheckListener(Delegate listener);
     }
 }

@@ -48,7 +48,7 @@ namespace ChatExchangeDotNet
 
             cookieKey = email.Split('@')[0];
 
-            if (RequestManager.Cookies.ContainsKey(cookieKey)) { throw new Exception("Can not create duplicate instances of the same user."); }
+            if (RequestManager.Cookies.ContainsKey(cookieKey)) { throw new Exception("Cannot create multiple instances of the same user."); }
 
             RequestManager.Cookies.Add(cookieKey, new CookieContainer());
 
@@ -69,7 +69,7 @@ namespace ChatExchangeDotNet
             var host = hostParser.Replace(roomUrl, "");
             var id = int.Parse(idParser.Replace(roomUrl, ""));
 
-            if (Rooms.Any(room => room.Host == host && room.ID == id)) { throw new Exception("You're already in this room."); }
+            if (Rooms.Any(room => room.Host == host && room.ID == id)) { throw new Exception("Cannot join a room you are already in."); }
 
             if (Rooms.All(room => room.Host != host))
             {

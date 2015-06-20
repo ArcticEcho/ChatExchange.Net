@@ -32,8 +32,6 @@ namespace ChatExchangeDotNet
         private string content;
 
         public int ID { get; private set; }
-        //public string AuthorName { get; private set; }
-        //public int AuthorID { get; private set; }
         public int ParentID { get; private set; }
         public User Author { get; private set; }
         public string Host { get; private set; }
@@ -136,6 +134,16 @@ namespace ChatExchangeDotNet
 
                 return string.IsNullOrEmpty(content) ? null : WebUtility.HtmlDecode(stripMention ? content.StripMention() : content);
             }
+        }
+
+        public override int GetHashCode()
+        {
+            return ID;
+        }
+
+        public override string ToString()
+        {
+            return Content;
         }
 
 

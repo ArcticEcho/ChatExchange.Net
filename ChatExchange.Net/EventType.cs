@@ -80,12 +80,12 @@ namespace ChatExchangeDotNet
         /// <summary>
         /// A message has been flagged as spam/offensive.
         /// </summary>
-        MessageFlagged,
+        //MessageFlagged,
 
         /// <summary>
         /// A message has been deleted.
         /// </summary>
-        MessageDeleted,
+        //MessageDeleted,
 
         /// <summary>
         /// 
@@ -150,7 +150,7 @@ namespace ChatExchangeDotNet
         /// <summary>
         /// A user has been suspended.
         /// </summary>
-        UserSuspended = 29,
+        //UserSuspended = 29,
 
         /// <summary>
         /// Two user accounts have been merged.

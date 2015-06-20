@@ -88,6 +88,11 @@ namespace ChatExchangeDotNet
             return ID;
         }
 
+        public override string ToString()
+        {
+            return Name;
+        }
+
         public void InvalidateCache()
         {
             FetchUserData(Host, RoomID, ID, null);

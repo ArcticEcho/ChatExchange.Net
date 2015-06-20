@@ -60,7 +60,8 @@ namespace Example
                     msgBuilder.AppendText("KA-BOOM!", TextFormattingOptions.Bold);
 
                     // Finally post the formatted message.
-                    var success = sandbox.PostMessage(msgBuilder.Message) != null;
+                    // (PostMessage() internally calls the message's ToString() method.)
+                    var success = sandbox.PostMessage(msgBuilder) != null;
 
                     Console.WriteLine("'KA-BOOM' message successfully posted: " + success);
                 }
@@ -69,7 +70,7 @@ namespace Example
             // Listen to the UserEntered event and post a welcome message when the event is fired.
             sandbox.EventManager.ConnectListener(EventType.UserEntered, new Action<User>(user =>
             {
-                var success = sandbox.PostMessage("Hello " + user.Name + "!") != null;
+                var success = sandbox.PostMessage("Hello " + user + "!") != null;
 
                 Console.WriteLine("'Welcome' message successfully posted: " + success);
             }));

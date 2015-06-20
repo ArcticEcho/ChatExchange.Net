@@ -36,16 +36,16 @@ namespace ChatExchangeDotNet
     /// </summary>
     public class Room : IDisposable
     {
+        private readonly AutoResetEvent throttleARE;
+        private readonly ActionExecutor actEx;
+        private readonly string chatRoot;
+        private readonly string cookieKey;
         private bool disposed;
         private bool hasLeft;
         private string fkey;
         private TimeSpan socketRecTimeout;
         private WebSocket socket;
         private EventManager evMan;
-        private readonly AutoResetEvent throttleARE;
-        private readonly ActionExecutor actEx;
-        private readonly string chatRoot;
-        private readonly string cookieKey;
 
         # region Public properties/indexer.
 
@@ -90,6 +90,15 @@ namespace ChatExchangeDotNet
         /// Returns the currently logged in user.
         /// </summary>
         public User Me { get; private set; }
+
+        // Get room name.
+        //public string Name { get; private set; }
+
+        // Get room desc.
+        //public string Description { get; private set; }
+
+        // Get room tags.
+        //public string Tags { get; private set; }
 
         /// <summary>
         /// The EventManager object provides an interface to (dis)connect/update chat event listeners.
@@ -153,6 +162,16 @@ namespace ChatExchangeDotNet
         }
 
 
+
+        public override int GetHashCode()
+        {
+            return ID;
+        }
+
+        //public override string ToString()
+        //{
+        //    return ""; // Return room name.
+        //}
 
         public void Dispose()
         {
@@ -269,15 +288,22 @@ namespace ChatExchangeDotNet
         /// </summary>
         /// <param name="message">The message to post.</param>
         /// <returns>A Message object representing the newly posted message (if successful), otherwise returns null.</returns>
-        public Message PostMessage(string message)
+        public Message PostMessage(object message)
         {
-            if (hasLeft) { return null; }
+            if (message == null || string.IsNullOrEmpty(message.ToString()))
+            {
+                throw new ArgumentException("'message' cannot be null or return an empty/null string upon calling .ToString().", "message");
+            }
+            if (hasLeft)
+            {
+                throw new InvalidOperationException("Cannot post message when you have left the room.");
+            }
 
             var action = new ChatAction(ActionType.PostMessage, new Func<object>(() =>
             {
                 while (!disposed)
                 {
-                    var data = "text=" + Uri.EscapeDataString(message).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
+                    var data = "text=" + Uri.EscapeDataString(message.ToString()).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
                     var resContent = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/chats/" + ID + "/messages/new", data);
 
                     if (string.IsNullOrEmpty(resContent) || hasLeft) { return null; }
@@ -303,30 +329,37 @@ namespace ChatExchangeDotNet
             return (Message)actEx.ExecuteAction(action);
         }
 
-        public Message PostReply(int targetMessageID, string message)
+        public Message PostReply(int targetMessageID, object message)
         {
             return PostMessage(":" + targetMessageID + " " + message);
         }
 
-        public Message PostReply(Message targetMessage, string message)
+        public Message PostReply(Message targetMessage, object message)
         {
             return PostMessage(":" + targetMessage.ID + " " + message);
         }
 
-        public bool EditMessage(Message oldMessage, string newMessage)
+        public bool EditMessage(Message oldMessage, object newMessage)
         {
             return EditMessage(oldMessage.ID, newMessage);
         }
 
-        public bool EditMessage(int messageID, string newMessage)
+        public bool EditMessage(int messageID, object newMessage)
         {
-            if (hasLeft) { return false; }
+            if (newMessage == null || string.IsNullOrEmpty(newMessage.ToString()))
+            {
+                throw new ArgumentException("'newMessage' cannot be null or return an empty/null string upon calling .ToString().", "newMessage");
+            }
+            if (hasLeft)
+            {
+                throw new InvalidOperationException("Cannot edit message when you have left the room.");
+            }
 
             var action = new ChatAction(ActionType.EditMessage, new Func<object>(() =>
             {
                 while (!disposed)
                 {
-                    var data = "text=" + Uri.EscapeDataString(newMessage).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
+                    var data = "text=" + Uri.EscapeDataString(newMessage.ToString()).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
                     var resContent = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID, data);
 
                     if (string.IsNullOrEmpty(resContent) || hasLeft) { return false; }
@@ -348,7 +381,10 @@ namespace ChatExchangeDotNet
 
         public bool DeleteMessage(int messageID)
         {
-            if (hasLeft) { return false; }
+            if (hasLeft)
+            {
+                throw new InvalidOperationException("Cannot delete message when you have left the room.");
+            }
 
             var action = new ChatAction(ActionType.DeleteMessage, new Func<object>(() =>
             {
@@ -375,7 +411,10 @@ namespace ChatExchangeDotNet
 
         public bool ToggleStar(int messageID)
         {
-            if (hasLeft) { return false; }
+            if (hasLeft)
+            {
+                throw new InvalidOperationException("Cannot toggle message star when you have left the room.");
+            }
 
             var action = new ChatAction(ActionType.ToggleMessageStar, new Func<object>(() =>
             {
@@ -406,12 +445,19 @@ namespace ChatExchangeDotNet
 
         public bool ClearMessageStars(int messageID)
         {
+            if (hasLeft)
+            {
+                throw new InvalidOperationException("Cannot clear message's stars when you have left the room.");
+            }
+            if (!Me.IsMod || !Me.IsRoomOwner)
+            {
+                throw new InvalidOperationException("Unable to clear message stars. You have insufficient privileges (must be a room owner or moderator).");
+            }
+
             var action = new ChatAction(ActionType.ClearMessageStars, new Func<object>(() =>
             {
                 while (true)
                 {
-                    if (!Me.IsMod || !Me.IsRoomOwner || hasLeft) { return false; }
-
                     var data = "fkey=" + fkey;
                     var resContent = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID + "/unstar", data);
 
@@ -432,12 +478,19 @@ namespace ChatExchangeDotNet
 
         public bool TogglePin(int messageID)
         {
+            if (hasLeft)
+            {
+                throw new InvalidOperationException("Cannot toggle message pin when you have left the room.");
+            }
+            if (!Me.IsMod || !Me.IsRoomOwner)
+            {
+                throw new InvalidOperationException("Unable to toggle a message pin. You have insufficient privileges (must be a room owner or moderator).");
+            }
+
             var action = new ChatAction(ActionType.ToggleMessagePin, new Func<object>(() =>
             {
                 while (true)
                 {
-                    if (!Me.IsMod || !Me.IsRoomOwner || hasLeft) { return false; }
-
                     var data = "fkey=" + fkey;
                     var resContent = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID + "/owner-star", data);
 
@@ -458,12 +511,19 @@ namespace ChatExchangeDotNet
 
         public bool KickMute(int userID)
         {
+            if (hasLeft)
+            {
+                throw new InvalidOperationException("Cannot kick-mute user when you have left the room.");
+            }
+            if (!Me.IsMod || !Me.IsRoomOwner)
+            {
+                throw new InvalidOperationException("Unable to kick-mute user. You have insufficient privileges (must be a room owner or moderator).");
+            }
+
             var action = new ChatAction(ActionType.KickMute, new Func<object>(() =>
             {
                 while (true)
                 {
-                    if (!Me.IsMod || !Me.IsRoomOwner || hasLeft) { return false; }
-
                     var data = "userID=" + userID + "&fkey=" + fkey;
                     var resContent = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/rooms/kickmute/" + ID, data);
 
@@ -484,12 +544,19 @@ namespace ChatExchangeDotNet
 
         public bool SetUserRoomAccess(UserRoomAccess access, int userID)
         {
+            if (hasLeft)
+            {
+                throw new InvalidOperationException("Cannot change user's access level when you have left the room.");
+            }
+            if (!Me.IsMod || !Me.IsRoomOwner)
+            {
+                throw new InvalidOperationException("Unable to change user's access level. You have insufficient privileges (must be a room owner or moderator).");
+            }
+
             var action = new ChatAction(ActionType.KickMute, new Func<object>(() =>
             {
                 while (true)
                 {
-                    if (!Me.IsMod || !Me.IsRoomOwner || hasLeft) { return false; }
-
                     var data = "fkey=" + fkey + "&aclUserId=" + userID + "&userAccess=";
 
                     switch (access)
