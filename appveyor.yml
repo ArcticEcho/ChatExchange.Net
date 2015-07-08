@@ -6,7 +6,7 @@ platform: Any CPU
 
 assembly_info:
   patch: true
-  file: AssemblyInfo.*
+  file: ChatExchange.Net\Properties\AssemblyInfo.cs
   assembly_version: '2.5.3'
   assembly_file_version: '{version}'
   assembly_informational_version: '2.5.3-beta'
@@ -21,6 +21,11 @@ build:
 
 after_build:
 - ps: .\NuGet\pack.ps1
+
+artifacts:
+- path: ChatExchange.Net\bin\Release\ChatExchange.Net.dll
+  name: ChatExchange.Net.dll
+- path: '**\*.nupkg'
   
 deploy:
 - provider: NuGet
