@@ -6,7 +6,7 @@ platform: Any CPU
 
 assembly_info:
   patch: true
-  file: '.\ChatExchange.Net\Properties\AssemblyInfo.cs'
+  file: '.*ChatExchange\.Net\\Properties\\AssemblyInfo\.cs'
   assembly_version: '2.5.3'
   assembly_file_version: '{version}'
   assembly_informational_version: '2.5.3-beta'
