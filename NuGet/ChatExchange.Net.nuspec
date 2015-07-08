@@ -27,6 +27,6 @@
         </frameworkAssemblies>
     </metadata>
     <files>
-        <file src="lib\ChatExchange.Net.dll" target="lib\ChatExchange.Net.dll" />
+        <file src="..\ChatExchange.Net\bin\Release\ChatExchange.Net.dll" target="lib\ChatExchange.Net.dll" />
     </files>
 </package>
