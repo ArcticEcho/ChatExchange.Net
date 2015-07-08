@@ -25,7 +25,7 @@ after_build:
 artifacts:
 - path: ChatExchange.Net\bin\Release\ChatExchange.Net.dll
   name: ChatExchange.Net.dll
-- path: '**\*.nupkg'
+- path: '**\ChatExchange.Net*.nupkg'
   
 deploy:
 - provider: NuGet
