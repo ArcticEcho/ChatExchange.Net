@@ -182,11 +182,6 @@ namespace ChatExchangeDotNet
 
             // Login to chat.SE.
             var postResContent = RequestManager.SendPOSTRequest(cookieKey, "http://chat.stackexchange.com/users/login/global", data, refOrigin, refOrigin);
-
-            if (postResContent == null || !postResContent.StartsWith("{\"Message\":\"Welcome"))
-            {
-                throw new Exception("Could not login to (chat) Stack Exchange.");
-            }
         }
     }
 }
