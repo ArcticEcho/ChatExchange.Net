@@ -106,8 +106,9 @@ namespace ChatExchangeDotNet
             get
             {
                 var resContent = RequestManager.SendGETRequest("", "http://chat." + Host + "/messages/" + ID + "/history");
+                var msgs = messageEdits.Matches(resContent);
 
-                return messageEdits.Matches(resContent).Count - 2;
+               return Math.Max((msgs == null ? 0 : msgs.Count) - 2, 0);
             }
         }
 
