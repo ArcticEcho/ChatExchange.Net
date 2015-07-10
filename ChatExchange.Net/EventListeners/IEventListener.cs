@@ -21,11 +21,14 @@
 
 
 using System;
+using System.Collections.Generic;
 
 namespace ChatExchangeDotNet.EventListeners
 {
     internal interface IEventListener
     {
         Exception CheckListener(Delegate listener);
+
+        void Execute(Room room, ref EventManager evMan, Dictionary<string, object> data);
     }
 }

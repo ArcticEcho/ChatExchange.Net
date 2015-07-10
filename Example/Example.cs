@@ -39,9 +39,12 @@ namespace Example
             var sandbox = client.JoinRoom("http://chat.meta.stackexchange.com/rooms/651/sandbox");
 
             // Post a new message in the room (if successful, returns a Message object, otherwise returns null).
+            // (If you have no use of the returned Message object, I'd recommend using .PostMessageFast() instead.)
             var myMessage = sandbox.PostMessage("Hello world!");
 
-            // Listen to the InternalException event for anything that may go wrong.
+            // Listen to the InternalException event for any exceptions that may arise during execution.
+            // See our wiki for examples of other events
+            // (https://github.com/ArcticEcho/ChatExchange.Net/wiki/Hooking-up-chat-events).
             sandbox.EventManager.ConnectListener(EventType.InternalException, new Action<Exception>(ex => Console.WriteLine("[ERROR] " + ex)));
 
             // Listen to the MessagePosted event for new messages.

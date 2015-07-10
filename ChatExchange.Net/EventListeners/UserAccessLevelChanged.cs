@@ -21,6 +21,7 @@
 
 
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 
 namespace ChatExchangeDotNet.EventListeners
@@ -42,6 +43,43 @@ namespace ChatExchangeDotNet.EventListeners
             }
 
             return null;
+        }
+
+        public void Execute(Room room, ref EventManager evMan, Dictionary<string, object> data)
+        {
+            // No point parsing all this data if no one's listening.
+            if (!evMan.ConnectedListeners.ContainsKey(EventType.UserAccessLevelChanged)) { return; }
+
+            var granterID = int.Parse(data["user_id"].ToString());
+
+            if (granterID == room.Me.ID && room.IgnoreOwnEvents) { return; }
+
+            var targetUserID = int.Parse(data["target_user_id"].ToString());
+            var content = (string)data["content"];
+            var granter = room.GetUser(granterID);
+            var targetUser = room.GetUser(targetUserID);
+            var newAccessLevel = UserRoomAccess.Normal;
+
+            switch (content)
+            {
+                case "Access now owner":
+                {
+                    newAccessLevel = UserRoomAccess.Owner;
+                    break;
+                }
+                case "Access now read-write":
+                {
+                    newAccessLevel = UserRoomAccess.ExplicitReadWrite;
+                    break;
+                }
+                case "Access now read-only":
+                {
+                    newAccessLevel = UserRoomAccess.ExplicitReadOnly;
+                    break;
+                }
+            }
+
+            evMan.CallListeners(EventType.UserAccessLevelChanged, granter, targetUser, newAccessLevel);
         }
     }
 }

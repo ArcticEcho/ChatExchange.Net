@@ -28,9 +28,6 @@ namespace ChatExchangeDotNet
 {
     public class User
     {
-        private readonly EventManager roomEvMan;
-        private bool accessListenerConnected;
-
         public string Name { get; private set; }
         public int ID { get; private set; }
         public int Reputation { get; private set; }
@@ -44,18 +41,6 @@ namespace ChatExchangeDotNet
 
         public User(string host, int roomID, int userID, bool? isPingable = null)
         {
-            var ex = FetchUserData(host, roomID, userID, isPingable);
-
-            if (ex != null)
-            {
-                throw ex;
-            }
-        }
-
-        public User(ref EventManager eventManager, string host, int roomID, int userID, bool? isPingable = null)
-        {
-            roomEvMan = eventManager;
-
             var ex = FetchUserData(host, roomID, userID, isPingable);
 
             if (ex != null)
@@ -100,6 +85,13 @@ namespace ChatExchangeDotNet
 
 
 
+        internal void UpdateAccessLevel(UserRoomAccess newAccess)
+        {
+            IsRoomOwner = newAccess == UserRoomAccess.Owner;
+        }
+
+
+
         private Exception FetchUserData(string host, int roomID, int userID, bool? isPingable)
         {
             ID = userID;
@@ -126,18 +118,6 @@ namespace ChatExchangeDotNet
                         IsRoomOwner = bool.Parse(data[0]["is_owner"].ToString());
                     }
                     IsPingable = isPingable ?? CanPing(host, roomID, userID);
-                }
-
-                if (roomEvMan != null && !accessListenerConnected)
-                {
-                    roomEvMan.ConnectListener(EventType.UserAccessLevelChanged, new Action<User, User, UserRoomAccess>((granter, targetUser, newAccess) =>
-                    {
-                        if (targetUser.ID == ID)
-                        {
-                            IsRoomOwner = newAccess == UserRoomAccess.Owner;
-                        }
-                    }));
-                    accessListenerConnected = true;
                 }
 
                 return null;

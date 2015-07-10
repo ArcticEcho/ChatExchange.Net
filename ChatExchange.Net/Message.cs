@@ -116,23 +116,17 @@ namespace ChatExchangeDotNet
 
         public Message(string host, int roomID, int messageID, User author, bool stripMention = true, int parentID = -1)
         {
-            EventManager temp = null;
-            var ex = Initialise(host, roomID, messageID, author, stripMention, parentID, ref temp);
+            if (string.IsNullOrEmpty(host)) { throw new ArgumentException("'host' can not be null or empty.", "host"); }
+            if (messageID < 0) { throw new ArgumentOutOfRangeException("messageID", "'ID' can not be less than 0."); }
+            if (author == null) { throw new ArgumentNullException("author"); }
 
-            if (ex != null)
-            {
-                throw ex;
-            }
-        }
-
-        public Message(ref EventManager evMan, string host, int roomID, int messageID, User author, bool stripMention = true, int parentID = -1)
-        {
-            var ex = Initialise(host, roomID, messageID, author, stripMention, parentID, ref evMan);
-
-            if (ex != null)
-            {
-                throw ex;
-            }
+            this.stripMention = stripMention;
+            content = GetMessageContent(host, messageID, stripMention);
+            Host = host;
+            RoomID = roomID;
+            ID = messageID;
+            Author = author;
+            ParentID = parentID;
         }
 
 
@@ -161,32 +155,9 @@ namespace ChatExchangeDotNet
 
 
 
-        private Exception Initialise(string host, int roomID, int messageID, User author, bool stripMention, int parentID, ref EventManager evMan)
+        internal void UpdateContent(string newContent)
         {
-            if (string.IsNullOrEmpty(host)) { return new ArgumentException("'host' can not be null or empty.", "host"); }
-            if (messageID < 0) { return new ArgumentOutOfRangeException("messageID", "'ID' can not be less than 0."); }
-            if (author == null) { return new ArgumentNullException("author"); }
-
-            this.stripMention = stripMention;
-            content = GetMessageContent(host, messageID, stripMention);
-            Host = host;
-            RoomID = roomID;
-            ID = messageID;
-            Author = author;
-            ParentID = parentID;
-
-            if (evMan != null)
-            {
-                evMan.ConnectListener(EventType.MessageEdited, new Action<Message>(editedMessage =>
-                {
-                    if (editedMessage.ID == ID)
-                    {
-                        content = editedMessage.Content;
-                    }
-                }));
-            }
-
-            return null;
+            content = newContent;
         }
     }
 }

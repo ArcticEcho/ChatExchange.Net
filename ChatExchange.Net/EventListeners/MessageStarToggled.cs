@@ -21,6 +21,7 @@
 
 
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 
 namespace ChatExchangeDotNet.EventListeners
@@ -43,6 +44,35 @@ namespace ChatExchangeDotNet.EventListeners
             }
 
             return null;
+        }
+
+        public void Execute(Room room, ref EventManager evMan, Dictionary<string, object> data)
+        {
+            // No point parsing all this data if no one's listening.
+            if (!evMan.ConnectedListeners.ContainsKey(EventType.MessageStarToggled)) { return; }
+
+            var starrerID = int.Parse(data["user_id"].ToString());
+
+            if (starrerID == room.Me.ID && room.IgnoreOwnEvents) { return; }
+
+            var id = int.Parse(data["message_id"].ToString());
+            var starCount = 0;
+            var pinCount = 0;
+
+            if (data.ContainsKey("message_stars") && data["message_stars"] != null)
+            {
+                starCount = int.Parse(data["message_stars"].ToString());
+            }
+
+            if (data.ContainsKey("message_owner_stars") && data["message_owner_stars"] != null)
+            {
+                pinCount = int.Parse(data["message_owner_stars"].ToString());
+            }
+
+            var message = room[id];
+            var user = room.GetUser(starrerID);
+
+            evMan.CallListeners(EventType.MessageStarToggled, message, user, starCount, pinCount);
         }
     }
 }

@@ -21,6 +21,7 @@
 
 
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 
 namespace ChatExchangeDotNet.EventListeners
@@ -39,6 +40,11 @@ namespace ChatExchangeDotNet.EventListeners
             }
 
             return null;
+        }
+
+        public void Execute(Room room, ref EventManager evMan, Dictionary<string, object> data)
+        {
+            throw new NotSupportedException();
         }
     }
 }

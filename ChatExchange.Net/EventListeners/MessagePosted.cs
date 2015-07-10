@@ -21,6 +21,7 @@
 
 
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 
 namespace ChatExchangeDotNet.EventListeners
@@ -39,6 +40,29 @@ namespace ChatExchangeDotNet.EventListeners
             }
 
             return null;
+        }
+
+        public void Execute(Room room, ref EventManager evMan, Dictionary<string, object> data)
+        {
+            // No point parsing all this data if no one's listening.
+            if (!evMan.ConnectedListeners.ContainsKey(EventType.MessagePosted)) { return; }
+
+            var authorID = int.Parse(data["user_id"].ToString());
+
+            if (authorID == room.Me.ID && room.IgnoreOwnEvents) { return; }
+
+            var id = int.Parse(data["message_id"].ToString());
+            var parentID = -1;
+
+            if (data.ContainsKey("parent_id") && data["parent_id"] != null)
+            {
+                parentID = int.Parse(data["parent_id"].ToString());
+            }
+
+            var message = new Message(room.Host, room.ID, id, room.GetUser(authorID), room.StripMentionFromMessages, parentID);
+
+            evMan.TrackMessage(message);
+            evMan.CallListeners(EventType.MessagePosted, message);
         }
     }
 }

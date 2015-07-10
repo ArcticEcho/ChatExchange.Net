@@ -32,7 +32,7 @@ namespace ChatExchangeDotNet
 {
     public class EventManager : IDisposable
     {
-        private readonly ConcurrentDictionary<EventType, IEventListener> listenerCheckers;
+        private readonly ConcurrentDictionary<EventType, IEventListener> events;
         private bool disposed;
 
         public ConcurrentDictionary<EventType, ConcurrentDictionary<int, Delegate>> ConnectedListeners { get; private set; }
@@ -41,18 +41,18 @@ namespace ChatExchangeDotNet
 
         public EventManager()
         {
-            listenerCheckers = new ConcurrentDictionary<EventType, IEventListener>();
+            events = new ConcurrentDictionary<EventType, IEventListener>();
 
             var types = Assembly.GetExecutingAssembly().GetTypes();
-            var eventCheckers = types.Where(t => t.Namespace == "ChatExchangeDotNet.EventListeners");
+            var eventTypes = types.Where(t => t.Namespace == "ChatExchangeDotNet.EventListeners");
 
             foreach (EventType chatEvent in Enum.GetValues(typeof(EventType)))
             {
                 var eventName = Enum.GetName(typeof(EventType), chatEvent);
-                var type = eventCheckers.First(t => t.Name == eventName);
+                var type = eventTypes.First(t => t.Name == eventName);
                 var instance = (IEventListener)Activator.CreateInstance(type);
 
-                listenerCheckers[chatEvent] = instance;
+                events[chatEvent] = instance;
             }
 
             ConnectedListeners = new ConcurrentDictionary<EventType, ConcurrentDictionary<int, Delegate>>();
@@ -64,26 +64,6 @@ namespace ChatExchangeDotNet
         }
 
 
-
-        internal void CallListeners(EventType eventType, params object[] args)
-        {
-            if (disposed) { return; }
-            if (!ConnectedListeners.ContainsKey(eventType)) { return; }
-            if (ConnectedListeners[eventType].Keys.Count == 0) { return; }
-
-            foreach (var listener in ConnectedListeners[eventType].Values)
-            {
-                try
-                {
-                    Task.Factory.StartNew(() => listener.DynamicInvoke(args));
-                }
-                catch (Exception ex)
-                {
-                    if (eventType == EventType.InternalException) { continue; } // Avoid infinite loop.
-                    CallListeners(EventType.InternalException, ex);
-                }
-            }
-        }
 
         public void Dispose()
         {
@@ -100,7 +80,7 @@ namespace ChatExchangeDotNet
         public void ConnectListener(EventType eventType, Delegate listener)
         {
             if (disposed) { return; }
-            var ex = listenerCheckers[eventType].CheckListener(listener);
+            var ex = events[eventType].CheckListener(listener);
             if (ex != null)
             {
                 throw ex;
@@ -135,6 +115,59 @@ namespace ChatExchangeDotNet
             var key = ConnectedListeners[eventType].Where(x => x.Value == listener).First().Key;
             Delegate temp;
             ConnectedListeners[eventType].TryRemove(key, out temp);
+        }
+
+
+
+        internal void TrackMessage(Message message)
+        {
+            if (message == null) { throw new ArgumentNullException("message"); }
+
+            ConnectListener(EventType.MessageEdited, new Action<Message>(m =>
+            {
+                if (m.ID == message.ID)
+                {
+                    message.UpdateContent(m.Content);
+                }
+            }));
+        }
+
+        internal void TrackUser(User user)
+        {
+            if (user == null) { throw new ArgumentNullException("user"); }
+
+            ConnectListener(EventType.UserAccessLevelChanged, new Action<User, User, UserRoomAccess>((granter, targetUser, newAccess) =>
+            {
+                if (targetUser.ID == user.ID)
+                {
+                    user.UpdateAccessLevel(newAccess);
+                }
+            }));
+        }
+
+        internal void CallListeners(EventType eventType, params object[] args)
+        {
+            if (disposed) { return; }
+            if (!ConnectedListeners.ContainsKey(eventType)) { return; }
+            if (ConnectedListeners[eventType].Keys.Count == 0) { return; }
+
+            foreach (var listener in ConnectedListeners[eventType].Values)
+            {
+                try
+                {
+                    Task.Factory.StartNew(() => listener.DynamicInvoke(args));
+                }
+                catch (Exception ex)
+                {
+                    if (eventType == EventType.InternalException) { continue; } // Avoid infinite loop.
+                    CallListeners(EventType.InternalException, ex);
+                }
+            }
+        }
+
+        internal void HandleEvent(EventType eventType, Room room, ref EventManager evMan, Dictionary<string, object> data)
+        {
+            events[eventType].Execute(room, ref evMan, data);
         }
     }
 }

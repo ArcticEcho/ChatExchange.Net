@@ -21,6 +21,7 @@
 
 
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 
 namespace ChatExchangeDotNet.EventListeners
@@ -39,6 +40,18 @@ namespace ChatExchangeDotNet.EventListeners
             }
 
             return null;
+        }
+
+        public void Execute(Room room, ref EventManager evMan, Dictionary<string, object> data)
+        {
+            // No point parsing all this data if no one's listening.
+            if (!evMan.ConnectedListeners.ContainsKey(EventType.UserLeft)) { return; }
+
+            var userID = int.Parse(data["user_id"].ToString());
+
+            if (userID == room.Me.ID && room.IgnoreOwnEvents) { return; }
+
+            evMan.CallListeners(EventType.UserLeft, room.GetUser(userID));
         }
     }
 }
