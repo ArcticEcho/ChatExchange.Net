@@ -22,12 +22,14 @@
 
 using System;
 using System.Net;
+using System.Text.RegularExpressions;
 using CsQuery;
 
 namespace ChatExchangeDotNet
 {
     public class Message
     {
+        private Regex messageEdits = new Regex("<div class=\"message\"", RegexOptions.Compiled | RegexOptions.CultureInvariant);
         private bool stripMention;
         private string content;
 
@@ -96,6 +98,16 @@ namespace ChatExchangeDotNet
                 }
 
                 return count;
+            }
+        }
+
+        public int EditCount
+        {
+            get
+            {
+                var resContent = RequestManager.SendGETRequest("", "http://chat." + Host + "/messages/" + ID + "/history");
+
+                return messageEdits.Matches(resContent).Count - 2;
             }
         }
 

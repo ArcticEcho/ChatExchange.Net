@@ -38,7 +38,7 @@ namespace Example
             // Join a room by specifying its URL (returns a Room object).
             var sandbox = client.JoinRoom("http://chat.meta.stackexchange.com/rooms/651/sandbox");
 
-            // Posts a new message in the room (if successful, returns a Message object, otherwise returns null).
+            // Post a new message in the room (if successful, returns a Message object, otherwise returns null).
             var myMessage = sandbox.PostMessage("Hello world!");
 
             // Listen to the InternalException event for anything that may go wrong.
@@ -53,7 +53,7 @@ namespace Example
                 // If the message contains "3... 2... 1...", post "KA-BOOM!" (this is simply an [awful] example).
                 if (message.Content.Contains("3... 2... 1..."))
                 {
-                    // Create a new MessageBuilder to format out message.
+                    // Create a new MessageBuilder to format our message.
                     var msgBuilder = new MessageBuilder();
 
                     // Append the text "KA-BOOM!" (formatted in bold).
