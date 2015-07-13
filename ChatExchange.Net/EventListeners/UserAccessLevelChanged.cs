@@ -79,6 +79,8 @@ namespace ChatExchangeDotNet.EventListeners
                 }
             }
 
+            evMan.TrackUser(granter);
+            evMan.TrackUser(targetUser);
             evMan.CallListeners(EventType.UserAccessLevelChanged, granter, targetUser, newAccessLevel);
         }
     }
