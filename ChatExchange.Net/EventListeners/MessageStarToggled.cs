@@ -72,6 +72,8 @@ namespace ChatExchangeDotNet.EventListeners
             var message = room[id];
             var user = room.GetUser(starrerID);
 
+            evMan.TrackMessage(message);
+            evMan.TrackUser(user);
             evMan.CallListeners(EventType.MessageStarToggled, message, user, starCount, pinCount);
         }
     }
