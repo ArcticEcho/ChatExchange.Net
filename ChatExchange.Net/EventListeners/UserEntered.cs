@@ -51,7 +51,10 @@ namespace ChatExchangeDotNet.EventListeners
 
             if (userID == room.Me.ID && room.IgnoreOwnEvents) { return; }
 
-            evMan.CallListeners(EventType.UserEntered, room.GetUser(userID));
+            var user = room.GetUser(userID);
+
+            evMan.TrackUser(user);
+            evMan.CallListeners(EventType.UserEntered, user);
         }
     }
 }
