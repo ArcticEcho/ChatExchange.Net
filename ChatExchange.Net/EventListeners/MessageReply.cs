@@ -58,6 +58,7 @@ namespace ChatExchangeDotNet.EventListeners
             var parent = room[parentID];
             var message = new Message(room.Host, room.ID, id, room.GetUser(authorID), room.StripMentionFromMessages, parentID);
 
+            evMan.TrackMessage(parent);
             evMan.TrackMessage(message);
             evMan.CallListeners(EventType.MessageReply, parent, message);
         }
