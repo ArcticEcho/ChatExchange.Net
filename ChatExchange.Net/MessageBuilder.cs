@@ -60,7 +60,7 @@ namespace ChatExchangeDotNet
 
         public override string ToString()
         {
-            return Message.Trim();
+            return Message;
         }
 
         public void Clear()
@@ -120,16 +120,14 @@ namespace ChatExchangeDotNet
 
         private string FormatString(string text, TextFormattingOptions formattingOptions)
         {
-            var msg = text.Trim();
-
             if (MultiLineType == MultiLineMessageType.Code)
             {
-                return msg.Replace("\n", "\n    ");
+                return text.Replace("\n", "\n    ");
             }
 
             if (MultiLineType == MultiLineMessageType.Quote)
             {
-                return msg.Replace("\n", "\n> ");
+                return text.Replace("\n", "\n> ");
             }
 
             if (formattingOptions == TextFormattingOptions.None)
@@ -139,7 +137,7 @@ namespace ChatExchangeDotNet
 
             if (formattingOptions == TextFormattingOptions.Tag)
             {
-                return "[tag:" + tagReg.Replace(msg, "-") + "]";
+                return "[tag:" + tagReg.Replace(text.Trim(), "-") + "]";
             }
 
             var mdChars = "";
@@ -164,7 +162,18 @@ namespace ChatExchangeDotNet
                 mdChars += "`";
             }
 
-            return mdChars + msg + new string(mdChars.Reverse().ToArray());
+            var mdCharsRev = new string(mdChars.Reverse().ToArray());
+
+            var msg = text;
+            var textLen = text.Length;
+
+            var startOffset = textLen - text.TrimStart().Length;
+            msg = msg.Insert(startOffset, mdChars);
+
+            var endOffset = textLen - text.TrimEnd().Length;
+            msg = msg.Insert((textLen - endOffset) + mdChars.Length, mdCharsRev);
+
+            return msg;
         }
     }
 }
