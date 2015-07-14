@@ -153,15 +153,17 @@ namespace ChatExchangeDotNet
 
             foreach (var listener in ConnectedListeners[eventType].Values)
             {
-                try
+                Task.Factory.StartNew(() =>
                 {
-                    Task.Factory.StartNew(() => listener.DynamicInvoke(args));
-                }
-                catch (Exception ex)
-                {
-                    if (eventType == EventType.InternalException) { continue; } // Avoid infinite loop.
-                    CallListeners(EventType.InternalException, ex);
-                }
+                    try
+                    {
+                        listener.DynamicInvoke(args);}
+                    catch (Exception ex)
+                    {
+                        if (eventType == EventType.InternalException) { return; } // Avoid infinite loop.
+                        CallListeners(EventType.InternalException, ex);
+                    }
+                });
             }
         }
 
