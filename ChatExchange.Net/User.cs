@@ -28,20 +28,42 @@ namespace ChatExchangeDotNet
 {
     public class User
     {
+        private string cookieKey;
+
         public string Name { get; private set; }
         public int ID { get; private set; }
         public int Reputation { get; private set; }
         public bool IsPingable { get; private set; }
         public bool IsMod { get; private set; }
-        public bool IsRoomOwner { get; private set; }
         public int RoomID { get; private set; }
         public string Host { get; private set; }
+        public bool IsRoomOwner { get; internal set; }
 
 
 
-        public User(string host, int roomID, int userID, bool? isPingable = null)
+        public User(string host, int roomID, int userID)
         {
-            var ex = FetchUserData(host, roomID, userID, isPingable);
+            var ex = FetchUserData(host, roomID, userID, null, null);
+
+            if (ex != null)
+            {
+                throw ex;
+            }
+        }
+
+        public User(string host, int roomID, int userID, bool isPingable)
+        {
+            var ex = FetchUserData(host, roomID, userID, isPingable, null);
+
+            if (ex != null)
+            {
+                throw ex;
+            }
+        }
+
+        public User(string host, int roomID, int userID, string cookieKey)
+        {
+            var ex = FetchUserData(host, roomID, userID, null, cookieKey);
 
             if (ex != null)
             {
@@ -51,10 +73,10 @@ namespace ChatExchangeDotNet
 
 
 
-        public static bool CanPing(string host, int roomID, int userID)
+        internal static bool CanPing(string cookieKey, string host, int roomID, int userID)
         {
-            var json = RequestManager.Get("", "http://chat." + host + "/rooms/pingable/" + roomID);
-            if (string.IsNullOrEmpty(json)) { return false; }
+            var json = RequestManager.Get(cookieKey, "http://chat." + host + "/rooms/pingable/" + roomID);
+            if (String.IsNullOrEmpty(json)) { return false; }
             var data = JsonSerializer.DeserializeFromString<HashSet<List<object>>>(json);
 
             foreach (var user in data)
@@ -80,20 +102,14 @@ namespace ChatExchangeDotNet
 
         public void InvalidateCache()
         {
-            FetchUserData(Host, RoomID, ID, null);
+            FetchUserData(Host, RoomID, ID, null, cookieKey);
         }
 
 
 
-        internal void UpdateAccessLevel(UserRoomAccess newAccess)
+        private Exception FetchUserData(string host, int roomID, int userID, bool? isPingable, string cookieKey)
         {
-            IsRoomOwner = newAccess == UserRoomAccess.Owner;
-        }
-
-
-
-        private Exception FetchUserData(string host, int roomID, int userID, bool? isPingable)
-        {
+            this.cookieKey = cookieKey;
             ID = userID;
             RoomID = roomID;
             Host = host;
@@ -117,8 +133,9 @@ namespace ChatExchangeDotNet
                     {
                         IsRoomOwner = bool.Parse(data[0]["is_owner"].ToString());
                     }
-                    IsPingable = isPingable ?? CanPing(host, roomID, userID);
                 }
+
+                IsPingable = isPingable ?? !String.IsNullOrEmpty(cookieKey) && CanPing(cookieKey, host, roomID, userID);
 
                 return null;
             }

@@ -127,7 +127,25 @@ namespace ChatExchangeDotNet
             {
                 if (m.ID == message.ID)
                 {
-                    message.UpdateContent(m.Content);
+                    message.Content = m.Content;
+                    message.EditCount++;
+                }
+            }));
+
+            ConnectListener(EventType.MessageDeleted, new Action<User, int>((u, mID) =>
+            {
+                if (mID == message.ID)
+                {
+                    message.IsDeleted = true;
+                }
+            }));
+
+            ConnectListener(EventType.MessageStarToggled, new Action<Message, User, int, int>((m, u, s, p) =>
+            {
+                if (m.ID == message.ID)
+                {
+                    message.StarCount = s;
+                    message.PinCount = p;
                 }
             }));
         }
@@ -140,7 +158,7 @@ namespace ChatExchangeDotNet
             {
                 if (targetUser.ID == user.ID)
                 {
-                    user.UpdateAccessLevel(newAccess);
+                    user.IsRoomOwner = newAccess == UserRoomAccess.Owner;
                 }
             }));
         }
@@ -160,7 +178,7 @@ namespace ChatExchangeDotNet
                         listener.DynamicInvoke(args);}
                     catch (Exception ex)
                     {
-                        if (eventType == EventType.InternalException) { return; } // Avoid infinite loop.
+                        if (eventType == EventType.InternalException) { throw ex; } // Avoid infinite loop.
                         CallListeners(EventType.InternalException, ex);
                     }
                 });

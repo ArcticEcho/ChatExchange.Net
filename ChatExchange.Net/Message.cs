@@ -30,103 +30,37 @@ namespace ChatExchangeDotNet
     public class Message
     {
         private Regex messageEdits = new Regex("<div class=\"message\"", RegexOptions.Compiled | RegexOptions.CultureInvariant);
-        private bool stripMention;
-        private string content;
 
+        public string Host { get; private set; }
+        public int RoomID { get; private set; }
         public int ID { get; private set; }
         public int ParentID { get; private set; }
         public User Author { get; private set; }
-        public string Host { get; private set; }
-        public int RoomID { get; private set; }
+        public string Content { get; internal set; }
+        public bool IsDeleted { get; internal set; }
+        public int StarCount { get; internal set; }
+        public int PinCount { get; internal set; }
+        public int EditCount { get; internal set; }
 
-        public string Content
+
+
+        public Message(Room room, int messageID, User author, int parentID = -1)
         {
-            get
-            {
-                return content;
-            }
-        }
-
-        public int StarCount
-        {
-            get
-            {
-                var resContent = RequestManager.Get("", "http://chat." + Host + "/messages/" + ID + "/history");
-
-                if (string.IsNullOrEmpty(resContent)) { return -1; }
-
-                var dom = CQ.Create(resContent)[".stars"];
-                var count = 0;
-
-                if (dom != null && dom.Length != 0)
-                {
-                    if (dom[".times"] != null && !string.IsNullOrEmpty(dom[".times"].First().Text()))
-                    {
-                        count = int.Parse(dom[".times"].First().Text());
-                    }
-                    else
-                    {
-                        count = 1;
-                    }
-                }
-
-                return count;
-            }
-        }
-
-        public int PinCount
-        {
-            get
-            {
-                var resContent = RequestManager.Get("", "http://chat." + Host + "/messages/" + ID + "/history");
-
-                if (string.IsNullOrEmpty(resContent)) { return -1; }
-
-                var dom = CQ.Create(resContent)[".owner-star"];
-                var count = 0;
-
-                if (dom != null && dom.Length != 0)
-                {
-                    if (dom[".times"] != null && !string.IsNullOrEmpty(dom[".times"].First().Text()))
-                    {
-                        count = int.Parse(dom[".times"].First().Text());
-                    }
-                    else
-                    {
-                        count = 1;
-                    }
-                }
-
-                return count;
-            }
-        }
-
-        public int EditCount
-        {
-            get
-            {
-                var resContent = RequestManager.Get("", "http://chat." + Host + "/messages/" + ID + "/history");
-                var msgs = messageEdits.Matches(resContent);
-
-               return Math.Max((msgs == null ? 0 : msgs.Count) - 2, 0);
-            }
-        }
-
-
-
-        public Message(string host, int roomID, int messageID, User author, bool stripMention = true, int parentID = -1)
-        {
-            if (string.IsNullOrEmpty(host)) { throw new ArgumentException("'host' can not be null or empty.", "host"); }
-            if (messageID < 0) { throw new ArgumentOutOfRangeException("messageID", "'ID' can not be less than 0."); }
+            if (room == null) { throw new ArgumentException("room"); }
+            if (messageID < 0) { throw new ArgumentOutOfRangeException("messageID", "'messageID' can not be less than 0."); }
             if (author == null) { throw new ArgumentNullException("author"); }
 
-            this.stripMention = stripMention;
-            content = GetMessageContent(host, messageID, stripMention);
-            Host = host;
-            RoomID = roomID;
+            Content = GetMessageContent(room.Host, messageID, room.StripMention);
+            Host = room.Host;
+            RoomID = room.ID;
             ID = messageID;
-            Author = author;
             ParentID = parentID;
+            Author = author;
+
+            var historyHtml = RequestManager.Get("", "http://chat." + Host + "/messages/" + ID + "/history");
+
+            SetStarPinCount(historyHtml);
+            EditCount = GetEditCount(historyHtml);
         }
 
 
@@ -170,9 +104,37 @@ namespace ChatExchangeDotNet
 
 
 
-        internal void UpdateContent(string newContent)
+        private void SetStarPinCount(string html)
         {
-            content = newContent;
+            StarCount = GetStarPinCount(html, true);
+            PinCount = GetStarPinCount(html, false);
+        }
+
+        private int GetEditCount(string html)
+        {
+            var msgs = messageEdits.Matches(html);
+
+            return Math.Max((msgs == null ? 0 : msgs.Count) - 2, 0);
+        }
+
+        private int GetStarPinCount(string html, bool stars)
+        {
+            var dom = CQ.Create(html)[stars ? ".stars" : ".owner-star"];
+            var count = 0;
+
+            if (dom != null && dom.Length != 0)
+            {
+                if (dom[".times"] != null && !string.IsNullOrEmpty(dom[".times"].First().Text()))
+                {
+                    count = int.Parse(dom[".times"].First().Text());
+                }
+                else
+                {
+                    count = 1;
+                }
+            }
+
+            return count;
         }
     }
 }

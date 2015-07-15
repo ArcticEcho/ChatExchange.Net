@@ -22,6 +22,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading;
 using CsQuery;
@@ -47,6 +48,7 @@ namespace ChatExchangeDotNet
         private WebSocket socket;
         private EventManager evMan;
 
+
         # region Public properties/indexer.
 
         /// <summary>
@@ -57,7 +59,7 @@ namespace ChatExchangeDotNet
         /// <summary>
         /// If true, removes (@Username) mentions and the message reply prefix (:012345) from all messages. Default set to true.
         /// </summary>
-        public bool StripMentionFromMessages { get; set; }
+        public bool StripMention { get; set; }
 
         /// <summary>
         /// Specifies how long to attempt to recovery the WebSocket after the connection closed;
@@ -145,7 +147,7 @@ namespace ChatExchangeDotNet
             socketRecTimeout = TimeSpan.FromMinutes(15);
             Host = host;
             IgnoreOwnEvents = true;
-            StripMentionFromMessages = true;
+            StripMention = true;
             Me = GetMe();
 
             SetFkey();
@@ -220,37 +222,46 @@ namespace ChatExchangeDotNet
         }
 
         /// <summary>
-        /// Resets the 'Me' property with fresh data.
-        /// </summary>
-        public void RefreshMe()
-        {
-            Me = GetUser(Me.ID);
-        }
-
-        /// <summary>
         /// Retrieves a message from the room.
         /// </summary>
         /// <param name="messageID">The ID of the message to fetch.</param>
         /// <returns>A Message object representing the requested message, or null if the message could not be found.</returns>
         public Message GetMessage(int messageID)
         {
-            var resContent = RequestManager.Get(cookieKey, chatRoot + "/messages/" + messageID + "/history");
+            string resContent;
+
+            try
+            {
+                resContent = RequestManager.Get(cookieKey, chatRoot + "/messages/" + messageID + "/history");
+            }
+            catch (WebException ex)
+            {
+                // If the input is valid, we've probably hit a deleted message.
+                if (ex.Response != null && ((HttpWebResponse)ex.Response).StatusCode == HttpStatusCode.NotFound)
+                {
+                    throw new MessageNotFoundException();
+                }
+                else
+                {
+                    throw ex;
+                }
+            }
 
             if (string.IsNullOrEmpty(resContent))
             {
-                throw new Exception("Could not retrieve data of message " + messageID + ". Do you have an active internet connection?");
+                throw new Exception("Unable to fetch data for message " + messageID + ".");
             }
 
             var lastestDom = CQ.Create(resContent).Select(".monologue").Last();
             var content = Message.GetMessageContent(Host, messageID);
 
-            if (content == null) { throw new Exception("The requested message was not found."); }
+            if (content == null) { throw new MessageNotFoundException(); }
 
             var parentID = content.IsReply() ? int.Parse(content.Substring(1, content.IndexOf(' '))) : -1;
             var authorName = lastestDom[".username a"].First().Text();
             var authorID = int.Parse(lastestDom[".username a"].First().Attr("href").Split('/')[2]);
 
-            var message = new Message(Host, ID, messageID, GetUser(authorID), StripMentionFromMessages, parentID);
+            var message = new Message(this, messageID, GetUser(authorID), parentID);
 
             evMan.TrackMessage(message);
 
@@ -263,7 +274,7 @@ namespace ChatExchangeDotNet
         /// <param name="userID">The user ID to look up.</param>
         public User GetUser(int userID)
         {
-            var u = new User(Host, ID, userID);
+            var u = new User(Host, ID, userID, cookieKey);
 
             evMan.TrackUser(u);
 
@@ -379,6 +390,16 @@ namespace ChatExchangeDotNet
         public Message PostReply(Message targetMessage, object message)
         {
             return PostMessage(":" + targetMessage.ID + " " + message);
+        }
+
+        public bool PostReplyFast(int targatMessageID, object message)
+        {
+            return PostMessageFast(":" + targatMessageID + " " + message);
+        }
+
+        public bool PostReplyFast(Message targatMessage, object message)
+        {
+            return PostMessageFast(":" + targatMessage.ID + " " + message);
         }
 
         public bool EditMessage(Message oldMessage, object newMessage)
@@ -663,13 +684,13 @@ namespace ChatExchangeDotNet
         {
             var html = RequestManager.Get(cookieKey, chatRoot + "/chats/join/favorite");
 
-            if (string.IsNullOrEmpty(html)) { throw new Exception("Could not get user information. Do you have an active internet connection?"); }
+            if (string.IsNullOrEmpty(html)) { throw new Exception("Unable to fetch requested user data."); }
 
             var dom = CQ.Create(html);
             var e = dom[".topbar-menu-links a"][0];
             var id = int.Parse(e.Attributes["href"].Split('/')[2]);
 
-            return new User(Host, ID, id);
+            return new User(Host, ID, id, cookieKey);
         }
 
         private void SetFkey()

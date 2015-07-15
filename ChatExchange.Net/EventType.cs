@@ -85,7 +85,7 @@ namespace ChatExchangeDotNet
         /// <summary>
         /// A message has been deleted.
         /// </summary>
-        //MessageDeleted,
+        MessageDeleted = 10,
 
         /// <summary>
         /// 

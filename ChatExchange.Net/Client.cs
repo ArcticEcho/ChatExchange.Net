@@ -142,11 +142,11 @@ namespace ChatExchangeDotNet
             {
                 if (res == null)
                 {
-                    throw new Exception("Unable to authenticate using OpenID.");
+                    throw new AuthenticationException("Unable to authenticate using OpenID.");
                 }
                 if (!string.IsNullOrEmpty(res.Headers["p3p"]))
                 {
-                    throw new Exception("Invalid OpenID credentials.");
+                    throw new AuthenticationException("Invalid OpenID credentials.");
                 }
 
                 var dom = CQ.Create(res.GetContent());
@@ -179,7 +179,7 @@ namespace ChatExchangeDotNet
             {
                 if (postRes == null)
                 {
-                    throw new Exception("Unable to login to " + host + ".");
+                    throw new AuthenticationException("Unable to login to " + host + ".");
                 }
 
                 HandleConfirmationPrompt(postRes);

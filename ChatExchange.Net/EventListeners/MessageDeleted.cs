@@ -26,7 +26,7 @@ using System.Reflection;
 
 namespace ChatExchangeDotNet.EventListeners
 {
-    internal class UserMentioned : IEventListener
+    internal class MessageDeleted : IEventListener
     {
         public Exception CheckListener(Delegate listener)
         {
@@ -34,9 +34,11 @@ namespace ChatExchangeDotNet.EventListeners
 
             var listenerParams = listener.Method.GetParameters();
 
-            if (listenerParams == null || listenerParams.Length != 1 || listenerParams[0].ParameterType != typeof(Message))
+            if (listenerParams == null || listenerParams.Length != 2 ||
+                listenerParams[0].ParameterType != typeof(User) ||
+                listenerParams[1].ParameterType != typeof(int))
             {
-                return new TargetException("This chat event takes a single argument of type 'Message'.");
+                return new TargetException("This chat event takes two arguments of type (in order): 'User' and 'int'.");
             }
 
             return null;
@@ -45,23 +47,18 @@ namespace ChatExchangeDotNet.EventListeners
         public void Execute(Room room, ref EventManager evMan, Dictionary<string, object> data)
         {
             // No point parsing all this data if no one's listening.
-            if (!evMan.ConnectedListeners.ContainsKey(EventType.UserMentioned)) { return; }
+            if (!evMan.ConnectedListeners.ContainsKey(EventType.MessageDeleted)) { return; }
 
-            var authorID = int.Parse(data["user_id"].ToString());
+            var deleterID = int.Parse(data["user_id"].ToString());
 
-            if (authorID == room.Me.ID && room.IgnoreOwnEvents) { return; }
+            if (deleterID == room.Me.ID && room.IgnoreOwnEvents) { return; }
 
             var id = int.Parse(data["message_id"].ToString());
-            var parentID = -1;
-            if (data.ContainsKey("parent_id") && data["parent_id"] != null)
-            {
-                parentID = int.Parse(data["parent_id"].ToString());
-            }
 
-            var message = new Message(room, id, room.GetUser(authorID), parentID);
+            var deleter = room.GetUser(deleterID);
 
-            evMan.TrackMessage(message);
-            evMan.CallListeners(EventType.UserMentioned, message);
+            evMan.TrackUser(deleter);
+            evMan.CallListeners(EventType.MessageDeleted, deleter, id);
         }
     }
 }

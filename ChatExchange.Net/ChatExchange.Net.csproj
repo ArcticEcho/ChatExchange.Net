@@ -54,6 +54,7 @@
     <Compile Include="Client.cs" />
     <Compile Include="EventListeners\DataReceived.cs" />
     <Compile Include="EventListeners\InternalException.cs" />
+    <Compile Include="EventListeners\MessageDeleted.cs" />
     <Compile Include="EventListeners\MessageEdited.cs" />
     <Compile Include="EventListeners\MessageReply.cs" />
     <Compile Include="EventListeners\MessageStarToggled.cs" />
@@ -65,6 +66,7 @@
     <Compile Include="EventListeners\IEventListener.cs" />
     <Compile Include="EventListeners\MessagePosted.cs" />
     <Compile Include="EventType.cs" />
+    <Compile Include="Exceptions.cs" />
     <Compile Include="ExtensionMethods.cs" />
     <Compile Include="Message.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
