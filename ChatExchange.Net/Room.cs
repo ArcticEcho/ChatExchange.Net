@@ -214,7 +214,7 @@ namespace ChatExchangeDotNet
         {
             if (hasLeft) { return; }
 
-            RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/chats/leave/" + ID, "quiet=true&fkey=" + fkey);
+            RequestManager.Post(cookieKey, chatRoot + "/chats/leave/" + ID, "quiet=true&fkey=" + fkey);
 
             hasLeft = true;
         }
@@ -234,7 +234,7 @@ namespace ChatExchangeDotNet
         /// <returns>A Message object representing the requested message, or null if the message could not be found.</returns>
         public Message GetMessage(int messageID)
         {
-            var resContent = RequestManager.SendGETRequest(cookieKey, chatRoot + "/messages/" + messageID + "/history");
+            var resContent = RequestManager.Get(cookieKey, chatRoot + "/messages/" + messageID + "/history");
 
             if (string.IsNullOrEmpty(resContent))
             {
@@ -275,7 +275,7 @@ namespace ChatExchangeDotNet
         /// </summary>
         public HashSet<User> GetPingableUsers()
         {
-            var json = RequestManager.SendGETRequest(cookieKey, "http://chat." + Host + "/rooms/pingable/" + ID);
+            var json = RequestManager.Get(cookieKey, "http://chat." + Host + "/rooms/pingable/" + ID);
             if (string.IsNullOrEmpty(json)) { return null; }
             var data = JsonSerializer.DeserializeFromString<HashSet<List<object>>>(json);
             var users = new HashSet<User>();
@@ -312,7 +312,7 @@ namespace ChatExchangeDotNet
                 while (!disposed)
                 {
                     var data = "text=" + Uri.EscapeDataString(message.ToString()).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
-                    var resContent = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/chats/" + ID + "/messages/new", data);
+                    var resContent = RequestManager.Post(cookieKey, chatRoot + "/chats/" + ID + "/messages/new", data);
 
                     if (string.IsNullOrEmpty(resContent) || hasLeft) { return null; }
                     if (HandleThrottling(resContent)) { continue; }
@@ -357,7 +357,7 @@ namespace ChatExchangeDotNet
                 while (!disposed)
                 {
                     var data = "text=" + Uri.EscapeDataString(message.ToString()).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
-                    var resContent = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/chats/" + ID + "/messages/new", data);
+                    var resContent = RequestManager.Post(cookieKey, chatRoot + "/chats/" + ID + "/messages/new", data);
 
                     if (string.IsNullOrEmpty(resContent) || hasLeft) { return false; }
                     if (HandleThrottling(resContent)) { continue; }
@@ -402,7 +402,7 @@ namespace ChatExchangeDotNet
                 while (!disposed)
                 {
                     var data = "text=" + Uri.EscapeDataString(newMessage.ToString()).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
-                    var resContent = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID, data);
+                    var resContent = RequestManager.Post(cookieKey, chatRoot + "/messages/" + messageID, data);
 
                     if (string.IsNullOrEmpty(resContent) || hasLeft) { return false; }
                     if (HandleThrottling(resContent)) { continue; }
@@ -432,7 +432,7 @@ namespace ChatExchangeDotNet
             {
                 while (!disposed)
                 {
-                    var resContent = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID + "/delete", "fkey=" + fkey);
+                    var resContent = RequestManager.Post(cookieKey, chatRoot + "/messages/" + messageID + "/delete", "fkey=" + fkey);
 
                     if (string.IsNullOrEmpty(resContent) || hasLeft) { return false; }
                     if (HandleThrottling(resContent)) { continue; }
@@ -462,7 +462,7 @@ namespace ChatExchangeDotNet
             {
                 while (!disposed)
                 {
-                    var resContent = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID + "/star", "fkey=" + fkey);
+                    var resContent = RequestManager.Post(cookieKey, chatRoot + "/messages/" + messageID + "/star", "fkey=" + fkey);
 
                     if (string.IsNullOrEmpty(resContent) || hasLeft) { return false; }
                     if (HandleThrottling(resContent)) { continue; }
@@ -501,7 +501,7 @@ namespace ChatExchangeDotNet
                 while (true)
                 {
                     var data = "fkey=" + fkey;
-                    var resContent = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID + "/unstar", data);
+                    var resContent = RequestManager.Post(cookieKey, chatRoot + "/messages/" + messageID + "/unstar", data);
 
                     if (string.IsNullOrEmpty(resContent)) { return false; }
                     if (HandleThrottling(resContent)) { continue; }
@@ -534,7 +534,7 @@ namespace ChatExchangeDotNet
                 while (true)
                 {
                     var data = "fkey=" + fkey;
-                    var resContent = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/messages/" + messageID + "/owner-star", data);
+                    var resContent = RequestManager.Post(cookieKey, chatRoot + "/messages/" + messageID + "/owner-star", data);
 
                     if (string.IsNullOrEmpty(resContent)) { return false; }
                     if (HandleThrottling(resContent)) { continue; }
@@ -567,7 +567,7 @@ namespace ChatExchangeDotNet
                 while (true)
                 {
                     var data = "userID=" + userID + "&fkey=" + fkey;
-                    var resContent = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/rooms/kickmute/" + ID, data);
+                    var resContent = RequestManager.Post(cookieKey, chatRoot + "/rooms/kickmute/" + ID, data);
 
                     if (string.IsNullOrEmpty(resContent)) { return false; }
                     if (HandleThrottling(resContent)) { continue; }
@@ -628,7 +628,7 @@ namespace ChatExchangeDotNet
                         }
                     }
 
-                    var resContent = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/rooms/setuseraccess/" + ID, data);
+                    var resContent = RequestManager.Post(cookieKey, chatRoot + "/rooms/setuseraccess/" + ID, data);
 
                     if (string.IsNullOrEmpty(resContent)) { return false; }
                     if (HandleThrottling(resContent)) { continue; }
@@ -661,7 +661,7 @@ namespace ChatExchangeDotNet
 
         private User GetMe()
         {
-            var html = RequestManager.SendGETRequest(cookieKey, chatRoot + "/chats/join/favorite");
+            var html = RequestManager.Get(cookieKey, chatRoot + "/chats/join/favorite");
 
             if (string.IsNullOrEmpty(html)) { throw new Exception("Could not get user information. Do you have an active internet connection?"); }
 
@@ -674,7 +674,7 @@ namespace ChatExchangeDotNet
 
         private void SetFkey()
         {
-            var resContent = RequestManager.SendGETRequest(cookieKey, chatRoot + "/rooms/" + ID);
+            var resContent = RequestManager.Get(cookieKey, chatRoot + "/rooms/" + ID);
             var ex = new Exception("Could not get fkey. Do you have an active internet connection?");
 
             if (string.IsNullOrEmpty(resContent)) { throw ex; }
@@ -689,7 +689,7 @@ namespace ChatExchangeDotNet
         private int GetGlobalEventCount()
         {
             var data = "mode=Events&msgCount=0&fkey=" + fkey;
-            var resContent = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/chats/" + ID + "/events", data);
+            var resContent = RequestManager.Post(cookieKey, chatRoot + "/chats/" + ID + "/events", data);
 
             if (string.IsNullOrEmpty(resContent))
             {
@@ -702,7 +702,7 @@ namespace ChatExchangeDotNet
         private string GetSocketURL(int eventTime)
         {
             var data = "roomid=" + ID + "&fkey=" + fkey;
-            var resContent = RequestManager.SendPOSTRequest(cookieKey, chatRoot + "/ws-auth", data, chatRoot + "/rooms/" + ID, chatRoot);
+            var resContent = RequestManager.Post(cookieKey, chatRoot + "/ws-auth", data, chatRoot + "/rooms/" + ID, chatRoot);
 
             if (string.IsNullOrEmpty(resContent)) { throw new Exception("Could not get WebSocket URL. Do you haven an active internet connection?"); }
 

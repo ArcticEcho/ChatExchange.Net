@@ -88,7 +88,7 @@ namespace Example
             // leave the room rather than letting timeouts figure out that we've gone.
             sandbox.Leave();
 
-            // Safely dispose of the client object (which will also clean up all created room instances).
+            // Safely dispose of the client object (which'll also clean up all created room instances).
             client.Dispose();
         }
     }

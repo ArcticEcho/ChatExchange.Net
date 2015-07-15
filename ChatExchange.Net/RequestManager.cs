@@ -30,108 +30,62 @@ namespace ChatExchangeDotNet
 {
     internal static class RequestManager
     {
-        private static readonly Dictionary<string, CookieContainer> cookies = new Dictionary<string, CookieContainer>();
-        private static int timeout = 100000;
+        public static Dictionary<string, CookieContainer> Cookies { get; private set; }
 
-        public static Dictionary<string, CookieContainer> Cookies
-        {
-            get
-            {
-                return cookies;
-            }
-        }
+        public static TimeSpan Timeout { get; set; }
 
-        public static int TimeoutMilliseconds
+
+
+        static RequestManager()
         {
-            get
-            {
-                return timeout;
-            }
-            set
-            {
-                timeout = value;
-            }
+            Timeout = TimeSpan.FromSeconds(100);
+            Cookies = new Dictionary<string, CookieContainer>();
         }
 
 
 
-        public static string GetResponseContent(HttpWebResponse response)
-        {
-            if (response == null) { throw new ArgumentNullException("response"); }
-
-            var data = "";
-
-            try
-            {
-                using (var strm = response.GetResponseStream())
-                using (var reader = new StreamReader(strm))
-                {
-                    data = reader.ReadToEnd();
-                }
-            }
-            catch (Exception)
-            {
-                return null;
-            }
-
-            return data;
-        }
-
-        public static HttpWebResponse SendPOSTRequestRaw(string cookieKey, string uri, string content, string referer = "", string origin = "")
+        public static HttpWebResponse PostRaw(string cookieKey, string uri, string content, string referer = null, string origin = null)
         {
             var req = GenerateRequest(cookieKey, uri, content, "POST", referer, origin);
             return GetResponse(req);
         }
 
-        public static HttpWebResponse SendGETRequestRaw(string cookieKey, string uri)
+        public static HttpWebResponse GetRaw(string cookieKey, string uri)
         {
             var req = GenerateRequest(cookieKey, uri, null, "GET");
             return GetResponse(req);
         }
 
-        public static string SendPOSTRequest(string cookieKey, string uri, string content, string referer = "", string origin = "")
+        public static string Post(string cookieKey, string uri, string content, string referer = null, string origin = null)
         {
-            try
+            var req = GenerateRequest(cookieKey, uri, content, "POST", referer, origin);
+            using (var res = GetResponse(req))
             {
-                var req = GenerateRequest(cookieKey, uri, content, "POST", referer, origin);
-                using (var res = GetResponse(req))
-                {
-                    return GetResponseContent(res);
-                }
-            }
-            catch (Exception)
-            {
-                return null;
+                return res.GetContent();
             }
         }
 
-        public static string SendGETRequest(string cookieKey, string uri)
+        public static string Get(string cookieKey, string uri)
         {
-            try
+            var req = GenerateRequest(cookieKey, uri, null, "GET");
+            using (var res = GetResponse(req))
             {
-                var req = GenerateRequest(cookieKey, uri, null, "GET");
-                using (var res = GetResponse(req))
-                {
-                    return GetResponseContent(res);
-                }
-            }
-            catch (Exception)
-            {
-                return null;
+                return res.GetContent();
             }
         }
 
 
 
-        private static HttpWebRequest GenerateRequest(string cookieKey, string uri, string content, string method, string referer = "", string origin = "")
+        private static HttpWebRequest GenerateRequest(string cookieKey, string uri, string content, string method, string referer = null, string origin = null)
         {
             if (uri == null) { throw new ArgumentNullException("uri"); }
 
             var req = (HttpWebRequest)WebRequest.Create(uri);
+            var meth = method.Trim().ToUpperInvariant();
 
-            req.Method = method;
+            req.Method = meth;
             req.CookieContainer = string.IsNullOrEmpty(cookieKey) ? null : Cookies[cookieKey];
-            req.Timeout = TimeoutMilliseconds;
+            req.Timeout = (int)Timeout.TotalMilliseconds;
             req.Referer = referer;
 
             if (!string.IsNullOrEmpty(origin))
@@ -139,7 +93,7 @@ namespace ChatExchangeDotNet
                 req.Headers.Add("Origin", origin);
             }
 
-            if (method.ToUpperInvariant() == "POST")
+            if (meth == "POST")
             {
                 var data = Encoding.UTF8.GetBytes(content);
 

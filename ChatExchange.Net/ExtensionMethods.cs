@@ -28,6 +28,7 @@ using System.Reflection;
 using System.Linq;
 using System.Text.RegularExpressions;
 using CsQuery;
+using System.IO;
 
 namespace ChatExchangeDotNet
 {
@@ -37,6 +38,17 @@ namespace ChatExchangeDotNet
         private static readonly Regex isReply = new Regex(@"^:\d+\s", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
 
+
+        internal static string GetContent(this HttpWebResponse response)
+        {
+            if (response == null) { throw new ArgumentNullException("response"); }
+
+            using (var strm = response.GetResponseStream())
+            using (var reader = new StreamReader(strm))
+            {
+                return reader.ReadToEnd();
+            }
+        }
 
         internal static List<Cookie> GetCookies(this CookieContainer container)
         {

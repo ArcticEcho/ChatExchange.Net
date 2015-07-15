@@ -51,7 +51,7 @@ namespace ChatExchangeDotNet
         {
             get
             {
-                var resContent = RequestManager.SendGETRequest("", "http://chat." + Host + "/messages/" + ID + "/history");
+                var resContent = RequestManager.Get("", "http://chat." + Host + "/messages/" + ID + "/history");
 
                 if (string.IsNullOrEmpty(resContent)) { return -1; }
 
@@ -78,7 +78,7 @@ namespace ChatExchangeDotNet
         {
             get
             {
-                var resContent = RequestManager.SendGETRequest("", "http://chat." + Host + "/messages/" + ID + "/history");
+                var resContent = RequestManager.Get("", "http://chat." + Host + "/messages/" + ID + "/history");
 
                 if (string.IsNullOrEmpty(resContent)) { return -1; }
 
@@ -105,7 +105,7 @@ namespace ChatExchangeDotNet
         {
             get
             {
-                var resContent = RequestManager.SendGETRequest("", "http://chat." + Host + "/messages/" + ID + "/history");
+                var resContent = RequestManager.Get("", "http://chat." + Host + "/messages/" + ID + "/history");
                 var msgs = messageEdits.Matches(resContent);
 
                return Math.Max((msgs == null ? 0 : msgs.Count) - 2, 0);
@@ -133,13 +133,28 @@ namespace ChatExchangeDotNet
 
         public static string GetMessageContent(string host, int messageID, bool stripMention = true)
         {
-            using (var res = RequestManager.SendGETRequestRaw("", "http://chat." + host + "/message/" + messageID + "?plain=true"))
+            try
             {
-                if (res == null || res.StatusCode != HttpStatusCode.OK) { return null; }
+                using (var res = RequestManager.GetRaw("", "http://chat." + host + "/message/" + messageID + "?plain=true"))
+                {
+                    if (res == null || res.StatusCode != HttpStatusCode.OK) { return null; }
 
-                var content = RequestManager.GetResponseContent(res);
+                    var content = res.GetContent();
 
-                return string.IsNullOrEmpty(content) ? null : WebUtility.HtmlDecode(stripMention ? content.StripMention() : content);
+                    return content ?? WebUtility.HtmlDecode(stripMention ? content.StripMention() : content);
+                }
+            }
+            catch (WebException ex)
+            {
+                // If the input is valid, we've probably hit a deleted message.
+                if (ex.Response != null && ((HttpWebResponse)ex.Response).StatusCode == HttpStatusCode.NotFound)
+                {
+                    return null;
+                }
+                else
+                {
+                    throw ex;
+                }
             }
         }
 

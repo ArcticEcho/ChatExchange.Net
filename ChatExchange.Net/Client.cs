@@ -43,12 +43,21 @@ namespace ChatExchangeDotNet
 
         public Client(string email, string password)
         {
-            if (string.IsNullOrEmpty(email) || !email.Contains("@")) { throw new ArgumentException("'email' must be a valid email address.", "email"); }
-            if (string.IsNullOrEmpty(password)) { throw new ArgumentException("'password' must not be null or empty.", "password"); }
+            if (string.IsNullOrEmpty(email) || !email.Contains("@"))
+            {
+                throw new ArgumentException("'email' must be a valid email address.", "email");
+            }
+            if (string.IsNullOrEmpty(password))
+            {
+                throw new ArgumentException("'password' must not be null or empty.", "password");
+            }
 
             cookieKey = email.Split('@')[0];
 
-            if (RequestManager.Cookies.ContainsKey(cookieKey)) { throw new Exception("Cannot create multiple instances of the same user."); }
+            if (RequestManager.Cookies.ContainsKey(cookieKey))
+            {
+                throw new Exception("Cannot create multiple instances of the same user.");
+            }
 
             RequestManager.Cookies.Add(cookieKey, new CookieContainer());
 
@@ -69,7 +78,10 @@ namespace ChatExchangeDotNet
             var host = hostParser.Replace(roomUrl, "");
             var id = int.Parse(idParser.Replace(roomUrl, ""));
 
-            if (Rooms.Any(room => room.Host == host && room.ID == id)) { throw new Exception("Cannot join a room you are already in."); }
+            if (Rooms.Any(room => room.Host == host && room.ID == id))
+            {
+                throw new Exception("Cannot join a room you are already in.");
+            }
 
             if (Rooms.All(room => room.Host != host))
             {
@@ -115,18 +127,29 @@ namespace ChatExchangeDotNet
 
         private void SEOpenIDLogin(string email, string password)
         {
-            var getResContent = RequestManager.SendGETRequest(cookieKey, "https://openid.stackexchange.com/account/login");
+            var getResContent = RequestManager.Get(cookieKey, "https://openid.stackexchange.com/account/login");
 
-            if (string.IsNullOrEmpty(getResContent)) { throw new Exception("Could not get OpenID fkey. Do you have an active internet connection?"); }
-
-            var data = "email=" + Uri.EscapeDataString(email) + "&password=" + Uri.EscapeDataString(password) + "&fkey=" + CQ.Create(getResContent).GetInputValue("fkey");
-            
-            using (var res = RequestManager.SendPOSTRequestRaw(cookieKey, "https://openid.stackexchange.com/account/login/submit", data))
+            if (string.IsNullOrEmpty(getResContent))
             {
-                if (res == null || !string.IsNullOrEmpty(res.Headers["p3p"])) { throw new Exception("Could not login using the specified OpenID credentials. Have you entered the correct credentials, and have an active internet connection?"); }
+                throw new Exception("Unable to find OpenID fkey.");
+            }
 
-                var postResContent = RequestManager.GetResponseContent(res);
-                var dom = CQ.Create(postResContent);
+            var data = "email=" + Uri.EscapeDataString(email) + "&password=" +
+                       Uri.EscapeDataString(password) + "&fkey=" +
+                       CQ.Create(getResContent).GetInputValue("fkey");
+
+            using (var res = RequestManager.PostRaw(cookieKey, "https://openid.stackexchange.com/account/login/submit", data))
+            {
+                if (res == null)
+                {
+                    throw new Exception("Unable to authenticate using OpenID.");
+                }
+                if (!string.IsNullOrEmpty(res.Headers["p3p"]))
+                {
+                    throw new Exception("Invalid OpenID credentials.");
+                }
+
+                var dom = CQ.Create(res.GetContent());
 
                 openidUrl = WebUtility.HtmlDecode(dom["#delegate"][0].InnerHTML);
                 openidUrl = openidUrl.Remove(0, openidUrl.LastIndexOf("href", StringComparison.Ordinal) + 6);
@@ -136,19 +159,27 @@ namespace ChatExchangeDotNet
 
         private void SiteLogin(string host)
         {
-            var getResContent = RequestManager.SendGETRequest(cookieKey, "http://" + host + "/users/login");
+            var getResContent = RequestManager.Get(cookieKey, "http://" + host + "/users/login");
 
-            if (string.IsNullOrEmpty(getResContent)) { throw new Exception("Could not get fkey from " + host + ". Do you have an active internet connection?"); }
+            if (string.IsNullOrEmpty(getResContent))
+            {
+                throw new Exception("Unable to find fkey from " + host + ".");
+            }
 
             var fkey = CQ.Create(getResContent).GetInputValue("fkey");
-            var data = "fkey=" + fkey + "&oauth_version=&oauth_server=&openid_username=&openid_identifier=" + Uri.EscapeDataString(openidUrl);
-            var referrer = "https://" + host + "/users/login?returnurl=" + Uri.EscapeDataString("http://" + host + "/");
 
-            using (var postRes = RequestManager.SendPOSTRequestRaw(cookieKey, "http://" + host + "/users/authenticate", data, referrer))
+            var data = "fkey=" + fkey +
+                       "&oauth_version=&oauth_server=&openid_username=&openid_identifier=" +
+                       Uri.EscapeDataString(openidUrl);
+
+            var referrer = "https://" + host + "/users/login?returnurl=" +
+                           Uri.EscapeDataString("http://" + host + "/");
+
+            using (var postRes = RequestManager.PostRaw(cookieKey, "http://" + host + "/users/authenticate", data, referrer))
             {
                 if (postRes == null)
                 {
-                    throw new Exception("Could not login into site " + host + ". Have you entered the correct credentials, and have an active internet connection?");
+                    throw new Exception("Unable to login to " + host + ".");
                 }
 
                 HandleConfirmationPrompt(postRes);
@@ -159,21 +190,20 @@ namespace ChatExchangeDotNet
         {
             if (!res.ResponseUri.ToString().StartsWith("https://openid.stackexchange.com/account/prompt")) { return; }
 
-            var resContent = RequestManager.GetResponseContent(res);
-            var dom = CQ.Create(resContent);
+            var dom = CQ.Create(res.GetContent());
             var session = dom["input"].First(e => e.Attributes["name"] != null && e.Attributes["name"] == "session");
             var fkey = dom.GetInputValue("fkey");
             var data = "session=" + session["value"] + "&fkey=" + fkey;
 
-            RequestManager.SendPOSTRequest(cookieKey, "https://openid.stackexchange.com/account/prompt/submit", data);
+            RequestManager.Post(cookieKey, "https://openid.stackexchange.com/account/prompt/submit", data);
         }
 
         private void SEChatLogin()
         {
             // Login to SE.
-            RequestManager.SendGETRequest(cookieKey, "http://stackexchange.com/users/authenticate?openid_identifier=" + Uri.EscapeDataString(openidUrl));
+            RequestManager.Get(cookieKey, "http://stackexchange.com/users/authenticate?openid_identifier=" + Uri.EscapeDataString(openidUrl));
 
-            var html = RequestManager.SendGETRequest(cookieKey, "http://stackexchange.com/users/chat-login");
+            var html = RequestManager.Get(cookieKey, "http://stackexchange.com/users/chat-login");
             var dom = CQ.Create(html);
             var authToken = Uri.EscapeDataString(dom.GetInputValue("authToken"));
             var nonce = Uri.EscapeDataString(dom.GetInputValue("nonce"));
@@ -181,7 +211,7 @@ namespace ChatExchangeDotNet
             var refOrigin = "http://chat.stackexchange.com";
 
             // Login to chat.SE.
-            var postResContent = RequestManager.SendPOSTRequest(cookieKey, "http://chat.stackexchange.com/users/login/global", data, refOrigin, refOrigin);
+            var postResContent = RequestManager.Post(cookieKey, "http://chat.stackexchange.com/users/login/global", data, refOrigin, refOrigin);
         }
     }
 }
