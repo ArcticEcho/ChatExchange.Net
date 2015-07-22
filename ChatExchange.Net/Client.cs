@@ -201,17 +201,9 @@ namespace ChatExchangeDotNet
         private void SEChatLogin()
         {
             // Login to SE.
-            RequestManager.Get(cookieKey, "http://stackexchange.com/users/authenticate?openid_identifier=" + Uri.EscapeDataString(openidUrl));
-
-            var html = RequestManager.Get(cookieKey, "http://stackexchange.com/users/chat-login");
-            var dom = CQ.Create(html);
-            var authToken = Uri.EscapeDataString(dom.GetInputValue("authToken"));
-            var nonce = Uri.EscapeDataString(dom.GetInputValue("nonce"));
-            var data = "authToken=" + authToken + "&nonce=" + nonce;
-            var refOrigin = "http://chat.stackexchange.com";
-
-            // Login to chat.SE.
-            var postResContent = RequestManager.Post(cookieKey, "http://chat.stackexchange.com/users/login/global", data, refOrigin, refOrigin);
+            var url = "http://stackexchange.com/users/authenticate?openid_identifier=" +
+                      Uri.EscapeDataString(openidUrl);
+            RequestManager.Get(cookieKey, url);
         }
     }
 }

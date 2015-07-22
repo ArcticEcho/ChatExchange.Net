@@ -36,7 +36,7 @@ namespace Example
             var client = new Client("some-email@address.com", "MySuperStr0ngPa55word");
 
             // Join a room by specifying its URL (returns a Room object).
-            var sandbox = client.JoinRoom("http://chat.meta.stackexchange.com/rooms/651/sandbox");
+            var sandbox = client.JoinRoom("http://chat.stackexchange.com/rooms/1/sandbox");
 
             // Post a new message in the room (if successful, returns a Message object, otherwise returns null).
             // (If you have no use of the returned Message object, I'd recommend using .PostMessageFast() instead.)
