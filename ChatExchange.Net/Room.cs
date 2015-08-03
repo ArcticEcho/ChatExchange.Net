@@ -301,8 +301,8 @@ namespace ChatExchangeDotNet
             return users;
         }
 
-        Regex findUsers = new Regex(@"CHAT\.RoomUsers\.initPresent\(\[(?<users>.+)\]\);", RegexOptions.Compiled | RegexOptions.Singleline);
-        Regex getId = new Regex(@"id: (?<id>\d+)", RegexOptions.Compiled);
+        static readonly Regex findUsers = new Regex(@"CHAT\.RoomUsers\.initPresent\(\[(?<users>.+)\]\);", RegexOptions.Compiled | RegexOptions.Singleline);
+        static readonly Regex getId = new Regex(@"id: (?<id>\d+)", RegexOptions.Compiled);
         /// <summary>
         /// Fetches a list of all users that are currently in the room.
         /// </summary>
