@@ -321,9 +321,7 @@ namespace ChatExchangeDotNet
             var users = new HashSet<User>();
             foreach (string line in lines)
             {
-                Console.WriteLine(line);
                 string id = getId.Match(line).Groups["id"].Value;
-                Console.WriteLine(id);
                 int userID = int.Parse(id);
                 users.Add(new User(Host, ID, userID, true));
             }
