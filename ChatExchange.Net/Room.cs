@@ -319,7 +319,7 @@ namespace ChatExchangeDotNet
             // The .Where call is to avoid lines who are whitespace-only, those do not get removed by RemoveEmptyEntries.
 
             var users = new HashSet<User>();
-            foreach (string line in lines)
+            foreach (var line in lines)
             {
                 var id = getId.Match(line).Groups["id"].Value;
                 var userID = int.Parse(id);
