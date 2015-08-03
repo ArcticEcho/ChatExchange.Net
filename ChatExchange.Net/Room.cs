@@ -301,6 +301,8 @@ namespace ChatExchangeDotNet
             return users;
         }
 
+        Regex findUsers = new Regex(@"CHAT\.RoomUsers\.initPresent\(\[(?<users>.+)\]\);", RegexOptions.Compiled | RegexOptions.Singleline);
+        Regex getId = new Regex(@"id: (?<id>\d+)", RegexOptions.Compiled);
         /// <summary>
         /// Fetches a list of all users that are currently in the room.
         /// </summary>
@@ -310,7 +312,6 @@ namespace ChatExchangeDotNet
             CQ doc = CQ.CreateDocument(html);
             IDomObject obj = doc.Select("script")[3];
             string script = obj.InnerText;
-            Regex findUsers = new Regex(@"CHAT\.RoomUsers\.initPresent\(\[(?<users>.+)\]\);", RegexOptions.Compiled | RegexOptions.Singleline);
             string usersJs = findUsers.Match(script).Groups["users"].Value;
             var lines = usersJs.Split(new char[] { '\n' }, StringSplitOptions.RemoveEmptyEntries)
                                .Select(x => x.Trim())
@@ -318,11 +319,10 @@ namespace ChatExchangeDotNet
             // The .Where call is to avoid lines who are whitespace-only, those do not get removed by RemoveEmptyEntries.
 
             var users = new HashSet<User>();
-            Regex re = new Regex(@"id: (?<id>\d+)", RegexOptions.Compiled);
             foreach (string line in lines)
             {
                 Console.WriteLine(line);
-                string id = re.Match(line).Groups["id"].Value;
+                string id = getId.Match(line).Groups["id"].Value;
                 Console.WriteLine(id);
                 int userID = int.Parse(id);
                 users.Add(new User(Host, ID, userID, true));
