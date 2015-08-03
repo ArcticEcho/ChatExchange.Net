@@ -22,6 +22,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -294,6 +295,34 @@ namespace ChatExchangeDotNet
             foreach (var user in data)
             {
                 var userID = int.Parse(user[0].ToString());
+                users.Add(new User(Host, ID, userID, true));
+            }
+
+            return users;
+        }
+
+        static readonly Regex findUsers = new Regex(@"CHAT\.RoomUsers\.initPresent\(\[(?<users>.+)\]\);", RegexOptions.Compiled | RegexOptions.Singleline);
+        static readonly Regex getId = new Regex(@"id: (?<id>\d+)", RegexOptions.Compiled);
+        /// <summary>
+        /// Fetches a list of all users that are currently in the room.
+        /// </summary>
+        public HashSet<User> GetCurrentUsers()
+        {
+            var html = RequestManager.Get(cookieKey, string.Format("http://chat.{0}/rooms/{1}/", Host, ID));
+            var doc = CQ.CreateDocument(html);
+            var obj = doc.Select("script")[3];
+            var script = obj.InnerText;
+            var usersJs = findUsers.Match(script).Groups["users"].Value;
+            var lines = usersJs.Split(new char[] { '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                               .Select(x => x.Trim())
+                               .Where(x => !string.IsNullOrEmpty(x));
+            // The .Where call is to avoid lines who are whitespace-only, those do not get removed by RemoveEmptyEntries.
+
+            var users = new HashSet<User>();
+            foreach (var line in lines)
+            {
+                var id = getId.Match(line).Groups["id"].Value;
+                var userID = int.Parse(id);
                 users.Add(new User(Host, ID, userID, true));
             }
 
