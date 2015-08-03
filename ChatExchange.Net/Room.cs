@@ -308,11 +308,11 @@ namespace ChatExchangeDotNet
         /// </summary>
         public HashSet<User> GetCurrentUsers()
         {
-            string html = RequestManager.Get(cookieKey, string.Format("http://chat.{0}/rooms/{1}/", Host, ID));
-            CQ doc = CQ.CreateDocument(html);
-            IDomObject obj = doc.Select("script")[3];
-            string script = obj.InnerText;
-            string usersJs = findUsers.Match(script).Groups["users"].Value;
+            var html = RequestManager.Get(cookieKey, string.Format("http://chat.{0}/rooms/{1}/", Host, ID));
+            var doc = CQ.CreateDocument(html);
+            var obj = doc.Select("script")[3];
+            var script = obj.InnerText;
+            var usersJs = findUsers.Match(script).Groups["users"].Value;
             var lines = usersJs.Split(new char[] { '\n' }, StringSplitOptions.RemoveEmptyEntries)
                                .Select(x => x.Trim())
                                .Where(x => !string.IsNullOrEmpty(x));
@@ -321,8 +321,8 @@ namespace ChatExchangeDotNet
             var users = new HashSet<User>();
             foreach (string line in lines)
             {
-                string id = getId.Match(line).Groups["id"].Value;
-                int userID = int.Parse(id);
+                var id = getId.Match(line).Groups["id"].Value;
+                var userID = int.Parse(id);
                 users.Add(new User(Host, ID, userID, true));
             }
 
