@@ -38,6 +38,8 @@ namespace ChatExchangeDotNet
     /// </summary>
     public class Room : IDisposable
     {
+        static readonly Regex findUsers = new Regex(@"CHAT\.RoomUsers\.initPresent\(\[(?<users>.+)\]\);", ExtensionMethods.RegexOpts | RegexOptions.Singleline);
+        static readonly Regex getId = new Regex(@"id: (?<id>\d+)", ExtensionMethods.RegexOpts);
         private readonly AutoResetEvent throttleARE;
         private readonly ActionExecutor actEx;
         private readonly string chatRoot;
@@ -301,8 +303,6 @@ namespace ChatExchangeDotNet
             return users;
         }
 
-        static readonly Regex findUsers = new Regex(@"CHAT\.RoomUsers\.initPresent\(\[(?<users>.+)\]\);", RegexOptions.Compiled | RegexOptions.Singleline);
-        static readonly Regex getId = new Regex(@"id: (?<id>\d+)", RegexOptions.Compiled);
         /// <summary>
         /// Fetches a list of all users that are currently in the room.
         /// </summary>
@@ -696,9 +696,11 @@ namespace ChatExchangeDotNet
 
         private bool HandleThrottling(string res)
         {
-            if (Regex.IsMatch(res, @"(?i)^you can perform this action again in \d*") && !disposed)
+            var msg = res.Trim().ToLowerInvariant();
+
+            if (msg.StartsWith("you can perform this action again in") && !disposed)
             {
-                var delay = Regex.Replace(res, @"\D", "");
+                var delay = new string(msg.Where(char.IsDigit).ToArray());
                 throttleARE.WaitOne(int.Parse(delay) * 1000);
 
                 return true;

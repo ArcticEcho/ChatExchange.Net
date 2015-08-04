@@ -29,7 +29,7 @@ namespace ChatExchangeDotNet
 {
     public class Message
     {
-        private Regex messageEdits = new Regex("<div class=\"message\"", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private Regex messageEdits = new Regex("<div class=\"message\"", ExtensionMethods.RegexOpts);
 
         public string Host { get; private set; }
         public int RoomID { get; private set; }

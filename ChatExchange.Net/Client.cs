@@ -31,8 +31,8 @@ namespace ChatExchangeDotNet
 {
     public class Client : IDisposable
     {
-        private readonly Regex hostParser = new Regex("https?://(chat.)?|/.*", RegexOptions.Compiled | RegexOptions.CultureInvariant);
-        private readonly Regex idParser = new Regex(".*/rooms/|/.*", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private readonly Regex hostParser = new Regex("https?://(chat.)?|/.*", ExtensionMethods.RegexOpts);
+        private readonly Regex idParser = new Regex(".*/rooms/|/.*", ExtensionMethods.RegexOpts);
         private readonly string cookieKey;
         private string openidUrl;
         private bool disposed;

@@ -28,9 +28,8 @@ namespace ChatExchangeDotNet
 {
     public class MessageBuilder
     {
-        private const RegexOptions regOpts = RegexOptions.Compiled | RegexOptions.CultureInvariant;
-        private static readonly Regex tagReg = new Regex(@"[^\w\.\#_\-\+]", regOpts);
-        private static readonly Regex chatMd = new Regex(@"[_*`\[\]]", regOpts);
+        private static readonly Regex tagReg = new Regex(@"[^\w\.\#_\-\+]", ExtensionMethods.RegexOpts);
+        private static readonly Regex chatMd = new Regex(@"[_*`\[\]]", ExtensionMethods.RegexOpts);
         private readonly string newline = "\n";
         private string message = "";
 
