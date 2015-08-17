@@ -47,6 +47,7 @@ namespace ChatExchangeDotNet
         private bool disposed;
         private bool hasLeft;
         private string fkey;
+        private string lastMsg;
         private TimeSpan socketRecTimeout;
         private WebSocket socket;
         private EventManager evMan;
@@ -75,7 +76,7 @@ namespace ChatExchangeDotNet
 
             set
             {
-                if (value.TotalSeconds < 10) { throw new ArgumentOutOfRangeException("value", "Must be more then 10 seconds."); }
+                if (value.TotalSeconds < 15) { throw new ArgumentOutOfRangeException("value", "Must be more then 15 seconds."); }
 
                 socketRecTimeout = value;
             }
@@ -305,6 +306,7 @@ namespace ChatExchangeDotNet
 
         /// <summary>
         /// Fetches a list of all users that are currently in the room.
+        /// (Pawcrafted by ProgramFOX.)
         /// </summary>
         public HashSet<User> GetCurrentUsers()
         {
@@ -345,6 +347,11 @@ namespace ChatExchangeDotNet
             if (hasLeft)
             {
                 throw new InvalidOperationException("Cannot post message when you have left the room.");
+            }
+            var ex = CheckDupeMsg(message.ToString());
+            if (ex != null)
+            {
+                throw ex;
             }
 
             var action = new ChatAction(ActionType.PostMessage, new Func<object>(() =>
@@ -387,7 +394,7 @@ namespace ChatExchangeDotNet
         /// <returns>True if the message was successfully posted, otherwise false.</returns>
         public bool PostMessageFast(object message)
         {
-            if (message == null || string.IsNullOrEmpty(message.ToString()) || hasLeft)
+            if (message == null || string.IsNullOrEmpty(message.ToString()) || hasLeft || CheckDupeMsg(message.ToString()) != null)
             {
                 return false;
             }
@@ -709,6 +716,18 @@ namespace ChatExchangeDotNet
             return false;
         }
 
+        private DupelicateMessageException CheckDupeMsg(string msg)
+        {
+            if (msg == lastMsg)
+            {
+                return new DupelicateMessageException();
+            }
+
+            lastMsg = msg;
+
+            return null;
+        }
+
         #region Instantiation related methods.
 
         private User GetMe()
@@ -783,10 +802,10 @@ namespace ChatExchangeDotNet
             {
                 if (!oo.WasClean || oo.Code != (ushort)CloseStatusCode.Normal)
                 {
-                    // The socket closed abnormally, probably best to restart it.
-                    for (var i = 0; i < socketRecTimeout.TotalMinutes * 6; i++)
+                    // The socket closed abnormally, probably best to restart it (at 15 second intervals).
+                    for (var i = 0; i < socketRecTimeout.TotalMinutes * 4; i++)
                     {
-                        Thread.Sleep(10000);
+                        Thread.Sleep(15000);
 
                         try
                         {
@@ -813,6 +832,8 @@ namespace ChatExchangeDotNet
 
         private void HandleData(string json)
         {
+            evMan.CallListeners(EventType.DataReceived, json);
+
             var obj = JsonObject.Parse(json);
             var data = obj.Get<Dictionary<string, List<Dictionary<string, object>>>>("r" + ID);
 
@@ -822,8 +843,6 @@ namespace ChatExchangeDotNet
             {
                 var eventType = (EventType)int.Parse(message["event_type"].ToString());
                 if (int.Parse(message["room_id"].ToString()) != ID) { continue; }
-
-                evMan.CallListeners(EventType.DataReceived, message.ToString());
                 evMan.HandleEvent(eventType, this, ref evMan, message);
             }
         }

@@ -41,4 +41,22 @@ namespace ChatExchangeDotNet
         }
     }
 
+    public class DupelicateMessageException : Exception
+    {
+        public DupelicateMessageException() : base("An attempt to post a dupelicate message has been made.")
+        {
+
+        }
+
+        public DupelicateMessageException(string message) : base(message)
+        {
+
+        }
+
+        public DupelicateMessageException(string message, Exception innerException) : base(message, innerException)
+        {
+
+        }
+    }
+
 }

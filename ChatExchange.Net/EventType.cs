@@ -33,7 +33,7 @@ namespace ChatExchangeDotNet
         InternalException = -1,
 
         /// <summary>
-        /// Meaningful (unparsed) data has been received via the WebSocket (as JSON).
+        /// Raw data (string) has been received via the WebSocket (as JSON).
         /// </summary>
         DataReceived,
 
