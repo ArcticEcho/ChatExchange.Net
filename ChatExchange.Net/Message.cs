@@ -75,7 +75,7 @@ namespace ChatExchangeDotNet
 
                     var content = res.GetContent();
 
-                    return content ?? WebUtility.HtmlDecode(stripMention ? content.StripMention() : content);
+                    return content == null ? null : WebUtility.HtmlDecode(stripMention ? content.StripMention() : content);
                 }
             }
             catch (WebException ex)

@@ -348,6 +348,10 @@ namespace ChatExchangeDotNet
             {
                 throw new InvalidOperationException("Cannot post message when you have left the room.");
             }
+            if (Me.Reputation < 20)
+            {
+                throw new Exception("You must have at least 20 reputation to post a message.");
+            }
             var ex = CheckDupeMsg(message.ToString());
             if (ex != null)
             {
@@ -394,7 +398,8 @@ namespace ChatExchangeDotNet
         /// <returns>True if the message was successfully posted, otherwise false.</returns>
         public bool PostMessageFast(object message)
         {
-            if (message == null || string.IsNullOrEmpty(message.ToString()) || hasLeft || CheckDupeMsg(message.ToString()) != null)
+            if (message == null || string.IsNullOrEmpty(message.ToString()) || hasLeft ||
+                CheckDupeMsg(message.ToString()) != null || Me.Reputation < 20)
             {
                 return false;
             }
