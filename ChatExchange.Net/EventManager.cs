@@ -140,7 +140,7 @@ namespace ChatExchangeDotNet
                 }
             }));
 
-            ConnectListener(EventType.MessageStarToggled, new Action<Message, User, int, int>((m, u, s, p) =>
+            ConnectListener(EventType.MessageStarToggled, new Action<Message, int, int>((m, s, p) =>
             {
                 if (m.ID == message.ID)
                 {

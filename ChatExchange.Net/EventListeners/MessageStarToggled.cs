@@ -34,13 +34,12 @@ namespace ChatExchangeDotNet.EventListeners
 
             var listenerParams = listener.Method.GetParameters();
 
-            if (listenerParams == null || listenerParams.Length != 4 ||
+            if (listenerParams == null || listenerParams.Length != 3 ||
                 listenerParams[0].ParameterType != typeof(Message) ||
-                listenerParams[1].ParameterType != typeof(User) ||
-                listenerParams[2].ParameterType != typeof(int) ||
-                listenerParams[3].ParameterType != typeof(int))
+                listenerParams[1].ParameterType != typeof(int) ||
+                listenerParams[2].ParameterType != typeof(int))
             {
-                return new TargetException("This chat event takes four arguments of type (in order): 'Message', 'User', 'int' & 'int'.");
+                return new TargetException("This chat event takes three arguments of type (in order): 'Message', 'int' & 'int'.");
             }
 
             return null;
@@ -50,10 +49,7 @@ namespace ChatExchangeDotNet.EventListeners
         {
             // No point parsing all this data if no one's listening.
             if (!evMan.ConnectedListeners.ContainsKey(EventType.MessageStarToggled)) { return; }
-
-            var starrerID = int.Parse(data["user_id"].ToString());
-
-            if (starrerID == room.Me.ID && room.IgnoreOwnEvents) { return; }
+            if (data.ContainsKey("user_id") && room.IgnoreOwnEvents) { return; }
 
             var id = int.Parse(data["message_id"].ToString());
             var starCount = 0;
@@ -70,11 +66,9 @@ namespace ChatExchangeDotNet.EventListeners
             }
 
             var message = room[id];
-            var user = room.GetUser(starrerID);
 
             evMan.TrackMessage(message);
-            evMan.TrackUser(user);
-            evMan.CallListeners(EventType.MessageStarToggled, message, user, starCount, pinCount);
+            evMan.CallListeners(EventType.MessageStarToggled, message, starCount, pinCount);
         }
     }
 }
