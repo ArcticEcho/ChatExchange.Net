@@ -31,6 +31,8 @@ namespace ChatExchangeDotNet
 {
     public class Client : IDisposable
     {
+        private readonly Regex userUrl = new Regex("href=\"/users/\\d*?/", ExtensionMethods.RegexOpts);
+        private readonly Regex openidDel = new Regex("https://openid\\.stackexchange\\.com/user/.*?\"", ExtensionMethods.RegexOpts);
         private readonly Regex hostParser = new Regex("https?://(chat.)?|/.*", ExtensionMethods.RegexOpts);
         private readonly Regex idParser = new Regex(".*/rooms/|/.*", ExtensionMethods.RegexOpts);
         private readonly string cookieKey;
@@ -144,16 +146,15 @@ namespace ChatExchangeDotNet
                 {
                     throw new AuthenticationException("Unable to authenticate using OpenID.");
                 }
-                if (!string.IsNullOrEmpty(res.Headers["p3p"]))
+                if (res.ResponseUri.ToString() != "https://openid.stackexchange.com/user")
                 {
                     throw new AuthenticationException("Invalid OpenID credentials.");
                 }
 
-                var dom = CQ.Create(res.GetContent());
+                var html = res.GetContent();
+                var del = openidDel.Match(html).Value;
 
-                openidUrl = WebUtility.HtmlDecode(dom["#delegate"][0].InnerHTML);
-                openidUrl = openidUrl.Remove(0, openidUrl.LastIndexOf("href", StringComparison.Ordinal) + 6);
-                openidUrl = openidUrl.Remove(openidUrl.IndexOf("\"", StringComparison.Ordinal));
+                openidUrl = del.Remove(del.Length - 1, 1);
             }
         }
 
@@ -182,28 +183,58 @@ namespace ChatExchangeDotNet
                     throw new AuthenticationException("Unable to login to " + host + ".");
                 }
 
-                HandleConfirmationPrompt(postRes);
+                var html = postRes.GetContent();
+                HandleConfirmationPrompt(postRes.ResponseUri.ToString(), html);
+                TryFetchUserID(html);
             }
         }
 
-        private void HandleConfirmationPrompt(HttpWebResponse res)
+        private void SEChatLogin()
         {
-            if (!res.ResponseUri.ToString().StartsWith("https://openid.stackexchange.com/account/prompt")) { return; }
+            var fkeyRes = RequestManager.Get(cookieKey, "https://stackexchange.com/users/login");
+            var fkey = CQ.Create(fkeyRes).GetInputValue("fkey");
+            var data = "fkey=" + fkey + "&oauth_version=&oauth_server=&openid_identifier=" + openidUrl;
+            using (var res = RequestManager.PostRaw(cookieKey,
+                                         "http://stackexchange.com/users/authenticate",
+                                         data, "https://stackexchange.com/users/login",
+                                         "https://stackexchange.com"))
+            {
+                var html = res.GetContent();
+                HandleConfirmationPrompt(res.ResponseUri.ToString(), html);
+                TryFetchUserID(html);
+            }
+        }
 
-            var dom = CQ.Create(res.GetContent());
+        private void TryFetchUserID(string html)
+        {
+            var dom = CQ.Create(html);
+            var id = 0;
+
+            foreach (var e in dom[".topbar a"])
+            {
+                if (userUrl.IsMatch(e.OuterHTML))
+                {
+                    id = int.Parse(e.Attributes["href"].Split('/')[2]);
+                    break;
+                }
+            }
+
+            if (id == 0)
+            {
+                throw new AuthenticationException("Unable to login to Stack Exchange.");
+            }
+        }
+
+        private void HandleConfirmationPrompt(string uri, string html)
+        {
+            if (!uri.ToString().StartsWith("https://openid.stackexchange.com/account/prompt")) { return; }
+
+            var dom = CQ.Create(html);
             var session = dom["input"].First(e => e.Attributes["name"] != null && e.Attributes["name"] == "session");
             var fkey = dom.GetInputValue("fkey");
             var data = "session=" + session["value"] + "&fkey=" + fkey;
 
             RequestManager.Post(cookieKey, "https://openid.stackexchange.com/account/prompt/submit", data);
-        }
-
-        private void SEChatLogin()
-        {
-            // Login to SE.
-            var url = "http://stackexchange.com/users/authenticate?openid_identifier=" +
-                      Uri.EscapeDataString(openidUrl);
-            RequestManager.Get(cookieKey, url);
         }
     }
 }

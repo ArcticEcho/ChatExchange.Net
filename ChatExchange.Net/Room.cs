@@ -47,7 +47,7 @@ namespace ChatExchangeDotNet
         private bool disposed;
         private bool hasLeft;
         private string fkey;
-        private string lastMsg;
+        private KeyValuePair<string, DateTime> lastMsg;
         private TimeSpan socketRecTimeout;
         private WebSocket socket;
         private EventManager evMan;
@@ -721,14 +721,14 @@ namespace ChatExchangeDotNet
             return false;
         }
 
-        private DupelicateMessageException CheckDupeMsg(string msg)
+        private DuplicateMessageException CheckDupeMsg(string msg)
         {
-            if (msg == lastMsg)
+            if (msg == lastMsg.Key && (DateTime.UtcNow - lastMsg.Value).TotalMinutes < 1)
             {
-                return new DupelicateMessageException();
+                return new DuplicateMessageException();
             }
 
-            lastMsg = msg;
+            lastMsg = new KeyValuePair<string, DateTime>(msg, DateTime.UtcNow);
 
             return null;
         }
