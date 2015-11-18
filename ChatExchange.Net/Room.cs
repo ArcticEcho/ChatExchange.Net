@@ -529,7 +529,7 @@ namespace ChatExchangeDotNet
                     if (string.IsNullOrEmpty(resContent) || hasLeft) { return false; }
                     if (HandleThrottling(resContent)) { continue; }
 
-                    return resContent != "\"ok\"";
+                    return resContent == "\"ok\"";
                 }
 
                 return false;
