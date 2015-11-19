@@ -59,7 +59,7 @@ namespace ChatExchangeDotNet
 
         public void Dispose()
         {
-            if (disposed) { return; }
+            if (disposed) return;
             disposed = true;
 
             if (consumerClosed != null)
@@ -73,7 +73,7 @@ namespace ChatExchangeDotNet
 
         public object ExecuteAction(ChatAction action)
         {
-            if (disposed) { return null; }
+            if (disposed) return null;
 
             var key = queuedActions.Keys.Count == 0 ? 0 : queuedActions.Keys.Max() + 1;
             var mre = new ManualResetEvent(false);
@@ -110,7 +110,7 @@ namespace ChatExchangeDotNet
             {
                 Thread.Sleep(50);
 
-                if (queuedActions.IsEmpty) { continue; }
+               if (queuedActions.IsEmpty) continue;
 
                 var action = new ActionPair(long.MinValue, null);
                 object data = null;

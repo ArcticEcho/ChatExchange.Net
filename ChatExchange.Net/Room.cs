@@ -506,7 +506,7 @@ namespace ChatExchangeDotNet
             {
                 while (!disposed)
                 {
-                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/messages/{messageID}/star", "fkey={fkey}");
+                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/messages/{messageID}/star", $"fkey={fkey}");
 
                     if (string.IsNullOrEmpty(resContent) || hasLeft) return false;
                     if (HandleThrottling(resContent)) continue;
@@ -540,8 +540,7 @@ namespace ChatExchangeDotNet
             {
                 while (true)
                 {
-                    var data = "fkey=" + fkey;
-                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/messages/{messageID}/unstar", data);
+                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/messages/{messageID}/unstar", $"fkey={fkey}");
 
                     if (string.IsNullOrEmpty(resContent)) return false;
                     if (HandleThrottling(resContent)) continue;
@@ -569,8 +568,7 @@ namespace ChatExchangeDotNet
             {
                 while (true)
                 {
-                    var data = $"fkey={fkey}";
-                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/messages/{messageID}/owner-star", data);
+                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/messages/{messageID}/owner-star", $"fkey={fkey}");
 
                     if (string.IsNullOrEmpty(resContent)) return false;
                     if (HandleThrottling(resContent)) continue;
