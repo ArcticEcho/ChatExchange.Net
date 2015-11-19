@@ -67,7 +67,7 @@
     <Compile Include="EventListeners\MessagePosted.cs" />
     <Compile Include="EventType.cs" />
     <Compile Include="Exceptions.cs" />
-    <Compile Include="ExtensionMethods.cs" />
+    <Compile Include="Extensions.cs" />
     <Compile Include="Message.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="MessageBuilder.cs" />

@@ -76,7 +76,7 @@ namespace ChatExchangeDotNet
         internal static bool CanPing(string cookieKey, string host, int roomID, int userID)
         {
             var json = RequestManager.Get(cookieKey, "http://chat." + host + "/rooms/pingable/" + roomID);
-            if (String.IsNullOrEmpty(json)) { return false; }
+            if (string.IsNullOrEmpty(json)) { return false; }
             var data = JsonSerializer.DeserializeFromString<HashSet<List<object>>>(json);
 
             foreach (var user in data)
@@ -135,7 +135,7 @@ namespace ChatExchangeDotNet
                     }
                 }
 
-                IsPingable = isPingable ?? !String.IsNullOrEmpty(cookieKey) && CanPing(cookieKey, host, roomID, userID);
+                IsPingable = isPingable ?? !string.IsNullOrEmpty(cookieKey) && CanPing(cookieKey, host, roomID, userID);
 
                 return null;
             }

@@ -29,13 +29,14 @@ namespace ChatExchangeDotNet
 {
     public class Message
     {
-        private Regex messageEdits = new Regex("<div class=\"message\"", ExtensionMethods.RegexOpts);
+        private Regex messageEdits = new Regex("<div class=\"message\"", Extensions.RegexOpts);
 
         public string Host { get; private set; }
         public int RoomID { get; private set; }
         public int ID { get; private set; }
         public int ParentID { get; private set; }
         public User Author { get; private set; }
+
         public string Content { get; internal set; }
         public bool IsDeleted { get; internal set; }
         public int StarCount { get; internal set; }
@@ -46,9 +47,9 @@ namespace ChatExchangeDotNet
 
         public Message(Room room, int messageID, User author, int parentID = -1)
         {
-            if (room == null) { throw new ArgumentException("room"); }
-            if (messageID < 0) { throw new ArgumentOutOfRangeException("messageID", "'messageID' can not be less than 0."); }
-            if (author == null) { throw new ArgumentNullException("author"); }
+            if (room == null) throw new ArgumentException("room");
+            if (messageID < 0) throw new ArgumentOutOfRangeException("messageID", "'messageID' can not be less than 0.");
+            if (author == null) throw new ArgumentNullException("author");
 
             Content = GetMessageContent(room.Host, messageID, room.StripMention);
             Host = room.Host;
@@ -57,7 +58,7 @@ namespace ChatExchangeDotNet
             ParentID = parentID;
             Author = author;
 
-            var historyHtml = RequestManager.Get("", "http://chat." + Host + "/messages/" + ID + "/history");
+            var historyHtml = RequestManager.Get("", $"http://chat.{Host}/messages/{ID}/history");
 
             SetStarPinCount(historyHtml);
             EditCount = GetEditCount(historyHtml);
@@ -69,9 +70,9 @@ namespace ChatExchangeDotNet
         {
             try
             {
-                using (var res = RequestManager.GetRaw("", "http://chat." + host + "/message/" + messageID + "?plain=true"))
+                using (var res = RequestManager.GetRaw("", $"http://chat.{host}/message/{messageID}?plain=true"))
                 {
-                    if (res == null || res.StatusCode != HttpStatusCode.OK) { return null; }
+                    if (res?.StatusCode != HttpStatusCode.OK) return null;
 
                     var content = res.GetContent();
 
@@ -124,9 +125,11 @@ namespace ChatExchangeDotNet
 
             if (dom != null && dom.Length != 0)
             {
-                if (dom[".times"] != null && !string.IsNullOrEmpty(dom[".times"].First().Text()))
+                var c = dom[".times"]?.First()?.Text();
+
+                if (!string.IsNullOrEmpty(c))
                 {
-                    count = int.Parse(dom[".times"].First().Text());
+                    count = int.Parse(c);
                 }
                 else
                 {

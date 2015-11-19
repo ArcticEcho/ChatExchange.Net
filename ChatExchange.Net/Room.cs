@@ -38,8 +38,8 @@ namespace ChatExchangeDotNet
     /// </summary>
     public class Room : IDisposable
     {
-        static readonly Regex findUsers = new Regex(@"CHAT\.RoomUsers\.initPresent\(\[(?<users>.+)\]\);", ExtensionMethods.RegexOpts | RegexOptions.Singleline);
-        static readonly Regex getId = new Regex(@"id: (?<id>\d+)", ExtensionMethods.RegexOpts);
+        private static readonly Regex findUsers = new Regex(@"CHAT\.RoomUsers\.initPresent\(\[(?<users>.+)\]\);", Extensions.RegexOpts);
+        private static readonly Regex getId = new Regex(@"id: (?<id>\d+)", Extensions.RegexOpts);
         private readonly AutoResetEvent throttleARE;
         private readonly ActionExecutor actEx;
         private readonly string chatRoot;
@@ -76,7 +76,8 @@ namespace ChatExchangeDotNet
 
             set
             {
-                if (value.TotalSeconds < 15) { throw new ArgumentOutOfRangeException("value", "Must be more then 15 seconds."); }
+                if (value.TotalSeconds < 15)
+                    throw new ArgumentOutOfRangeException("value", "Must be more then 15 seconds.");
 
                 socketRecTimeout = value;
             }
@@ -109,7 +110,7 @@ namespace ChatExchangeDotNet
         /// <summary>
         /// Provides a means to (dis)connect chat event listeners (Delegates).
         /// </summary>
-        public EventManager EventManager { get { return evMan; } }
+        public EventManager EventManager => evMan;
 
         /// <summary>
         /// Gets the Message object associated with the specified message ID.
@@ -120,7 +121,7 @@ namespace ChatExchangeDotNet
         {
             get
             {
-                if (messageID < 0) { throw new IndexOutOfRangeException(); }
+                if (messageID < 0) throw new IndexOutOfRangeException();
 
                 return GetMessage(messageID);
             }
@@ -138,15 +139,15 @@ namespace ChatExchangeDotNet
         /// <param name="ID">The room's identification number.</param>
         public Room(string cookieKey, string host, int ID)
         {
-            if (string.IsNullOrEmpty(cookieKey)) { throw new ArgumentNullException("cookieKey"); }
-            if (string.IsNullOrEmpty(host)) { throw new ArgumentNullException("'host' must not be null or empty.", "host"); }
-            if (ID < 0) { throw new ArgumentOutOfRangeException("ID", "'ID' must not be negative."); }
+            if (string.IsNullOrEmpty(cookieKey)) throw new ArgumentNullException("cookieKey"); 
+            if (string.IsNullOrEmpty(host)) throw new ArgumentNullException("'host' must not be null or empty.", "host"); 
+            if (ID < 0) throw new ArgumentOutOfRangeException("ID", "'ID' must not be negative."); 
 
             this.ID = ID;
             this.cookieKey = cookieKey;
             evMan = new EventManager();
             actEx = new ActionExecutor(ref evMan);
-            chatRoot = "http://chat." + host;
+            chatRoot = $"http://chat.{host}";
             throttleARE = new AutoResetEvent(false);
             socketRecTimeout = TimeSpan.FromMinutes(15);
             Host = host;
@@ -181,11 +182,11 @@ namespace ChatExchangeDotNet
 
         public void Dispose()
         {
-            if (disposed) { return; }
+            if (disposed) return;
 
             disposed = true;
 
-            if (socket != null && socket.ReadyState == WebSocketState.Open)
+            if (socket?.ReadyState == WebSocketState.Open)
             {
                 try
                 {
@@ -202,14 +203,10 @@ namespace ChatExchangeDotNet
                 throttleARE.Set(); // Release any threads currently being throttled.
                 throttleARE.Dispose();
             }
-            if (actEx != null)
-            {
-                actEx.Dispose();
-            }
-            if (evMan != null)
-            {
-                evMan.Dispose();
-            }
+
+            actEx?.Dispose();
+            evMan?.Dispose();
+
             GC.SuppressFinalize(this);
         }
 
@@ -218,9 +215,9 @@ namespace ChatExchangeDotNet
         /// </summary>
         public void Leave()
         {
-            if (hasLeft) { return; }
+            if (hasLeft) return;
 
-            RequestManager.Post(cookieKey, chatRoot + "/chats/leave/" + ID, "quiet=true&fkey=" + fkey);
+            RequestManager.Post(cookieKey, $"{chatRoot}/chats/leave/{ID}", $"quiet=true&fkey={fkey}");
 
             hasLeft = true;
         }
@@ -236,7 +233,7 @@ namespace ChatExchangeDotNet
 
             try
             {
-                resContent = RequestManager.Get(cookieKey, chatRoot + "/messages/" + messageID + "/history");
+                resContent = RequestManager.Get(cookieKey, $"{chatRoot}/messages/{messageID}/history");
             }
             catch (WebException ex)
             {
@@ -253,13 +250,13 @@ namespace ChatExchangeDotNet
 
             if (string.IsNullOrEmpty(resContent))
             {
-                throw new Exception("Unable to fetch data for message " + messageID + ".");
+                throw new Exception($"Unable to fetch data for message {messageID}.");
             }
 
             var lastestDom = CQ.Create(resContent).Select(".monologue").Last();
             var content = Message.GetMessageContent(Host, messageID);
 
-            if (content == null) { throw new MessageNotFoundException(); }
+            if (content == null) throw new MessageNotFoundException();
 
             var parentID = content.IsReply() ? int.Parse(content.Substring(1, content.IndexOf(' '))) : -1;
             var authorName = lastestDom[".username a"].First().Text();
@@ -290,8 +287,10 @@ namespace ChatExchangeDotNet
         /// </summary>
         public HashSet<User> GetPingableUsers()
         {
-            var json = RequestManager.Get(cookieKey, "http://chat." + Host + "/rooms/pingable/" + ID);
-            if (string.IsNullOrEmpty(json)) { return null; }
+            var json = RequestManager.Get(cookieKey, $"http://chat.{Host}/rooms/pingable/{ID}");
+
+            if (string.IsNullOrEmpty(json)) return null;
+
             var data = JsonSerializer.DeserializeFromString<HashSet<List<object>>>(json);
             var users = new HashSet<User>();
 
@@ -310,7 +309,7 @@ namespace ChatExchangeDotNet
         /// </summary>
         public HashSet<User> GetCurrentUsers()
         {
-            var html = RequestManager.Get(cookieKey, string.Format("http://chat.{0}/rooms/{1}/", Host, ID));
+            var html = RequestManager.Get(cookieKey, $"http://chat.{Host}/rooms/{ID}/");
             var doc = CQ.CreateDocument(html);
             var obj = doc.Select("script")[3];
             var script = obj.InnerText;
@@ -341,32 +340,25 @@ namespace ChatExchangeDotNet
         public Message PostMessage(object message)
         {
             if (message == null || string.IsNullOrEmpty(message.ToString()))
-            {
                 throw new ArgumentException("'message' cannot be null or return an empty/null string upon calling .ToString().", "message");
-            }
             if (hasLeft)
-            {
                 throw new InvalidOperationException("Cannot post message when you have left the room.");
-            }
             if (Me.Reputation < 20)
-            {
                 throw new Exception("You must have at least 20 reputation to post a message.");
-            }
+
             var ex = CheckDupeMsg(message.ToString());
             if (ex != null)
-            {
                 throw ex;
-            }
 
             var action = new ChatAction(ActionType.PostMessage, new Func<object>(() =>
             {
                 while (!disposed)
                 {
-                    var data = "text=" + Uri.EscapeDataString(message.ToString()).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
-                    var resContent = RequestManager.Post(cookieKey, chatRoot + "/chats/" + ID + "/messages/new", data);
+                    var data = $"text={Uri.EscapeDataString(message.ToString()).Replace("%5Cn", "%0A")}&fkey={fkey}";
+                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/chats/{ID}/messages/new", data);
 
-                    if (string.IsNullOrEmpty(resContent) || hasLeft) { return null; }
-                    if (HandleThrottling(resContent)) { continue; }
+                    if (string.IsNullOrEmpty(resContent) || hasLeft) return null;
+                    if (HandleThrottling(resContent)) continue;
 
                     var json = JsonObject.Parse(resContent);
                     var messageID = -1;
@@ -400,9 +392,7 @@ namespace ChatExchangeDotNet
         {
             if (message == null || string.IsNullOrEmpty(message.ToString()) || hasLeft ||
                 CheckDupeMsg(message.ToString()) != null || Me.Reputation < 20)
-            {
                 return false;
-            }
 
             var action = new ChatAction(ActionType.PostMessage, new Func<object>(() =>
             {
@@ -411,8 +401,8 @@ namespace ChatExchangeDotNet
                     var data = "text=" + Uri.EscapeDataString(message.ToString()).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
                     var resContent = RequestManager.Post(cookieKey, chatRoot + "/chats/" + ID + "/messages/new", data);
 
-                    if (string.IsNullOrEmpty(resContent) || hasLeft) { return false; }
-                    if (HandleThrottling(resContent)) { continue; }
+                    if (string.IsNullOrEmpty(resContent) || hasLeft) return false;
+                    if (HandleThrottling(resContent)) continue;
 
                     return JsonObject.Parse(resContent).ContainsKey("id");
                 }
@@ -425,22 +415,22 @@ namespace ChatExchangeDotNet
 
         public Message PostReply(int targetMessageID, object message)
         {
-            return PostMessage(":" + targetMessageID + " " + message);
+            return PostMessage($":{targetMessageID} {message}");
         }
 
         public Message PostReply(Message targetMessage, object message)
         {
-            return PostMessage(":" + targetMessage.ID + " " + message);
+            return PostMessage($":{targetMessage.ID} {message}");
         }
 
         public bool PostReplyFast(int targatMessageID, object message)
         {
-            return PostMessageFast(":" + targatMessageID + " " + message);
+            return PostMessageFast($":{targatMessageID} {message}");
         }
 
         public bool PostReplyFast(Message targatMessage, object message)
         {
-            return PostMessageFast(":" + targatMessage.ID + " " + message);
+            return PostMessageFast($":{targatMessage.ID} {message}");
         }
 
         public bool EditMessage(Message oldMessage, object newMessage)
@@ -451,23 +441,19 @@ namespace ChatExchangeDotNet
         public bool EditMessage(int messageID, object newMessage)
         {
             if (newMessage == null || string.IsNullOrEmpty(newMessage.ToString()))
-            {
                 throw new ArgumentException("'newMessage' cannot be null or return an empty/null string upon calling .ToString().", "newMessage");
-            }
             if (hasLeft)
-            {
                 throw new InvalidOperationException("Cannot edit message when you have left the room.");
-            }
 
             var action = new ChatAction(ActionType.EditMessage, new Func<object>(() =>
             {
                 while (!disposed)
                 {
-                    var data = "text=" + Uri.EscapeDataString(newMessage.ToString()).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
-                    var resContent = RequestManager.Post(cookieKey, chatRoot + "/messages/" + messageID, data);
+                    var data = $"text={Uri.EscapeDataString(newMessage.ToString()).Replace("%5Cn", "%0A")}&fkey={fkey}";
+                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/messages/{messageID}", data);
 
-                    if (string.IsNullOrEmpty(resContent) || hasLeft) { return false; }
-                    if (HandleThrottling(resContent)) { continue; }
+                    if (string.IsNullOrEmpty(resContent) || hasLeft) return false;
+                    if (HandleThrottling(resContent)) continue;
 
                     return resContent == "\"ok\"";
                 }
@@ -486,18 +472,16 @@ namespace ChatExchangeDotNet
         public bool DeleteMessage(int messageID)
         {
             if (hasLeft)
-            {
                 throw new InvalidOperationException("Cannot delete message when you have left the room.");
-            }
 
             var action = new ChatAction(ActionType.DeleteMessage, new Func<object>(() =>
             {
                 while (!disposed)
                 {
-                    var resContent = RequestManager.Post(cookieKey, chatRoot + "/messages/" + messageID + "/delete", "fkey=" + fkey);
+                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/messages/{messageID}/delete", $"fkey={fkey}");
 
-                    if (string.IsNullOrEmpty(resContent) || hasLeft) { return false; }
-                    if (HandleThrottling(resContent)) { continue; }
+                    if (string.IsNullOrEmpty(resContent) || hasLeft) return false;
+                    if (HandleThrottling(resContent)) continue;
 
                     return resContent == "\"ok\"";
                 }
@@ -516,18 +500,16 @@ namespace ChatExchangeDotNet
         public bool ToggleStar(int messageID)
         {
             if (hasLeft)
-            {
                 throw new InvalidOperationException("Cannot toggle message star when you have left the room.");
-            }
 
             var action = new ChatAction(ActionType.ToggleMessageStar, new Func<object>(() =>
             {
                 while (!disposed)
                 {
-                    var resContent = RequestManager.Post(cookieKey, chatRoot + "/messages/" + messageID + "/star", "fkey=" + fkey);
+                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/messages/{messageID}/star", "fkey={fkey}");
 
-                    if (string.IsNullOrEmpty(resContent) || hasLeft) { return false; }
-                    if (HandleThrottling(resContent)) { continue; }
+                    if (string.IsNullOrEmpty(resContent) || hasLeft) return false;
+                    if (HandleThrottling(resContent)) continue;
 
                     return resContent == "\"ok\"";
                 }
@@ -550,23 +532,19 @@ namespace ChatExchangeDotNet
         public bool ClearMessageStars(int messageID)
         {
             if (hasLeft)
-            {
                 throw new InvalidOperationException("Cannot clear message's stars when you have left the room.");
-            }
             if (!Me.IsMod || !Me.IsRoomOwner)
-            {
                 throw new InvalidOperationException("Unable to clear message stars. You have insufficient privileges (must be a room owner or moderator).");
-            }
 
             var action = new ChatAction(ActionType.ClearMessageStars, new Func<object>(() =>
             {
                 while (true)
                 {
                     var data = "fkey=" + fkey;
-                    var resContent = RequestManager.Post(cookieKey, chatRoot + "/messages/" + messageID + "/unstar", data);
+                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/messages/{messageID}/unstar", data);
 
-                    if (string.IsNullOrEmpty(resContent)) { return false; }
-                    if (HandleThrottling(resContent)) { continue; }
+                    if (string.IsNullOrEmpty(resContent)) return false;
+                    if (HandleThrottling(resContent)) continue;
 
                     return resContent == "\"ok\"";
                 }
@@ -583,23 +561,19 @@ namespace ChatExchangeDotNet
         public bool TogglePin(int messageID)
         {
             if (hasLeft)
-            {
                 throw new InvalidOperationException("Cannot toggle message pin when you have left the room.");
-            }
             if (!Me.IsMod || !Me.IsRoomOwner)
-            {
                 throw new InvalidOperationException("Unable to toggle a message pin. You have insufficient privileges (must be a room owner or moderator).");
-            }
 
             var action = new ChatAction(ActionType.ToggleMessagePin, new Func<object>(() =>
             {
                 while (true)
                 {
-                    var data = "fkey=" + fkey;
-                    var resContent = RequestManager.Post(cookieKey, chatRoot + "/messages/" + messageID + "/owner-star", data);
+                    var data = $"fkey={fkey}";
+                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/messages/{messageID}/owner-star", data);
 
-                    if (string.IsNullOrEmpty(resContent)) { return false; }
-                    if (HandleThrottling(resContent)) { continue; }
+                    if (string.IsNullOrEmpty(resContent)) return false;
+                    if (HandleThrottling(resContent)) continue;
 
                     return resContent == "\"ok\"";
                 }
@@ -616,25 +590,21 @@ namespace ChatExchangeDotNet
         public bool KickMute(int userID)
         {
             if (hasLeft)
-            {
                 throw new InvalidOperationException("Cannot kick-mute user when you have left the room.");
-            }
             if (!Me.IsMod || !Me.IsRoomOwner)
-            {
                 throw new InvalidOperationException("Unable to kick-mute user. You have insufficient privileges (must be a room owner or moderator).");
-            }
 
             var action = new ChatAction(ActionType.KickMute, new Func<object>(() =>
             {
                 while (true)
                 {
-                    var data = "userID=" + userID + "&fkey=" + fkey;
-                    var resContent = RequestManager.Post(cookieKey, chatRoot + "/rooms/kickmute/" + ID, data);
+                    var data = $"userID={userID}&fkey={fkey}";
+                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/rooms/kickmute/{ID}", data);
 
-                    if (string.IsNullOrEmpty(resContent)) { return false; }
-                    if (HandleThrottling(resContent)) { continue; }
+                    if (string.IsNullOrEmpty(resContent)) return false;
+                    if (HandleThrottling(resContent)) continue;
 
-                    return resContent != null && resContent.Contains("has been kicked");
+                    return resContent?.Contains("has been kicked");
                 }
             }));
 
@@ -649,19 +619,15 @@ namespace ChatExchangeDotNet
         public bool SetUserRoomAccess(UserRoomAccess access, int userID)
         {
             if (hasLeft)
-            {
                 throw new InvalidOperationException("Cannot change user's access level when you have left the room.");
-            }
             if (!Me.IsMod || !Me.IsRoomOwner)
-            {
                 throw new InvalidOperationException("Unable to change user's access level. You have insufficient privileges (must be a room owner or moderator).");
-            }
 
             var action = new ChatAction(ActionType.KickMute, new Func<object>(() =>
             {
                 while (true)
                 {
-                    var data = "fkey=" + fkey + "&aclUserId=" + userID + "&userAccess=";
+                    var data = $"fkey={fkey}&aclUserId={userID}&userAccess=";
 
                     switch (access)
                     {
@@ -690,10 +656,10 @@ namespace ChatExchangeDotNet
                         }
                     }
 
-                    var resContent = RequestManager.Post(cookieKey, chatRoot + "/rooms/setuseraccess/" + ID, data);
+                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/rooms/setuseraccess/{ID}", data);
 
-                    if (string.IsNullOrEmpty(resContent)) { return false; }
-                    if (HandleThrottling(resContent)) { continue; }
+                    if (string.IsNullOrEmpty(resContent)) return false;
+                    if (HandleThrottling(resContent)) continue;
 
                     return true;
                 }
@@ -724,22 +690,21 @@ namespace ChatExchangeDotNet
         private DuplicateMessageException CheckDupeMsg(string msg)
         {
             if (msg == lastMsg.Key && (DateTime.UtcNow - lastMsg.Value).TotalMinutes < 1)
-            {
                 return new DuplicateMessageException();
-            }
 
             lastMsg = new KeyValuePair<string, DateTime>(msg, DateTime.UtcNow);
 
             return null;
         }
 
-        #region Instantiation related methods.
+        #region Instantiation/event handling related methods.
 
         private User GetMe()
         {
-            var html = RequestManager.Get(cookieKey, chatRoot + "/chats/join/favorite");
+            var html = RequestManager.Get(cookieKey, $"{chatRoot}/chats/join/favorite");
 
-            if (string.IsNullOrEmpty(html)) { throw new Exception("Unable to fetch requested user data."); }
+            if (string.IsNullOrEmpty(html))
+                throw new Exception("Unable to fetch requested user data.");
 
             var dom = CQ.Create(html);
             var e = dom[".topbar-menu-links a"][0];
@@ -750,26 +715,26 @@ namespace ChatExchangeDotNet
 
         private void SetFkey()
         {
-            var resContent = RequestManager.Get(cookieKey, chatRoot + "/rooms/" + ID);
-            var ex = new Exception("Could not get fkey. Do you have an active internet connection?");
+            var resContent = RequestManager.Get(cookieKey, $"{chatRoot}/rooms/{ID}");
+            var ex = new Exception("Could not get fkey.");
 
-            if (string.IsNullOrEmpty(resContent)) { throw ex; }
+            if (string.IsNullOrEmpty(resContent)) throw ex;
 
             var fk = CQ.Create(resContent).GetInputValue("fkey");
 
-            if (string.IsNullOrEmpty(fk)) { throw ex; }
+            if (string.IsNullOrEmpty(fk)) throw ex;
 
             fkey = fk;
         }
 
         private int GetGlobalEventCount()
         {
-            var data = "mode=Events&msgCount=0&fkey=" + fkey;
-            var resContent = RequestManager.Post(cookieKey, chatRoot + "/chats/" + ID + "/events", data);
+            var data = $"mode=Events&msgCount=0&fkey={fkey}";
+            var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/chats/{ID}/events", data);
 
             if (string.IsNullOrEmpty(resContent))
             {
-                throw new Exception("Could not get 'eventtime' for room " + ID + " on " + Host + ". Do you have an active internet conection?");
+                throw new Exception($"Could not get 'eventtime' for room {ID} on {Host}.");
             }
 
             return JsonObject.Parse(resContent).Get<int>("time");
@@ -777,10 +742,10 @@ namespace ChatExchangeDotNet
 
         private string GetSocketURL(int eventTime)
         {
-            var data = "roomid=" + ID + "&fkey=" + fkey;
-            var resContent = RequestManager.Post(cookieKey, chatRoot + "/ws-auth", data, chatRoot + "/rooms/" + ID, chatRoot);
+            var data = $"roomid={ID}&fkey={fkey}";
+            var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/ws-auth", data, $"{chatRoot}/rooms/{ID}", chatRoot);
 
-            if (string.IsNullOrEmpty(resContent)) { throw new Exception("Could not get WebSocket URL. Do you haven an active internet connection?"); }
+            if (string.IsNullOrEmpty(resContent)) throw new Exception("Could not get WebSocket URL.");
 
             return JsonObject.Parse(resContent).Get<string>("url") + "?l=" + eventTime;
         }
@@ -842,12 +807,14 @@ namespace ChatExchangeDotNet
             var obj = JsonObject.Parse(json);
             var data = obj.Get<Dictionary<string, List<Dictionary<string, object>>>>("r" + ID);
 
-            if (!data.ContainsKey("e") || data["e"] == null) { return; }
+            if (!data.ContainsKey("e") || data["e"] == null) return;
 
             foreach (var message in data["e"])
             {
                 var eventType = (EventType)int.Parse(message["event_type"].ToString());
-                if (int.Parse(message["room_id"].ToString()) != ID) { continue; }
+
+                if (int.Parse(message["room_id"].ToString()) != ID) continue;
+
                 evMan.HandleEvent(eventType, this, ref evMan, message);
             }
         }

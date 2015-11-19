@@ -32,19 +32,12 @@ using System.IO;
 
 namespace ChatExchangeDotNet
 {
-    public static class ExtensionMethods
+    internal static class Extensions
     {
-        private const RegexOptions regOpts = RegexOptions.Compiled | RegexOptions.CultureInvariant;
         private static readonly Regex hasMention = new Regex(@"^:\d+\s|(\A|\s)@\S{3,}(\s|\Z)", RegexOpts);
         private static readonly Regex isReply = new Regex(@"^:\d+\s", RegexOpts);
 
-        internal static RegexOptions RegexOpts
-        {
-            get
-            {
-                return regOpts;
-            }
-        }
+        internal static RegexOptions RegexOpts { get; } = RegexOptions.Compiled | RegexOptions.CultureInvariant;
 
 
 
@@ -54,9 +47,7 @@ namespace ChatExchangeDotNet
 
             using (var strm = response.GetResponseStream())
             using (var reader = new StreamReader(strm))
-            {
                 return reader.ReadToEnd();
-            }
         }
 
         internal static List<Cookie> GetCookies(this CookieContainer container)
@@ -67,54 +58,44 @@ namespace ChatExchangeDotNet
             foreach (var key in table.Keys)
             {
                 Uri uri;
-
                 var domain = key as string;
 
-                if (domain == null) { continue; }
-
+                if (domain == null) continue;
                 if (domain.StartsWith("."))
-                {
                     domain = domain.Substring(1);
-                }
 
-                var address = string.Format("http://{0}/", domain);
+                var address = $"http://{domain}/";
 
-                if (Uri.TryCreate(address, UriKind.RelativeOrAbsolute, out uri) == false) { continue; }
+                if (Uri.TryCreate(address, UriKind.RelativeOrAbsolute, out uri) == false) continue;
 
                 foreach (Cookie cookie in container.GetCookies(uri))
-                {
                     cookies.Add(cookie);
-                }
             }
-        
+
             return cookies;
         }
 
         internal static string GetInputValue(this CQ input, string elementName)
         {
-            var fkeyE = input["input"].FirstOrDefault(e => e.Attributes["name"] != null && e.Attributes["name"] == elementName);
-            return fkeyE == null ? null : fkeyE.Attributes["value"];
+            var fkeyE = input["input"].FirstOrDefault(e => e.Attributes["name"] == elementName);
+            return fkeyE?.Attributes["value"];
         }
 
         public static List<Message> GetMessagesByUser(this IEnumerable<Message> messages, User user)
         {
-            if (user == null) { throw new ArgumentNullException("user"); }
+            if (user == null) throw new ArgumentNullException("user");
             return messages.GetMessagesByUser(user.ID);
         }
 
         public static List<Message> GetMessagesByUser(this IEnumerable<Message> messages, int userID)
         {
-            if (messages == null) { throw new ArgumentNullException("messages"); }
+            if (messages == null) throw new ArgumentNullException("messages");
 
             var userMessages = new List<Message>();
 
             foreach (var m in messages)
-            {
                 if (m.Author.ID == userID)
-                {
                     userMessages.Add(m);
-                }
-            }
 
             return userMessages;
         }

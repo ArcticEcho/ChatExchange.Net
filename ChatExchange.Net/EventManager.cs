@@ -67,24 +67,22 @@ namespace ChatExchangeDotNet
 
         public void Dispose()
         {
-            if (disposed) { return; }
+            if (disposed) return;
 
             disposed = true;
+
             if (ConnectedListeners != null)
-            {
                 ConnectedListeners.Clear();
-            }
+
             GC.SuppressFinalize(this);
         }
 
         public void ConnectListener(EventType eventType, Delegate listener)
         {
-            if (disposed) { return; }
+            if (disposed) return;
             var ex = events[eventType].CheckListener(listener);
             if (ex != null)
-            {
                 throw ex;
-            }
 
             if (!ConnectedListeners.ContainsKey(eventType))
             {
@@ -108,9 +106,9 @@ namespace ChatExchangeDotNet
 
         public void DisconnectListener(EventType eventType, Delegate listener)
         {
-            if (disposed) { return; }
-            if (!ConnectedListeners.ContainsKey(eventType)) { throw new KeyNotFoundException(); }
-            if (!ConnectedListeners[eventType].Values.Contains(listener)) { throw new KeyNotFoundException(); }
+            if (disposed) return;
+            if (!ConnectedListeners.ContainsKey(eventType)) throw new KeyNotFoundException();
+            if (!ConnectedListeners[eventType].Values.Contains(listener)) throw new KeyNotFoundException();
 
             var key = ConnectedListeners[eventType].Where(x => x.Value == listener).First().Key;
             Delegate temp;
@@ -121,7 +119,7 @@ namespace ChatExchangeDotNet
 
         internal void TrackMessage(Message message)
         {
-            if (message == null) { throw new ArgumentNullException("message"); }
+            if (message == null) throw new ArgumentNullException("message");
 
             ConnectListener(EventType.MessageEdited, new Action<Message>(m =>
             {
@@ -135,9 +133,7 @@ namespace ChatExchangeDotNet
             ConnectListener(EventType.MessageDeleted, new Action<User, int>((u, mID) =>
             {
                 if (mID == message.ID)
-                {
                     message.IsDeleted = true;
-                }
             }));
 
             ConnectListener(EventType.MessageStarToggled, new Action<Message, int, int>((m, s, p) =>
@@ -152,22 +148,20 @@ namespace ChatExchangeDotNet
 
         internal void TrackUser(User user)
         {
-            if (user == null) { throw new ArgumentNullException("user"); }
+            if (user == null) throw new ArgumentNullException("user");
 
             ConnectListener(EventType.UserAccessLevelChanged, new Action<User, User, UserRoomAccess>((granter, targetUser, newAccess) =>
             {
                 if (targetUser.ID == user.ID)
-                {
                     user.IsRoomOwner = newAccess == UserRoomAccess.Owner;
-                }
             }));
         }
 
         internal void CallListeners(EventType eventType, params object[] args)
         {
-            if (disposed) { return; }
-            if (!ConnectedListeners.ContainsKey(eventType)) { return; }
-            if (ConnectedListeners[eventType].Keys.Count == 0) { return; }
+            if (disposed) return;
+            if (!ConnectedListeners.ContainsKey(eventType)) return;
+            if (ConnectedListeners[eventType].Keys.Count == 0) return;
 
             foreach (var listener in ConnectedListeners[eventType].Values)
             {
@@ -175,19 +169,18 @@ namespace ChatExchangeDotNet
                 {
                     try
                     {
-                        listener.DynamicInvoke(args);}
+                        listener.DynamicInvoke(args);
+                    }
                     catch (Exception ex)
                     {
-                        if (eventType == EventType.InternalException) { throw ex; } // Avoid infinite loop.
+                        if (eventType == EventType.InternalException) throw ex; // Avoid infinite loop.
                         CallListeners(EventType.InternalException, ex);
                     }
                 });
             }
         }
 
-        internal void HandleEvent(EventType eventType, Room room, ref EventManager evMan, Dictionary<string, object> data)
-        {
+        internal void HandleEvent(EventType eventType, Room room, ref EventManager evMan, Dictionary<string, object> data) =>
             events[eventType].Execute(room, ref evMan, data);
-        }
     }
 }

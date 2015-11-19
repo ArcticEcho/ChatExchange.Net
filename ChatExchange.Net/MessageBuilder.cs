@@ -28,8 +28,8 @@ namespace ChatExchangeDotNet
 {
     public class MessageBuilder
     {
-        private static readonly Regex tagReg = new Regex(@"[^\w\.\#_\-\+]", ExtensionMethods.RegexOpts);
-        private static readonly Regex chatMd = new Regex(@"[_*`\[\]]", ExtensionMethods.RegexOpts);
+        private static readonly Regex tagReg = new Regex(@"[^\w\.\#_\-\+]", Extensions.RegexOpts);
+        private static readonly Regex chatMd = new Regex(@"[_*`\[\]]", Extensions.RegexOpts);
         private readonly string newline = "\n";
         private string message = "";
 
@@ -37,13 +37,7 @@ namespace ChatExchangeDotNet
 
         public bool EscapeMarkdown { get; private set; }
 
-        public string Message
-        {
-            get
-            {
-                return message.TrimEnd();
-            }
-        }
+        public string Message => message.TrimEnd();
 
 
 
@@ -69,7 +63,8 @@ namespace ChatExchangeDotNet
 
         public void AppendText(string text, TextFormattingOptions formattingOptions = TextFormattingOptions.None, WhiteSpace appendWhiteSpace = WhiteSpace.None)
         {
-            if (string.IsNullOrEmpty(text)) { throw new ArgumentException("'text' must not be null or empty.", "text"); }
+            if (string.IsNullOrEmpty(text))
+                throw new ArgumentException("'text' must not be null or empty.", "text");
 
             var msg = EscapeMarkdown ? chatMd.Replace(text, @"\$0") : text;
             message += FormatString(msg, formattingOptions);
@@ -79,30 +74,31 @@ namespace ChatExchangeDotNet
         public void AppendLink(string text, string url, string onHoverText = null, TextFormattingOptions formattingOptions = TextFormattingOptions.None, WhiteSpace appendWhiteSpace = WhiteSpace.Space)
         {
             if (MultiLineType != MultiLineMessageType.None)
-            {
                 throw new InvalidOperationException("Cannot append an in-line link when this object's 'MultiLineType' is not set to 'MultiLineMessageType.None'.");
-            }
-            if (string.IsNullOrEmpty(url)) { throw new ArgumentException("'url' must not be null or empty.", "url"); }
-            if (string.IsNullOrEmpty(text)) { throw new ArgumentException("'text' must not be null or empty.", "text"); }
+            if (string.IsNullOrEmpty(url))
+                throw new ArgumentException("'url' must not be null or empty.", "url");
+            if (string.IsNullOrEmpty(text))
+                throw new ArgumentException("'text' must not be null or empty.", "text");
 
             var urlSafe = (url.StartsWith("http://") ? url : "http://" + url).Trim();
             var textSafe = chatMd.Replace(text.Trim(), @"\$0");
 
-            message += "[" + FormatString(textSafe, formattingOptions) + "]";
-            message += "(" + urlSafe + (string.IsNullOrEmpty(onHoverText) ? "" : " \"" + onHoverText + "\"") + ")";
+            message += $"[{FormatString(textSafe, formattingOptions)}]";
+            message += $"({urlSafe + (string.IsNullOrEmpty(onHoverText) ? "" : $" \"{onHoverText}\"")})";
             message = AppendWhiteSpace(message, appendWhiteSpace);
         }
 
         public void AppendPing(User targetUser, WhiteSpace appendWhiteSpace = WhiteSpace.Space)
         {
-            if (targetUser == null) { throw new ArgumentNullException("targetUser"); }
+            if (targetUser == null) throw new ArgumentNullException("targetUser");
 
             AppendPing(targetUser.Name, appendWhiteSpace);
         }
 
         public void AppendPing(string targetUserName, WhiteSpace appendWhiteSpace = WhiteSpace.Space)
         {
-            if (string.IsNullOrEmpty(targetUserName)) { throw new ArgumentException("'targetUserName' must not be null or empty.", "targetUser"); }
+            if (string.IsNullOrEmpty(targetUserName))
+                throw new ArgumentException("'targetUserName' must not be null or empty.", "targetUser");
 
             message += "@" + targetUserName.Replace(" ", "");
             message = AppendWhiteSpace(message, appendWhiteSpace);
@@ -112,7 +108,7 @@ namespace ChatExchangeDotNet
 
         private string AppendWhiteSpace(string text, WhiteSpace option = WhiteSpace.None)
         {
-            if (option == WhiteSpace.None) { return text; }
+            if (option == WhiteSpace.None) return text;
 
             return text + (option == WhiteSpace.Space ? " " : newline);
         }
@@ -120,46 +116,30 @@ namespace ChatExchangeDotNet
         private string FormatString(string text, TextFormattingOptions formattingOptions)
         {
             if (MultiLineType == MultiLineMessageType.Code)
-            {
                 return text.Replace("\n", "\n    ");
-            }
 
             if (MultiLineType == MultiLineMessageType.Quote)
-            {
                 return text.Replace("\n", "\n> ");
-            }
 
             if (formattingOptions == TextFormattingOptions.None)
-            {
                 return text;
-            }
 
             if (formattingOptions == TextFormattingOptions.Tag)
-            {
-                return "[tag:" + tagReg.Replace(text.Trim(), "-") + "]";
-            }
+                return $"[tag:{tagReg.Replace(text.Trim(), "-")}]";
 
             var mdChars = "";
 
             if ((formattingOptions & TextFormattingOptions.Strikethrough) == TextFormattingOptions.Strikethrough)
-            {
                 mdChars = "---";
-            }
 
             if ((formattingOptions & TextFormattingOptions.Bold) == TextFormattingOptions.Bold)
-            {
                 mdChars += "**";
-            }
 
             if ((formattingOptions & TextFormattingOptions.Italic) == TextFormattingOptions.Italic)
-            {
                 mdChars += "*";
-            }
 
             if ((formattingOptions & TextFormattingOptions.InLineCode) == TextFormattingOptions.InLineCode)
-            {
                 mdChars += "`";
-            }
 
             var mdCharsRev = new string(mdChars.Reverse().ToArray());
 
