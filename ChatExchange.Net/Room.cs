@@ -38,7 +38,7 @@ namespace ChatExchangeDotNet
     /// </summary>
     public class Room : IDisposable
     {
-        private static readonly Regex findUsers = new Regex(@"CHAT\.RoomUsers\.initPresent\(\[(?<users>.+)\]\);", Extensions.RegexOpts);
+        private static readonly Regex findUsers = new Regex(@"id:\s?(\d+),\sname", Extensions.RegexOpts);
         private static readonly Regex getId = new Regex(@"id: (?<id>\d+)", Extensions.RegexOpts);
         private readonly AutoResetEvent throttleARE;
         private readonly ActionExecutor actEx;
@@ -312,19 +312,15 @@ namespace ChatExchangeDotNet
             var html = RequestManager.Get(cookieKey, $"http://chat.{Host}/rooms/{ID}/");
             var doc = CQ.CreateDocument(html);
             var obj = doc.Select("script")[3];
-            var script = obj.InnerText;
-            var usersJs = findUsers.Match(script).Groups["users"].Value;
-            var lines = usersJs.Split(new char[] { '\n' }, StringSplitOptions.RemoveEmptyEntries)
-                               .Select(x => x.Trim())
-                               .Where(x => !string.IsNullOrEmpty(x));
-            // The .Where call is to avoid lines who are whitespace-only, those do not get removed by RemoveEmptyEntries.
+            var ids = findUsers.Matches(obj.InnerText);
 
             var users = new HashSet<User>();
-            foreach (var line in lines)
+            foreach (Match id in ids)
             {
-                var id = getId.Match(line).Groups["id"].Value;
-                var userID = int.Parse(id);
-                users.Add(new User(Host, ID, userID, true));
+                var userID = 0;
+
+                if (int.TryParse(id.Value, out userID))
+                    users.Add(new User(Host, ID, userID, true));
             }
 
             return users;

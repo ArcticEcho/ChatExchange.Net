@@ -1,4 +1,4 @@
-version: 3.2.{build}.1
+version: 3.2.{build}.2
 
 configuration: Release
 
@@ -7,9 +7,9 @@ platform: Any CPU
 assembly_info:
   patch: true
   file: ChatExchange.Net\Properties\AssemblyInfo.cs
-  assembly_version: '3.2.0.1'
+  assembly_version: '3.2.0.2'
   assembly_file_version: '{version}'
-  assembly_informational_version: '3.2.1-beta'
+  assembly_informational_version: '3.2.2-beta'
 
 before_build:
 - nuget restore
