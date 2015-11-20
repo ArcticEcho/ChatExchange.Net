@@ -319,7 +319,7 @@ namespace ChatExchangeDotNet
             {
                 var userID = 0;
 
-                if (int.TryParse(id.Value, out userID))
+                if (int.TryParse(id.Groups[1].Value, out userID))
                     users.Add(new User(Host, ID, userID, true));
             }
 
