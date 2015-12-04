@@ -28,6 +28,7 @@ namespace ChatExchangeDotNet
 {
     public class MessageBuilder
     {
+        private static readonly Regex linkStartReg = new Regex(@"(?i)^(ftp|https?)://\S{2,}", Extensions.RegexOpts);
         private static readonly Regex tagReg = new Regex(@"[^\w\.\#_\-\+]", Extensions.RegexOpts);
         private static readonly Regex chatMd = new Regex(@"[_*`\[\]]", Extensions.RegexOpts);
         private readonly string newline = "\n";
@@ -64,27 +65,30 @@ namespace ChatExchangeDotNet
         public void AppendText(string text, TextFormattingOptions formattingOptions = TextFormattingOptions.None, WhiteSpace appendWhiteSpace = WhiteSpace.None)
         {
             if (string.IsNullOrEmpty(text))
+            {
                 throw new ArgumentException("'text' must not be null or empty.", "text");
+            }
 
             var msg = EscapeMarkdown ? chatMd.Replace(text, @"\$0") : text;
             message += FormatString(msg, formattingOptions);
             message = AppendWhiteSpace(message, appendWhiteSpace);
         }
 
-        public void AppendLink(string text, string url, string onHoverText = null, TextFormattingOptions formattingOptions = TextFormattingOptions.None, WhiteSpace appendWhiteSpace = WhiteSpace.Space)
+        public void AppendLink(string text, string url, string onHoverText = null, TextFormattingOptions formattingOptions = TextFormattingOptions.None, WhiteSpace appendWhiteSpace = WhiteSpace.None)
         {
             if (MultiLineType != MultiLineMessageType.None)
-                throw new InvalidOperationException("Cannot append an in-line link when this object's 'MultiLineType' is not set to 'MultiLineMessageType.None'.");
+                throw new InvalidOperationException("Cannot append an in-line link when this object's 'MultiLineType' property is not set to 'MultiLineMessageType.None'.");
             if (string.IsNullOrEmpty(url))
                 throw new ArgumentException("'url' must not be null or empty.", "url");
+            if (!linkStartReg.IsMatch(url))
+                throw new ArgumentException("The specified URL is not supported by chat markdown.", "url");
             if (string.IsNullOrEmpty(text))
                 throw new ArgumentException("'text' must not be null or empty.", "text");
 
-            var urlSafe = (url.StartsWith("http://") ? url : "http://" + url).Trim();
             var textSafe = chatMd.Replace(text.Trim(), @"\$0");
 
             message += $"[{FormatString(textSafe, formattingOptions)}]";
-            message += $"({urlSafe + (string.IsNullOrEmpty(onHoverText) ? "" : $" \"{onHoverText}\"")})";
+            message += $"({url.Trim() + (string.IsNullOrEmpty(onHoverText) ? "" : $" \"{onHoverText}\"")})";
             message = AppendWhiteSpace(message, appendWhiteSpace);
         }
 
