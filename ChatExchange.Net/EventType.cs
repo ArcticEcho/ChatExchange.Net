@@ -131,12 +131,12 @@ namespace ChatExchangeDotNet
         /// <summary>
         /// A room owner/moderator has moved a message out of the room.
         /// </summary>
-        MessageMovedOut,
+        MessageMovedOut = 19,
 
         /// <summary>
         /// A room owner/moderator has moved a message into the room.
         /// </summary>
-        MessageMovedIn,
+        MessageMovedIn = 20,
 
         /// <summary>
         /// No idea.
