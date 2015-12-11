@@ -56,6 +56,7 @@
     <Compile Include="EventListeners\InternalException.cs" />
     <Compile Include="EventListeners\MessageDeleted.cs" />
     <Compile Include="EventListeners\MessageEdited.cs" />
+    <Compile Include="EventListeners\MessageMovedIn.cs" />
     <Compile Include="EventListeners\MessageReply.cs" />
     <Compile Include="EventListeners\MessageStarToggled.cs" />
     <Compile Include="EventListeners\UserAccessLevelChanged.cs" />
@@ -69,12 +70,14 @@
     <Compile Include="Exceptions.cs" />
     <Compile Include="Extensions.cs" />
     <Compile Include="Message.cs" />
+    <Compile Include="EventListeners\MessageMovedOut.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="MessageBuilder.cs" />
     <Compile Include="MultiLineMessageType.cs" />
     <Compile Include="TextFormattingOptions.cs" />
     <Compile Include="RequestManager.cs" />
     <Compile Include="Room.cs" />
+    <Compile Include="TrackedObject.cs" />
     <Compile Include="User.cs" />
     <Compile Include="UserRoomAccess.cs" />
     <Compile Include="WhiteSpace.cs" />

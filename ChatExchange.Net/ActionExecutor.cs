@@ -121,7 +121,7 @@ namespace ChatExchangeDotNet
                 }
                 catch (Exception ex)
                 {
-                    evMan.CallListeners(EventType.InternalException, ex);
+                    evMan.CallListeners(EventType.InternalException, false, ex);
                 }
                 finally
                 {
@@ -141,7 +141,7 @@ namespace ChatExchangeDotNet
                     ActionCompleted(item.Key, null);
                 }
 
-                evMan.CallListeners(EventType.InternalException, new Exception("An unknown error has occurred; all queued actions have been cleared."));
+                evMan.CallListeners(EventType.InternalException, false, new Exception("An unknown error has occurred; all queued actions have been cleared."));
             }
             else
             {

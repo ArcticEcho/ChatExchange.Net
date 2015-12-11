@@ -55,15 +55,19 @@ namespace ChatExchangeDotNet
 
         # region Public properties/indexer.
 
-        /// <summary>
-        /// If true, actions by the currently logged in user will not raise any events. Default set to true.
-        /// </summary>
-        public bool IgnoreOwnEvents { get; set; }
+
 
         /// <summary>
         /// If true, removes (@Username) mentions and the message reply prefix (:012345) from all messages. Default set to true.
         /// </summary>
-        public bool StripMention { get; set; }
+        public bool StripMention { get; set; } = true;
+
+        /// <summary>
+        /// If true, messages will only- LOOK I'M FREAKING TIED OF WRITIN' UP THESE DAMN DOCS.
+        /// I MEAN, ARE YOU ACTUALLY GONNA READ ALL THIS GARBAGE? IF YOU ARE, FEEL FREE TO WRITE UP
+        /// A NICE LITTLE ISSUE ON GH. Default set to false.
+        /// </summary>
+        public bool InitialisePrimaryContentOnly { get; set; } = false;
 
         /// <summary>
         /// Specifies how long to attempt to recovery the WebSocket after the connection closed;
@@ -77,7 +81,9 @@ namespace ChatExchangeDotNet
             set
             {
                 if (value.TotalSeconds < 15)
+                {
                     throw new ArgumentOutOfRangeException("value", "Must be more then 15 seconds.");
+                }
 
                 socketRecTimeout = value;
             }
@@ -151,8 +157,6 @@ namespace ChatExchangeDotNet
             throttleARE = new AutoResetEvent(false);
             socketRecTimeout = TimeSpan.FromMinutes(15);
             Host = host;
-            IgnoreOwnEvents = true;
-            StripMention = true;
             Me = GetMe();
 
             SetFkey();
@@ -170,10 +174,7 @@ namespace ChatExchangeDotNet
 
 
 
-        public override int GetHashCode()
-        {
-            return ID;
-        }
+        public override int GetHashCode() => ID;
 
         //public override string ToString()
         //{
@@ -194,7 +195,7 @@ namespace ChatExchangeDotNet
                 }
                 catch (Exception ex)
                 {
-                    evMan.CallListeners(EventType.InternalException, ex);
+                    evMan.CallListeners(EventType.InternalException, false, ex);
                 }
             }
 
@@ -254,17 +255,14 @@ namespace ChatExchangeDotNet
             }
 
             var lastestDom = CQ.Create(resContent).Select(".monologue").Last();
-            var content = Message.GetMessageContent(Host, messageID);
+            var content = Message.GetMessageContent(Host, messageID, StripMention);
 
             if (content == null) throw new MessageNotFoundException();
 
             var parentID = content.IsReply() ? int.Parse(content.Substring(1, content.IndexOf(' '))) : -1;
-            var authorName = lastestDom[".username a"].First().Text();
             var authorID = int.Parse(lastestDom[".username a"].First().Attr("href").Split('/')[2]);
-
-            var message = new Message(this, messageID, GetUser(authorID), parentID);
-
-            evMan.TrackMessage(message);
+            var author = GetUser(authorID);
+            var message = new Message(this, ref evMan, messageID, author, parentID);
 
             return message;
         }
@@ -320,7 +318,9 @@ namespace ChatExchangeDotNet
                 var userID = 0;
 
                 if (int.TryParse(id.Groups[1].Value, out userID))
+                {
                     users.Add(new User(Host, ID, userID, true));
+                }
             }
 
             return users;
@@ -336,15 +336,20 @@ namespace ChatExchangeDotNet
         public Message PostMessage(object message)
         {
             if (message == null || string.IsNullOrEmpty(message.ToString()))
+            {
                 throw new ArgumentException("'message' cannot be null or return an empty/null string upon calling .ToString().", "message");
+            }
             if (hasLeft)
+            {
                 throw new InvalidOperationException("Cannot post message when you have left the room.");
+            }
             if (Me.Reputation < 20)
+            {
                 throw new Exception("You must have at least 20 reputation to post a message.");
+            }
 
             var ex = CheckDupeMsg(message.ToString());
-            if (ex != null)
-                throw ex;
+            if (ex != null) throw ex;
 
             var action = new ChatAction(ActionType.PostMessage, new Func<object>(() =>
             {
@@ -388,7 +393,9 @@ namespace ChatExchangeDotNet
         {
             if (message == null || string.IsNullOrEmpty(message.ToString()) || hasLeft ||
                 CheckDupeMsg(message.ToString()) != null || Me.Reputation < 20)
+            {
                 return false;
+            }
 
             var action = new ChatAction(ActionType.PostMessage, new Func<object>(() =>
             {
@@ -409,37 +416,32 @@ namespace ChatExchangeDotNet
             return (bool)actEx.ExecuteAction(action);
         }
 
-        public Message PostReply(int targetMessageID, object message)
-        {
-            return PostMessage($":{targetMessageID} {message}");
-        }
+        public Message PostReply(int targetMessageID, object message) =>
+            PostMessage($":{targetMessageID} {message}");
 
-        public Message PostReply(Message targetMessage, object message)
-        {
-            return PostMessage($":{targetMessage.ID} {message}");
-        }
+        public Message PostReply(Message targetMessage, object message) =>
+            PostMessage($":{targetMessage.ID} {message}");
 
-        public bool PostReplyFast(int targatMessageID, object message)
-        {
-            return PostMessageFast($":{targatMessageID} {message}");
-        }
+        public bool PostReplyFast(int targatMessageID, object message) =>
+            PostMessageFast($":{targatMessageID} {message}");
 
-        public bool PostReplyFast(Message targatMessage, object message)
-        {
-            return PostMessageFast($":{targatMessage.ID} {message}");
-        }
+        public bool PostReplyFast(Message targatMessage, object message) =>
+            PostMessageFast($":{targatMessage.ID} {message}");
 
-        public bool EditMessage(Message oldMessage, object newMessage)
-        {
-            return EditMessage(oldMessage.ID, newMessage);
-        }
+        public bool EditMessage(Message oldMessage, object newMessage) =>
+            EditMessage(oldMessage.ID, newMessage);
 
         public bool EditMessage(int messageID, object newMessage)
         {
             if (newMessage == null || string.IsNullOrEmpty(newMessage.ToString()))
-                throw new ArgumentException("'newMessage' cannot be null or return an empty/null string upon calling .ToString().", "newMessage");
+            {
+                throw new ArgumentException("'newMessage' cannot be null or return an " +
+                    "empty/null string upon calling .ToString().", "newMessage");
+            }
             if (hasLeft)
+            {
                 throw new InvalidOperationException("Cannot edit message when you have left the room.");
+            }
 
             var action = new ChatAction(ActionType.EditMessage, new Func<object>(() =>
             {
@@ -460,15 +462,14 @@ namespace ChatExchangeDotNet
             return (bool?)actEx.ExecuteAction(action) ?? false;
         }
 
-        public bool DeleteMessage(Message message)
-        {
-            return DeleteMessage(message.ID);
-        }
+        public bool DeleteMessage(Message message) => DeleteMessage(message.ID);
 
         public bool DeleteMessage(int messageID)
         {
             if (hasLeft)
+            {
                 throw new InvalidOperationException("Cannot delete message when you have left the room.");
+            }
 
             var action = new ChatAction(ActionType.DeleteMessage, new Func<object>(() =>
             {
@@ -488,15 +489,14 @@ namespace ChatExchangeDotNet
             return (bool?)actEx.ExecuteAction(action) ?? false;
         }
 
-        public bool ToggleStar(Message message)
-        {
-            return ToggleStar(message.ID);
-        }
+        public bool ToggleStar(Message message) => ToggleStar(message.ID);
 
         public bool ToggleStar(int messageID)
         {
             if (hasLeft)
+            {
                 throw new InvalidOperationException("Cannot toggle message star when you have left the room.");
+            }
 
             var action = new ChatAction(ActionType.ToggleMessageStar, new Func<object>(() =>
             {
@@ -520,17 +520,19 @@ namespace ChatExchangeDotNet
 
         #region Owner chat commands.
 
-        public bool ClearMessageStars(Message message)
-        {
-            return ClearMessageStars(message.ID);
-        }
+        public bool ClearMessageStars(Message message) => ClearMessageStars(message.ID);
 
         public bool ClearMessageStars(int messageID)
         {
             if (hasLeft)
+            {
                 throw new InvalidOperationException("Cannot clear message's stars when you have left the room.");
+            }
             if (!Me.IsMod || !Me.IsRoomOwner)
-                throw new InvalidOperationException("Unable to clear message stars. You have insufficient privileges (must be a room owner or moderator).");
+            {
+                throw new InvalidOperationException("Unable to clear message stars. You have " +
+                    "insufficient privileges (must be a room owner or moderator).");
+            }
 
             var action = new ChatAction(ActionType.ClearMessageStars, new Func<object>(() =>
             {
@@ -548,17 +550,19 @@ namespace ChatExchangeDotNet
             return (bool?)actEx.ExecuteAction(action) ?? false;
         }
 
-        public bool TogglePin(Message message)
-        {
-            return TogglePin(message.ID);
-        }
+        public bool TogglePin(Message message) => TogglePin(message.ID);
 
         public bool TogglePin(int messageID)
         {
             if (hasLeft)
-                throw new InvalidOperationException("Cannot toggle message pin when you have left the room.");
+            {
+                throw new InvalidOperationException("Cannot clear message's stars when you have left the room.");
+            }
             if (!Me.IsMod || !Me.IsRoomOwner)
-                throw new InvalidOperationException("Unable to toggle a message pin. You have insufficient privileges (must be a room owner or moderator).");
+            {
+                throw new InvalidOperationException("Unable to (un)pin a message. You have " +
+                    "insufficient privileges (must be a room owner or moderator).");
+            }
 
             var action = new ChatAction(ActionType.ToggleMessagePin, new Func<object>(() =>
             {
@@ -584,9 +588,14 @@ namespace ChatExchangeDotNet
         public bool KickMute(int userID)
         {
             if (hasLeft)
-                throw new InvalidOperationException("Cannot kick-mute user when you have left the room.");
+            {
+                throw new InvalidOperationException("Cannot clear message's stars when you have left the room.");
+            }
             if (!Me.IsMod || !Me.IsRoomOwner)
-                throw new InvalidOperationException("Unable to kick-mute user. You have insufficient privileges (must be a room owner or moderator).");
+            {
+                throw new InvalidOperationException("Unable to kick-mute user. You have " +
+                    "insufficient privileges (must be a room owner or moderator).");
+            }
 
             var action = new ChatAction(ActionType.KickMute, new Func<object>(() =>
             {
@@ -605,17 +614,20 @@ namespace ChatExchangeDotNet
             return (bool?)actEx.ExecuteAction(action) ?? false;
         }
 
-        public bool SetUserRoomAccess(UserRoomAccess access, User user)
-        {
-            return SetUserRoomAccess(access, user.ID);
-        }
+        public bool SetUserRoomAccess(UserRoomAccess access, User user) =>
+            SetUserRoomAccess(access, user.ID);
 
         public bool SetUserRoomAccess(UserRoomAccess access, int userID)
         {
             if (hasLeft)
-                throw new InvalidOperationException("Cannot change user's access level when you have left the room.");
+            {
+                throw new InvalidOperationException("Cannot clear message's stars when you have left the room.");
+            }
             if (!Me.IsMod || !Me.IsRoomOwner)
-                throw new InvalidOperationException("Unable to change user's access level. You have insufficient privileges (must be a room owner or moderator).");
+            {
+                throw new InvalidOperationException("Unable to change user's access level. You have " +
+                    "insufficient privileges (must be a room owner or moderator).");
+            }
 
             var action = new ChatAction(ActionType.KickMute, new Func<object>(() =>
             {
@@ -684,7 +696,9 @@ namespace ChatExchangeDotNet
         private DuplicateMessageException CheckDupeMsg(string msg)
         {
             if (msg == lastMsg.Key && (DateTime.UtcNow - lastMsg.Value).TotalMinutes < 1)
+            {
                 return new DuplicateMessageException();
+            }
 
             lastMsg = new KeyValuePair<string, DateTime>(msg, DateTime.UtcNow);
 
@@ -698,7 +712,9 @@ namespace ChatExchangeDotNet
             var html = RequestManager.Get(cookieKey, $"{chatRoot}/chats/join/favorite");
 
             if (string.IsNullOrEmpty(html))
+            {
                 throw new Exception("Unable to fetch requested user data.");
+            }
 
             var dom = CQ.Create(html);
             var e = dom[".topbar-menu-links a"][0];
@@ -756,11 +772,11 @@ namespace ChatExchangeDotNet
                 }
                 catch (Exception ex)
                 {
-                    evMan.CallListeners(EventType.InternalException, ex);
+                    evMan.CallListeners(EventType.InternalException, false, ex);
                 }
             };
 
-            socket.OnError += (o, oo) => evMan.CallListeners(EventType.InternalException, oo.Exception);
+            socket.OnError += (o, oo) => evMan.CallListeners(EventType.InternalException, false, oo.Exception);
 
             socket.OnClose += (o, oo) =>
             {
@@ -781,12 +797,12 @@ namespace ChatExchangeDotNet
                         }
                         catch (Exception ex)
                         {
-                            evMan.CallListeners(EventType.InternalException, ex);
+                            evMan.CallListeners(EventType.InternalException, false, ex);
                         }
                     }
 
                     // We failed to restart the socket; dispose of the object and log the error.
-                    evMan.CallListeners(EventType.InternalException, new Exception("Could not restart WebSocket; now disposing this Room object."));
+                    evMan.CallListeners(EventType.InternalException,false, new Exception("Could not restart WebSocket; now disposing this Room object."));
                     Dispose();
                 }
             };
@@ -796,7 +812,7 @@ namespace ChatExchangeDotNet
 
         private void HandleData(string json)
         {
-            evMan.CallListeners(EventType.DataReceived, json);
+            evMan.CallListeners(EventType.DataReceived, false, json);
 
             var obj = JsonObject.Parse(json);
             var data = obj.Get<Dictionary<string, List<Dictionary<string, object>>>>("r" + ID);

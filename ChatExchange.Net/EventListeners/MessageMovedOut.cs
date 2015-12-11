@@ -26,7 +26,7 @@ using System.Reflection;
 
 namespace ChatExchangeDotNet.EventListeners
 {
-    internal class MessageReply : IEventListener
+    internal class MessageMovedOut : IEventListener
     {
         public Exception CheckListener(Delegate listener)
         {
@@ -34,11 +34,9 @@ namespace ChatExchangeDotNet.EventListeners
 
             var listenerParams = listener.Method.GetParameters();
 
-            if (listenerParams == null || listenerParams.Length != 2 ||
-                listenerParams[0].ParameterType != typeof(Message) ||
-                listenerParams[1].ParameterType != typeof(Message))
+            if (listenerParams == null || listenerParams.Length != 1 || listenerParams[0].ParameterType != typeof(Message))
             {
-                return new TargetException("This chat event takes two arguments (both) of type 'Message'.");
+                return new TargetException("This chat event takes a single argument of type 'Message'.");
             }
 
             return null;
@@ -48,12 +46,16 @@ namespace ChatExchangeDotNet.EventListeners
         {
             var authorID = int.Parse(data["user_id"].ToString());
             var id = int.Parse(data["message_id"].ToString());
-            var parentID = int.Parse(data["parent_id"].ToString());
-            var parent = room[parentID];
-            var author = room.GetUser(authorID);
-            var message = new Message(room, ref evMan, id, author, parentID);
+            var parentID = -1;
 
-            evMan.CallListeners(EventType.MessageReply, authorID == room.Me.ID, parent, message);
+            if (data.ContainsKey("parent_id") && data["parent_id"] != null)
+            {
+                parentID = int.Parse(data["parent_id"].ToString());
+            }
+
+            var message = new Message(room, ref evMan, id, room.GetUser(authorID), parentID);
+
+            evMan.CallListeners(EventType.MessageMovedOut, authorID == room.Me.ID, message);
         }
     }
 }

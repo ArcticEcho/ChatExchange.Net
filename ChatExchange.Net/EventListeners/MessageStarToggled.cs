@@ -30,7 +30,7 @@ namespace ChatExchangeDotNet.EventListeners
     {
         public Exception CheckListener(Delegate listener)
         {
-            if (listener == null) { return new ArgumentNullException("listener"); }
+            if (listener == null) return new ArgumentNullException("listener");
 
             var listenerParams = listener.Method.GetParameters();
 
@@ -47,10 +47,6 @@ namespace ChatExchangeDotNet.EventListeners
 
         public void Execute(Room room, ref EventManager evMan, Dictionary<string, object> data)
         {
-            // No point parsing all this data if no one's listening.
-            if (!evMan.ConnectedListeners.ContainsKey(EventType.MessageStarToggled)) { return; }
-            if (data.ContainsKey("user_id") && room.IgnoreOwnEvents) { return; }
-
             var id = int.Parse(data["message_id"].ToString());
             var starCount = 0;
             var pinCount = 0;
@@ -67,8 +63,7 @@ namespace ChatExchangeDotNet.EventListeners
 
             var message = room[id];
 
-            evMan.TrackMessage(message);
-            evMan.CallListeners(EventType.MessageStarToggled, message, starCount, pinCount);
+            evMan.CallListeners(EventType.MessageStarToggled, data.ContainsKey("user_id"), message, starCount, pinCount);
         }
     }
 }

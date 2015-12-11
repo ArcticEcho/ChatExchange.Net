@@ -68,7 +68,7 @@ namespace ChatExchangeDotNet
         MessageStarToggled = 6,
 
         /// <summary>
-        /// Still have no idea what this is...
+        /// No idea.
         /// </summary>
         //DebugMessage,
 
@@ -88,7 +88,8 @@ namespace ChatExchangeDotNet
         MessageDeleted = 10,
 
         /// <summary>
-        /// 
+        /// A file has been uploaded to the room.
+        /// Only one room supports this publicly, the Android SE testing app room (afaik).
         /// </summary>
         //FileAdded,
 
@@ -98,12 +99,12 @@ namespace ChatExchangeDotNet
         //ModeratorFlag,
 
         /// <summary>
-        /// 
+        /// No idea.
         /// </summary>
         //UserSettingsChanged,
 
         /// <summary>
-        /// 
+        /// No idea.
         /// </summary>
         //GlobalNotification,
 
@@ -113,7 +114,7 @@ namespace ChatExchangeDotNet
         UserAccessLevelChanged = 15,
 
         /// <summary>
-        ///  
+        /// No idea.
         /// </summary>
         //UserNotification,
 
@@ -128,22 +129,22 @@ namespace ChatExchangeDotNet
         MessageReply = 18,
 
         /// <summary>
-        /// A room owner (or moderator) has moved messages (or a message) out of the room.
+        /// A room owner/moderator has moved a message out of the room.
         /// </summary>
-        //MessageMovedOut,
+        MessageMovedOut,
 
         /// <summary>
-        /// A room owner (or moderator) has moved messages (or a message) into the room.
+        /// A room owner/moderator has moved a message into the room.
         /// </summary>
-        //MessageMovedIn,
+        MessageMovedIn,
 
         /// <summary>
-        /// 
+        /// No idea.
         /// </summary>
         //TimeBreak,
 
         /// <summary>
-        /// Occurs when a new feed ticker message is posted.
+        /// Occurs when a new feed message is posted (I think).
         /// </summary>
         //FeedTicker,
 

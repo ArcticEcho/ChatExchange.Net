@@ -46,14 +46,20 @@ namespace ChatExchangeDotNet
         public Client(string email, string password)
         {
             if (string.IsNullOrEmpty(email) || !email.Contains("@"))
+            {
                 throw new ArgumentException("'email' must be a valid email address.", "email");
+            }
             if (string.IsNullOrEmpty(password))
+            {
                 throw new ArgumentException("'password' must not be null or empty.", "password");
+            }
 
             cookieKey = email.Split('@')[0];
 
             if (RequestManager.Cookies.ContainsKey(cookieKey))
+            {
                 throw new Exception("Cannot create multiple instances of the same user.");
+            }
 
             RequestManager.Cookies.Add(cookieKey, new CookieContainer());
 
@@ -74,8 +80,15 @@ namespace ChatExchangeDotNet
             var host = hostParser.Replace(roomUrl, "");
             var id = int.Parse(idParser.Replace(roomUrl, ""));
 
-            if (Rooms.Any(room => room.Host == host && room.ID == id))
+            return JoinRoom(host, id);
+        }
+
+        public Room JoinRoom(string host, int roomID)
+        {
+            if (Rooms.Any(room => room.Host == host && room.ID == roomID))
+            {
                 throw new Exception("Cannot join a room you are already in.");
+            }
 
             if (Rooms.All(room => room.Host != host))
             {
@@ -89,7 +102,7 @@ namespace ChatExchangeDotNet
                 }
             }
 
-            var r = new Room(cookieKey, host, id);
+            var r = new Room(cookieKey, host, roomID);
 
             Rooms.Add(r);
 

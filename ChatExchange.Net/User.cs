@@ -37,6 +37,7 @@ namespace ChatExchangeDotNet
         public bool IsMod { get; private set; }
         public int RoomID { get; private set; }
         public string Host { get; private set; }
+
         public bool IsRoomOwner { get; internal set; }
 
 
@@ -76,7 +77,7 @@ namespace ChatExchangeDotNet
         internal static bool CanPing(string cookieKey, string host, int roomID, int userID)
         {
             var json = RequestManager.Get(cookieKey, "http://chat." + host + "/rooms/pingable/" + roomID);
-            if (string.IsNullOrEmpty(json)) { return false; }
+            if (string.IsNullOrEmpty(json)) return false;
             var data = JsonSerializer.DeserializeFromString<HashSet<List<object>>>(json);
 
             foreach (var user in data)
@@ -90,20 +91,11 @@ namespace ChatExchangeDotNet
             return false;
         }
 
-        public override int GetHashCode()
-        {
-            return ID;
-        }
+        public override int GetHashCode() => ID;
 
-        public override string ToString()
-        {
-            return Name;
-        }
+        public override string ToString() => Name;
 
-        public void InvalidateCache()
-        {
-            FetchUserData(Host, RoomID, ID, null, cookieKey);
-        }
+        public void InvalidateCache() => FetchUserData(Host, RoomID, ID, null, cookieKey);
 
 
 

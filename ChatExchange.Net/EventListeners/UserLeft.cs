@@ -30,7 +30,7 @@ namespace ChatExchangeDotNet.EventListeners
     {
         public Exception CheckListener(Delegate listener)
         {
-            if (listener == null) { return new ArgumentNullException("listener"); }
+            if (listener == null) return new ArgumentNullException("listener");
 
             var listenerParams = listener.Method.GetParameters();
 
@@ -44,17 +44,9 @@ namespace ChatExchangeDotNet.EventListeners
 
         public void Execute(Room room, ref EventManager evMan, Dictionary<string, object> data)
         {
-            // No point parsing all this data if no one's listening.
-            if (!evMan.ConnectedListeners.ContainsKey(EventType.UserLeft)) { return; }
-
             var userID = int.Parse(data["user_id"].ToString());
 
-            if (userID == room.Me.ID && room.IgnoreOwnEvents) { return; }
-
-            var user = room.GetUser(userID);
-
-            evMan.TrackUser(user);
-            evMan.CallListeners(EventType.UserLeft, user);
+            evMan.CallListeners(EventType.UserLeft, userID == room.Me.ID, room.GetUser(userID));
         }
     }
 }

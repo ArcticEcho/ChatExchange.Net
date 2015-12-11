@@ -22,29 +22,13 @@
 
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 
-namespace ChatExchangeDotNet.EventListeners
+namespace ChatExchangeDotNet
 {
-    internal class DataReceived : IEventListener
+    internal class TrackedObject
     {
-        public Exception CheckListener(Delegate listener)
-        {
-            if (listener == null) return new ArgumentNullException("listener");
-
-            var listenerParams = listener.Method.GetParameters();
-
-            if (listenerParams == null || listenerParams.Length != 1 || listenerParams[0].ParameterType != typeof(string))
-            {
-                return new TargetException("This chat event takes a single argument of type 'string'.");
-            }
-
-            return null;
-        }
-
-        public void Execute(Room room, ref EventManager evMan, Dictionary<string, object> data)
-        {
-            throw new NotSupportedException();
-        }
+        public Guid ID { get; set; }
+        public object Object { get; set; }
+        public Dictionary<EventType, Delegate> Listeners { get; set; }
     }
 }

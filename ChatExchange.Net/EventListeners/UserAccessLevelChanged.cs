@@ -30,7 +30,7 @@ namespace ChatExchangeDotNet.EventListeners
     {
         public Exception CheckListener(Delegate listener)
         {
-            if (listener == null) { return new ArgumentNullException("listener"); }
+            if (listener == null) return new ArgumentNullException("listener");
 
             var listenerParams = listener.Method.GetParameters();
 
@@ -47,13 +47,7 @@ namespace ChatExchangeDotNet.EventListeners
 
         public void Execute(Room room, ref EventManager evMan, Dictionary<string, object> data)
         {
-            // No point parsing all this data if no one's listening.
-            if (!evMan.ConnectedListeners.ContainsKey(EventType.UserAccessLevelChanged)) { return; }
-
             var granterID = int.Parse(data["user_id"].ToString());
-
-            if (granterID == room.Me.ID && room.IgnoreOwnEvents) { return; }
-
             var targetUserID = int.Parse(data["target_user_id"].ToString());
             var content = (string)data["content"];
             var granter = room.GetUser(granterID);
@@ -79,9 +73,7 @@ namespace ChatExchangeDotNet.EventListeners
                 }
             }
 
-            evMan.TrackUser(granter);
-            evMan.TrackUser(targetUser);
-            evMan.CallListeners(EventType.UserAccessLevelChanged, granter, targetUser, newAccessLevel);
+            evMan.CallListeners(EventType.UserAccessLevelChanged, granterID == room.Me.ID, granter, targetUser, newAccessLevel);
         }
     }
 }

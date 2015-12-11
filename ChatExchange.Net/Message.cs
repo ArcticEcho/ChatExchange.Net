@@ -27,9 +27,13 @@ using CsQuery;
 
 namespace ChatExchangeDotNet
 {
-    public class Message
+    public class Message : IDisposable
     {
         private Regex messageEdits = new Regex("<div class=\"message\"", Extensions.RegexOpts);
+        private EventManager evMan;
+        private Guid trackID;
+
+        internal bool DisposeObject { get; private set; }
 
         public string Host { get; private set; }
         public int RoomID { get; private set; }
@@ -37,6 +41,7 @@ namespace ChatExchangeDotNet
         public int ParentID { get; private set; }
         public User Author { get; private set; }
 
+        // Kept updated by the room's EventManager (hence the internal set).
         public string Content { get; internal set; }
         public bool IsDeleted { get; internal set; }
         public int StarCount { get; internal set; }
@@ -45,12 +50,13 @@ namespace ChatExchangeDotNet
 
 
 
-        public Message(Room room, int messageID, User author, int parentID = -1)
+        internal Message(Room room, ref EventManager eventManager, int messageID, User author, int parentID = -1)
         {
             if (room == null) throw new ArgumentException("room");
             if (messageID < 0) throw new ArgumentOutOfRangeException("messageID", "'messageID' can not be less than 0.");
             if (author == null) throw new ArgumentNullException("author");
 
+            evMan = eventManager;
             Content = GetMessageContent(room.Host, messageID, room.StripMention);
             Host = room.Host;
             RoomID = room.ID;
@@ -58,10 +64,23 @@ namespace ChatExchangeDotNet
             ParentID = parentID;
             Author = author;
 
-            var historyHtml = RequestManager.Get("", $"http://chat.{Host}/messages/{ID}/history");
+            if (evMan != null)
+            {
+                trackID = room.EventManager.TrackMessage(this, room.InitialisePrimaryContentOnly);
+            }
 
-            SetStarPinCount(historyHtml);
-            EditCount = GetEditCount(historyHtml);
+            if (!room.InitialisePrimaryContentOnly)
+            {
+                var historyHtml = RequestManager.Get("", $"http://chat.{Host}/messages/{ID}/history");
+
+                SetStarPinCount(historyHtml);
+                EditCount = GetEditCount(historyHtml);
+            }
+        }
+
+        ~Message()
+        {
+            Dispose();
         }
 
 
@@ -84,13 +103,23 @@ namespace ChatExchangeDotNet
                 // If the input is valid, we've probably hit a deleted message.
                 if (ex.Response != null && ((HttpWebResponse)ex.Response).StatusCode == HttpStatusCode.NotFound)
                 {
-                    return null;
+                    throw new MessageNotFoundException();
                 }
                 else
                 {
                     throw ex;
                 }
             }
+        }
+
+        public void Dispose()
+        {
+            if (DisposeObject) return;
+            DisposeObject = true;
+
+            if (trackID != null) evMan.UntrackObject(trackID);
+
+            GC.SuppressFinalize(this);
         }
 
         public override int GetHashCode()
@@ -115,7 +144,7 @@ namespace ChatExchangeDotNet
         {
             var msgs = messageEdits.Matches(html);
 
-            return Math.Max((msgs == null ? 0 : msgs.Count) - 2, 0);
+            return Math.Max((msgs?.Count ?? 0) - 2, 0);
         }
 
         private int GetStarPinCount(string html, bool stars)

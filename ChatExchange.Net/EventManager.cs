@@ -33,15 +33,22 @@ namespace ChatExchangeDotNet
     public class EventManager : IDisposable
     {
         private readonly ConcurrentDictionary<EventType, IEventListener> events;
+        private readonly ConcurrentDictionary<Guid, TrackedObject> trackDict;
         private bool disposed;
 
         public ConcurrentDictionary<EventType, ConcurrentDictionary<int, Delegate>> ConnectedListeners { get; private set; }
+
+        /// <summary>
+        /// If true, actions by the currently logged in user will not raise any events. Default set to true.
+        /// </summary>
+        public bool IgnoreOwnEvents { get; set; } = true;
 
 
 
         public EventManager()
         {
             events = new ConcurrentDictionary<EventType, IEventListener>();
+            trackDict = new ConcurrentDictionary<Guid, TrackedObject>();
 
             var types = Assembly.GetExecutingAssembly().GetTypes();
             var eventTypes = types.Where(t => t.Namespace == "ChatExchangeDotNet.EventListeners");
@@ -117,49 +124,110 @@ namespace ChatExchangeDotNet
 
 
 
-        internal void TrackMessage(Message message)
+        internal Guid TrackMessage(Message message, bool primaryOnly)
         {
             if (message == null) throw new ArgumentNullException("message");
 
-            ConnectListener(EventType.MessageEdited, new Action<Message>(m =>
+            var obj = new TrackedObject
             {
-                if (m.ID == message.ID)
+                Object = message,
+                ID = Guid.NewGuid(),
+                Listeners = new Dictionary<EventType, Delegate>
                 {
-                    message.Content = m.Content;
-                    message.EditCount++;
+                    [EventType.MessageEdited] = new Action<Message>(m =>
+                    {
+                        if (m.ID == message.ID)
+                        {
+                            message.Content = m.Content;
+                            message.EditCount++;
+                        }
+                    }),
+                    [EventType.MessageDeleted] = new Action<User, int>((u, mID) =>
+                    {
+                        if (mID == message.ID) message.IsDeleted = true;
+                    })
                 }
-            }));
+            };
 
-            ConnectListener(EventType.MessageDeleted, new Action<User, int>((u, mID) =>
+            if (!primaryOnly)
             {
-                if (mID == message.ID)
-                    message.IsDeleted = true;
-            }));
-
-            ConnectListener(EventType.MessageStarToggled, new Action<Message, int, int>((m, s, p) =>
-            {
-                if (m.ID == message.ID)
+                obj.Listeners[EventType.MessageStarToggled] = new Action<Message, int, int>((m, s, p) =>
                 {
-                    message.StarCount = s;
-                    message.PinCount = p;
-                }
-            }));
+                    if (m.ID == message.ID)
+                    {
+                        message.StarCount = s;
+                        message.PinCount = p;
+                    }
+                });
+            }
+
+            trackDict[obj.ID] = obj;
+
+            return obj.ID;
         }
 
-        internal void TrackUser(User user)
+        internal Guid TrackUser(User user)
         {
             if (user == null) throw new ArgumentNullException("user");
 
-            ConnectListener(EventType.UserAccessLevelChanged, new Action<User, User, UserRoomAccess>((granter, targetUser, newAccess) =>
+            var obj = new TrackedObject
             {
-                if (targetUser.ID == user.ID)
-                    user.IsRoomOwner = newAccess == UserRoomAccess.Owner;
-            }));
+                Object = user,
+                ID = Guid.NewGuid(),
+                Listeners = new Dictionary<EventType, Delegate>
+                {
+                    [EventType.UserAccessLevelChanged] = new Action<User, User, UserRoomAccess>((granter, targetUser, newAccess) =>
+                    {
+                        if (targetUser.ID == user.ID)
+                        {
+                            user.IsRoomOwner = newAccess == UserRoomAccess.Owner;
+                        }
+                    })
+                }
+            };
+
+            trackDict[obj.ID] = obj;
+
+            return obj.ID;
         }
 
-        internal void CallListeners(EventType eventType, params object[] args)
+        internal void UntrackObject(Guid trackID)
+        {
+            if (trackID == null) throw new ArgumentNullException("trackID");
+            if (!trackDict.ContainsKey(trackID)) throw new KeyNotFoundException();
+
+            TrackedObject temp;
+            trackDict.TryRemove(trackID, out temp);
+        }
+
+        internal void CallListeners(EventType eventType, bool selfCaused, params object[] args)
         {
             if (disposed) return;
+
+            // Notify relevant object listeners first (in a separate thread,
+            // as we could cause a delay if there a mass of objects to notify).
+            Task.Factory.StartNew(() =>
+            {
+                foreach (var obj in trackDict.Values)
+                {
+                    if (!obj.Listeners.ContainsKey(eventType)) continue;
+
+                    Task.Factory.StartNew(() =>
+                    {
+                        try
+                        {
+                            obj.Listeners[eventType].DynamicInvoke(args);
+                        }
+                        catch (Exception ex)
+                        {
+                            if (eventType == EventType.InternalException) throw ex; // Avoid infinite loop.
+                            CallListeners(EventType.InternalException, false, ex);
+                        }
+                    });
+                }
+            });
+
+            if (IgnoreOwnEvents && selfCaused) return;
             if (!ConnectedListeners.ContainsKey(eventType)) return;
             if (ConnectedListeners[eventType].Keys.Count == 0) return;
 
@@ -174,7 +242,7 @@ namespace ChatExchangeDotNet
                     catch (Exception ex)
                     {
                         if (eventType == EventType.InternalException) throw ex; // Avoid infinite loop.
-                        CallListeners(EventType.InternalException, ex);
+                        CallListeners(EventType.InternalException, false, ex);
                     }
                 });
             }
