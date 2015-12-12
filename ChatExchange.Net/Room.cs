@@ -1,6 +1,6 @@
 /*
  * ChatExchange.Net. A .Net (4.0) API for interacting with Stack Exchange chat.
- * Copyright © 2015, ArcticEcho.
+ * Copyright Â© 2015, ArcticEcho.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -63,9 +63,9 @@ namespace ChatExchangeDotNet
         public bool StripMention { get; set; } = true;
 
         /// <summary>
-        /// If true, messages will only- LOOK I'M FREAKING TIED OF WRITIN' UP THESE DAMN DOCS.
-        /// I MEAN, ARE YOU ACTUALLY GONNA READ ALL THIS GARBAGE? IF YOU ARE, FEEL FREE TO WRITE UP
-        /// A NICE LITTLE ISSUE ON GH. Default set to false.
+        /// If true, all Message instances will NOT initialise/update their StarCount and PinCount properties.
+        /// (Setting to "true" can help increase performance.)
+        /// Default set to false.
         /// </summary>
         public bool InitialisePrimaryContentOnly { get; set; } = false;
 
