@@ -128,15 +128,20 @@ namespace ChatExchangeDotNet
         {
             if (message == null) throw new ArgumentNullException("message");
 
+            var id = Guid.NewGuid();
             var obj = new TrackedObject
             {
                 Object = message,
-                ID = Guid.NewGuid(),
+                ID = id,
                 Listeners = new Dictionary<EventType, Delegate>
                 {
                     [EventType.MessageEdited] = new Action<Message>(m =>
                     {
-                        if (m.ID == message.ID)
+                        if (message?.DisposeObject ?? true)
+                        {
+                            UntrackObject(id);
+                        }
+                        else if (m.ID == message.ID)
                         {
                             message.Content = m.Content;
                             message.EditCount++;
@@ -144,7 +149,14 @@ namespace ChatExchangeDotNet
                     }),
                     [EventType.MessageDeleted] = new Action<User, int>((u, mID) =>
                     {
-                        if (mID == message.ID) message.IsDeleted = true;
+                        if (message?.DisposeObject ?? true)
+                        {
+                            UntrackObject(id);
+                        }
+                        else if (mID == message.ID)
+                        {
+                            message.IsDeleted = true;
+                        }
                     })
                 }
             };
@@ -153,7 +165,11 @@ namespace ChatExchangeDotNet
             {
                 obj.Listeners[EventType.MessageStarToggled] = new Action<Message, int, int>((m, s, p) =>
                 {
-                    if (m.ID == message.ID)
+                    if (message?.DisposeObject ?? true)
+                    {
+                        UntrackObject(id);
+                    }
+                    else if (m.ID == message.ID)
                     {
                         message.StarCount = s;
                         message.PinCount = p;
@@ -161,24 +177,29 @@ namespace ChatExchangeDotNet
                 });
             }
 
-            trackDict[obj.ID] = obj;
+            trackDict[id] = obj;
 
-            return obj.ID;
+            return id;
         }
 
         internal Guid TrackUser(User user)
         {
             if (user == null) throw new ArgumentNullException("user");
 
+            var id = Guid.NewGuid();
             var obj = new TrackedObject
             {
                 Object = user,
-                ID = Guid.NewGuid(),
+                ID = id,
                 Listeners = new Dictionary<EventType, Delegate>
                 {
                     [EventType.UserAccessLevelChanged] = new Action<User, User, UserRoomAccess>((granter, targetUser, newAccess) =>
                     {
-                        if (targetUser.ID == user.ID)
+                        if (user == null)
+                        {
+                            UntrackObject(id);
+                        }
+                        else if (targetUser.ID == user.ID)
                         {
                             user.IsRoomOwner = newAccess == UserRoomAccess.Owner;
                         }
@@ -186,9 +207,9 @@ namespace ChatExchangeDotNet
                 }
             };
 
-            trackDict[obj.ID] = obj;
+            trackDict[id] = obj;
 
-            return obj.ID;
+            return id;
         }
 
         internal void UntrackObject(Guid trackID)
