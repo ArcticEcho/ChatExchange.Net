@@ -137,7 +137,7 @@ namespace ChatExchangeDotNet
                 {
                     [EventType.MessageEdited] = new Action<Message>(m =>
                     {
-                        if (m.ID == message.ID && !message?.DisposeObject ?? false)
+                        if (m.ID == message.ID && !(message?.DisposeObject ?? true))
                         {
                             message.Content = m.Content;
                             message.EditCount++;
@@ -145,7 +145,7 @@ namespace ChatExchangeDotNet
                     }),
                     [EventType.MessageDeleted] = new Action<User, int>((u, mID) =>
                     {
-                        if (mID == message.ID && !message?.DisposeObject ?? false)
+                        if (mID == message.ID && !(message?.DisposeObject ?? true))
                         {
                             message.IsDeleted = true;
                         }
@@ -157,7 +157,7 @@ namespace ChatExchangeDotNet
             {
                 obj.Listeners[EventType.MessageStarToggled] = new Action<Message, int, int>((m, s, p) =>
                 {
-                    if (m.ID == message.ID && !message?.DisposeObject ?? false)
+                    if (m.ID == message.ID && !(message?.DisposeObject ?? true))
                     {
                         message.StarCount = s;
                         message.PinCount = p;
