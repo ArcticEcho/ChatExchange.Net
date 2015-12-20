@@ -137,11 +137,7 @@ namespace ChatExchangeDotNet
                 {
                     [EventType.MessageEdited] = new Action<Message>(m =>
                     {
-                        if (message?.DisposeObject ?? true)
-                        {
-                            UntrackObject(id);
-                        }
-                        else if (m.ID == message.ID)
+                        if (m.ID == message.ID && !message?.DisposeObject ?? false)
                         {
                             message.Content = m.Content;
                             message.EditCount++;
@@ -149,11 +145,7 @@ namespace ChatExchangeDotNet
                     }),
                     [EventType.MessageDeleted] = new Action<User, int>((u, mID) =>
                     {
-                        if (message?.DisposeObject ?? true)
-                        {
-                            UntrackObject(id);
-                        }
-                        else if (mID == message.ID)
+                        if (mID == message.ID && !message?.DisposeObject ?? false)
                         {
                             message.IsDeleted = true;
                         }
@@ -165,11 +157,7 @@ namespace ChatExchangeDotNet
             {
                 obj.Listeners[EventType.MessageStarToggled] = new Action<Message, int, int>((m, s, p) =>
                 {
-                    if (message?.DisposeObject ?? true)
-                    {
-                        UntrackObject(id);
-                    }
-                    else if (m.ID == message.ID)
+                    if (m.ID == message.ID && !message?.DisposeObject ?? false)
                     {
                         message.StarCount = s;
                         message.PinCount = p;
@@ -195,11 +183,7 @@ namespace ChatExchangeDotNet
                 {
                     [EventType.UserAccessLevelChanged] = new Action<User, User, UserRoomAccess>((granter, targetUser, newAccess) =>
                     {
-                        if (user == null)
-                        {
-                            UntrackObject(id);
-                        }
-                        else if (targetUser.ID == user.ID)
+                        if (targetUser.ID == user.ID && user != null)
                         {
                             user.IsRoomOwner = newAccess == UserRoomAccess.Owner;
                         }
