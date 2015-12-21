@@ -29,9 +29,9 @@ namespace ChatExchangeDotNet
 {
     public class Message : IDisposable
     {
-        private Regex messageEdits = new Regex("<div class=\"message\"", Extensions.RegexOpts);
-        private EventManager evMan;
-        private Guid trackID;
+        private readonly Regex messageEdits = new Regex("<div class=\"message\"", Extensions.RegexOpts);
+        private readonly EventManager evMan;
+        private readonly Guid trackID;
 
         internal bool DisposeObject { get; private set; }
 
@@ -64,10 +64,7 @@ namespace ChatExchangeDotNet
             ParentID = parentID;
             Author = author;
 
-            if (evMan != null)
-            {
-                trackID = room.EventManager.TrackMessage(this, room.InitialisePrimaryContentOnly);
-            }
+            trackID = eventManager.TrackMessage(this, room.InitialisePrimaryContentOnly);
 
             if (!room.InitialisePrimaryContentOnly)
             {
@@ -117,7 +114,7 @@ namespace ChatExchangeDotNet
             if (DisposeObject) return;
             DisposeObject = true;
 
-            if (trackID != null) evMan.UntrackObject(trackID);
+            evMan.UntrackObject(trackID);
 
             GC.SuppressFinalize(this);
         }
