@@ -26,6 +26,7 @@ using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Tasks;
 using CsQuery;
 using ServiceStack.Text;
 using WebSocketSharp;
@@ -40,11 +41,13 @@ namespace ChatExchangeDotNet
     {
         private static readonly Regex findUsers = new Regex(@"id:\s?(\d+),\sname", Extensions.RegexOpts);
         private static readonly Regex getId = new Regex(@"id: (?<id>\d+)", Extensions.RegexOpts);
-        private readonly AutoResetEvent throttleARE;
+        private readonly AutoResetEvent throttleARE = new AutoResetEvent(false);
+        private readonly ManualResetEvent passWSRecMre = new ManualResetEvent(false);
+        private readonly ManualResetEvent aggWSRecMre = new ManualResetEvent(false);
         private readonly ActionExecutor actEx;
         private readonly string chatRoot;
         private readonly string cookieKey;
-        private bool disposed;
+        private bool dispose;
         private bool hasLeft;
         private string fkey;
         private KeyValuePair<string, DateTime> lastMsg;
@@ -55,23 +58,32 @@ namespace ChatExchangeDotNet
 
         # region Public properties/indexer.
 
-
+        /// <summary>
+        /// If true, restarts the event listener
+        /// WebSocket after a period of inactivity.
+        /// Default set to true.
+        /// </summary>
+        public bool AggressiveWebSocketRecovery { get; set; } = true;
 
         /// <summary>
-        /// If true, removes (@Username) mentions and the message reply prefix (:012345) from all messages. Default set to true.
+        /// If true, removes (@Username) mentions and the message
+        /// reply prefix (:012345) from all messages. Default set to true.
         /// </summary>
         public bool StripMention { get; set; } = true;
 
         /// <summary>
-        /// If true, all Message instances will NOT initialise/update their StarCount and PinCount properties.
+        /// If true, all Message instances will NOT initialise/update
+        /// their StarCount and PinCount properties.
         /// (Setting to "true" can help increase performance.)
         /// Default set to false.
         /// </summary>
         public bool InitialisePrimaryContentOnly { get; set; } = false;
 
         /// <summary>
-        /// Specifies how long to attempt to recovery the WebSocket after the connection closed;
-        /// after which, an error is passed to the InternalException event and the room self-destructs.
+        /// Specifies how long to attempt to recovery the
+        /// WebSocket after the connection closed;
+        /// after which, an error is passed to the InternalException
+        /// event and the room self-destructs.
         /// (Default set to 15 minutes.)
         /// </summary>
         public TimeSpan WebSocketRecoveryTimeout
@@ -154,7 +166,6 @@ namespace ChatExchangeDotNet
             evMan = new EventManager();
             actEx = new ActionExecutor(ref evMan);
             chatRoot = $"http://chat.{host}";
-            throttleARE = new AutoResetEvent(false);
             socketRecTimeout = TimeSpan.FromMinutes(15);
             Host = host;
             Me = GetMe();
@@ -165,6 +176,8 @@ namespace ChatExchangeDotNet
             var url = GetSocketURL(count);
 
             InitialiseSocket(url);
+
+            Task.Factory.StartNew(() => WSRecovery());
         }
 
         ~Room()
@@ -183,11 +196,10 @@ namespace ChatExchangeDotNet
 
         public void Dispose()
         {
-            if (disposed) return;
+            if (dispose) return;
+            dispose = true;
 
-            disposed = true;
-
-            if (socket?.ReadyState == WebSocketState.Open)
+            if ((socket?.ReadyState ?? WebSocketState.Closed) == WebSocketState.Open)
             {
                 try
                 {
@@ -205,6 +217,18 @@ namespace ChatExchangeDotNet
                 throttleARE.Dispose();
             }
 
+            if (passWSRecMre != null)
+            {
+                passWSRecMre.Set();
+                passWSRecMre.Dispose();
+            }
+
+            if (aggWSRecMre != null)
+            {
+                aggWSRecMre.Set();
+                aggWSRecMre.Dispose();
+            }
+
             actEx?.Dispose();
             evMan?.Dispose();
 
@@ -212,7 +236,7 @@ namespace ChatExchangeDotNet
         }
 
         /// <summary>
-        /// Leave the room.
+        /// Leaves the room and then disposes it.
         /// </summary>
         public void Leave()
         {
@@ -221,6 +245,8 @@ namespace ChatExchangeDotNet
             RequestManager.Post(cookieKey, $"{chatRoot}/chats/leave/{ID}", $"quiet=true&fkey={fkey}");
 
             hasLeft = true;
+
+            Dispose();
         }
 
         /// <summary>
@@ -353,7 +379,7 @@ namespace ChatExchangeDotNet
 
             var action = new ChatAction(ActionType.PostMessage, new Func<object>(() =>
             {
-                while (!disposed)
+                while (!dispose)
                 {
                     var data = $"text={Uri.EscapeDataString(message.ToString()).Replace("%5Cn", "%0A")}&fkey={fkey}";
                     var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/chats/{ID}/messages/new", data);
@@ -399,7 +425,7 @@ namespace ChatExchangeDotNet
 
             var action = new ChatAction(ActionType.PostMessage, new Func<object>(() =>
             {
-                while (!disposed)
+                while (!dispose)
                 {
                     var data = "text=" + Uri.EscapeDataString(message.ToString()).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
                     var resContent = RequestManager.Post(cookieKey, chatRoot + "/chats/" + ID + "/messages/new", data);
@@ -445,7 +471,7 @@ namespace ChatExchangeDotNet
 
             var action = new ChatAction(ActionType.EditMessage, new Func<object>(() =>
             {
-                while (!disposed)
+                while (!dispose)
                 {
                     var data = $"text={Uri.EscapeDataString(newMessage.ToString()).Replace("%5Cn", "%0A")}&fkey={fkey}";
                     var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/messages/{messageID}", data);
@@ -473,7 +499,7 @@ namespace ChatExchangeDotNet
 
             var action = new ChatAction(ActionType.DeleteMessage, new Func<object>(() =>
             {
-                while (!disposed)
+                while (!dispose)
                 {
                     var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/messages/{messageID}/delete", $"fkey={fkey}");
 
@@ -500,7 +526,7 @@ namespace ChatExchangeDotNet
 
             var action = new ChatAction(ActionType.ToggleMessageStar, new Func<object>(() =>
             {
-                while (!disposed)
+                while (!dispose)
                 {
                     var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/messages/{messageID}/star", $"fkey={fkey}");
 
@@ -682,7 +708,7 @@ namespace ChatExchangeDotNet
         {
             var msg = res.Trim().ToLowerInvariant();
 
-            if (msg.StartsWith("you can perform this action again in") && !disposed)
+            if (msg.StartsWith("you can perform this action again in") && !dispose)
             {
                 var delay = new string(msg.Where(char.IsDigit).ToArray());
                 throttleARE.WaitOne(int.Parse(delay) * 1000);
@@ -760,8 +786,32 @@ namespace ChatExchangeDotNet
             return JsonObject.Parse(resContent).Get<string>("url") + "?l=" + eventTime;
         }
 
+        private void WSRecovery()
+        {
+            var lastData = DateTime.MaxValue;
+            evMan.ConnectListener(EventType.DataReceived, new Action<string>(json =>
+            {
+                lastData = DateTime.UtcNow;
+            }));
+
+            while (!dispose)
+            {
+                if (AggressiveWebSocketRecovery && (DateTime.UtcNow - lastData).TotalSeconds > 30)
+                {
+                    SetFkey();
+                    var count = GetGlobalEventCount();
+                    var url = GetSocketURL(count);
+                    InitialiseSocket(url);
+                }
+
+                aggWSRecMre.WaitOne(TimeSpan.FromSeconds(15));
+            }
+        }
+
         private void InitialiseSocket(string socketUrl)
         {
+            if (socket != null) socket.Close(CloseStatusCode.Normal);
+
             socket = new WebSocket(socketUrl) { Origin = chatRoot };
 
             socket.OnMessage += (o, oo) =>
@@ -780,12 +830,13 @@ namespace ChatExchangeDotNet
 
             socket.OnClose += (o, oo) =>
             {
-                if (!oo.WasClean || oo.Code != (ushort)CloseStatusCode.Normal)
+                // Beware, ugly code ahead...
+                if (!AggressiveWebSocketRecovery && (!oo.WasClean || oo.Code != (ushort)CloseStatusCode.Normal))
                 {
                     // The socket closed abnormally, probably best to restart it (at 15 second intervals).
                     for (var i = 0; i < socketRecTimeout.TotalMinutes * 4; i++)
                     {
-                        Thread.Sleep(15000);
+                        if (dispose) return;
 
                         try
                         {
@@ -799,10 +850,12 @@ namespace ChatExchangeDotNet
                         {
                             evMan.CallListeners(EventType.InternalException, false, ex);
                         }
+
+                        passWSRecMre.WaitOne(TimeSpan.FromSeconds(15));
                     }
 
                     // We failed to restart the socket; dispose of the object and log the error.
-                    evMan.CallListeners(EventType.InternalException,false, new Exception("Could not restart WebSocket; now disposing this Room object."));
+                    evMan.CallListeners(EventType.InternalException, false, new Exception("Could not restart WebSocket; now disposing this Room object."));
                     Dispose();
                 }
             };
