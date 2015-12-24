@@ -199,7 +199,7 @@ namespace ChatExchangeDotNet
         internal void UntrackObject(Guid trackID)
         {
             if (trackID == null) throw new ArgumentNullException("trackID");
-            if (!trackDict.ContainsKey(trackID)) throw new KeyNotFoundException();
+            if (!trackDict.ContainsKey(trackID)) return; // Just for now. Until I can find the bug responsible for this.
 
             TrackedObject temp;
             trackDict.TryRemove(trackID, out temp);
