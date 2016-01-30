@@ -58,9 +58,9 @@ namespace ChatExchangeDotNet
         UserLeft,
 
         /// <summary>
-        /// The room's name (and/or description) has been changed.
+        /// The room's name, description and/or tags have been changed.
         /// </summary>
-        //RoomNameChanged,
+        RoomMetaChanged,
 
         /// <summary>
         /// Someone has (un)starred a message.

@@ -27,10 +27,16 @@ using System.Collections.Generic;
 
 namespace ChatExchangeDotNet
 {
-    internal static class RequestManager
+    /// <summary>
+    /// The core class used by CE.Net to make essential network requests.
+    /// </summary>
+    public static class RequestManager
     {
-        public static Dictionary<string, CookieContainer> Cookies { get; private set; }
+        internal static Dictionary<string, CookieContainer> Cookies { get; private set; }
 
+        /// <summary>
+        /// The timeout to be used when making requests.
+        /// </summary>
         public static TimeSpan Timeout { get; set; }
 
 
@@ -43,39 +49,43 @@ namespace ChatExchangeDotNet
 
 
 
-        public static HttpWebResponse PostRaw(string cookieKey, string uri, string content, string referer = null, string origin = null)
+        internal static HttpWebResponse PostRaw(string cookieKey, string uri, string content, string referrer = null, string origin = null)
         {
-            var req = GenerateRequest(cookieKey, uri, content, "POST", referer, origin);
+            var req = GenerateRequest(cookieKey, uri, content, "POST", referrer, origin);
 
             return GetResponse(req);
         }
 
-        public static HttpWebResponse GetRaw(string cookieKey, string uri)
+        internal static HttpWebResponse GetRaw(string cookieKey, string uri)
         {
             var req = GenerateRequest(cookieKey, uri, null, "GET");
 
             return GetResponse(req);
         }
 
-        public static string Post(string cookieKey, string uri, string content, string referer = null, string origin = null)
+        internal static string Post(string cookieKey, string uri, string content, string referrer = null, string origin = null)
         {
-            var req = GenerateRequest(cookieKey, uri, content, "POST", referer, origin);
+            var req = GenerateRequest(cookieKey, uri, content, "POST", referrer, origin);
 
             using (var res = GetResponse(req))
+            {
                 return res.GetContent();
+            }
         }
 
-        public static string Get(string cookieKey, string uri)
+        internal static string Get(string cookieKey, string uri)
         {
             var req = GenerateRequest(cookieKey, uri, null, "GET");
 
             using (var res = GetResponse(req))
+            {
                 return res.GetContent();
+            }
         }
 
 
 
-        private static HttpWebRequest GenerateRequest(string cookieKey, string uri, string content, string method, string referer = null, string origin = null)
+        private static HttpWebRequest GenerateRequest(string cookieKey, string uri, string content, string method, string referrer = null, string origin = null)
         {
             if (uri == null) throw new ArgumentNullException("uri");
 
@@ -85,10 +95,12 @@ namespace ChatExchangeDotNet
             req.Method = meth;
             req.CookieContainer = string.IsNullOrEmpty(cookieKey) ? null : Cookies[cookieKey];
             req.Timeout = (int)Timeout.TotalMilliseconds;
-            req.Referer = referer;
+            req.Referer = referrer;
 
             if (!string.IsNullOrEmpty(origin))
+            {
                 req.Headers.Add("Origin", origin);
+            }
 
             if (meth == "POST")
             {
@@ -98,7 +110,9 @@ namespace ChatExchangeDotNet
                 req.ContentLength = data.Length;
 
                 using (var dataStream = req.GetRequestStream())
+                {
                     dataStream.Write(data, 0, data.Length);
+                }
             }
 
             return req;
@@ -115,20 +129,15 @@ namespace ChatExchangeDotNet
                 res = (HttpWebResponse)req.GetResponse();
 
                 if (!string.IsNullOrEmpty(cookieKey))
+                {
                     Cookies[cookieKey].Add(res.Cookies);
+                }
             }
-            catch (WebException ex)
+            // Check if we've been throttled.
+            catch (WebException ex) when (ex.Response != null && ((HttpWebResponse)ex.Response).StatusCode == HttpStatusCode.Conflict)
             {
-                // Check if we've been throttled.
-                if (ex.Response != null && ((HttpWebResponse)ex.Response).StatusCode == HttpStatusCode.Conflict)
-                {
-                    // Yep, we have.
-                    res = (HttpWebResponse)ex.Response;
-                }
-                else
-                {
-                    throw ex;
-                }
+                // Yep, we have.
+                res = (HttpWebResponse)ex.Response;
             }
 
             return res;

@@ -24,7 +24,7 @@ using System;
 
 namespace ChatExchangeDotNet
 {
-    public class ChatAction
+    internal class ChatAction
     {
         public Delegate Action { get; private set; }
         public ActionType Type { get; private set; }

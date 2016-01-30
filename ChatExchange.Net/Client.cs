@@ -22,13 +22,17 @@
 
 using System;
 using System.Linq;
-using System.Collections.Generic;
 using System.Net;
 using System.Text.RegularExpressions;
 using CsQuery;
+using System.Collections.ObjectModel;
+using System.Collections.Generic;
 
 namespace ChatExchangeDotNet
 {
+    /// <summary>
+    /// Provides access to chat rooms via logging in using OAuth.
+    /// </summary>
     public class Client : IDisposable
     {
         private readonly Regex userUrl = new Regex("href=\"/users/\\d*?/", Extensions.RegexOpts);
@@ -39,10 +43,17 @@ namespace ChatExchangeDotNet
         private string openidUrl;
         private bool disposed;
 
-        public List<Room> Rooms { get; private set; }
+        /// <summary>
+        /// Returns a collection of rooms the user is currently in.
+        /// </summary>
+        public ReadOnlyCollection<Room> Rooms { get; private set; }
 
 
-
+        /// <summary>
+        /// Logs in using the provided credentials.
+        /// </summary>
+        /// <param name="email">The account's registered OAuth email.</param>
+        /// <param name="password">The account's password.</param>
         public Client(string email, string password)
         {
             if (string.IsNullOrEmpty(email) || !email.Contains("@"))
@@ -63,18 +74,28 @@ namespace ChatExchangeDotNet
 
             RequestManager.Cookies.Add(cookieKey, new CookieContainer());
 
-            Rooms = new List<Room>();
+            Rooms = new ReadOnlyCollection<Room>(new List<Room>());
 
             SEOpenIDLogin(email, password);
         }
 
+#pragma warning disable CS1591
         ~Client()
         {
             Dispose();
         }
+#pragma warning restore CS1591
 
 
 
+        /// <summary>
+        /// Joins a chat room specified by its URL.
+        /// </summary>
+        /// <param name="roomUrl">The URL of the chat room to join.</param>
+        /// <returns>A Room object which provides access to chat events/actions.</returns>
+        /// <exception cref="System.Exception">
+        /// Thrown if you attempt to join a room you are currently in.
+        /// </exception>
         public Room JoinRoom(string roomUrl)
         {
             var host = hostParser.Replace(roomUrl, "");
@@ -83,14 +104,25 @@ namespace ChatExchangeDotNet
             return JoinRoom(host, id);
         }
 
+        /// <summary>
+        /// Joins a chat room specified by its host and ID.
+        /// </summary>
+        /// <param name="host">
+        /// The host domain of the chat room.
+        /// For example: meta.stackexchange.com</param>
+        /// <param name="roomID">The unique identification number of the room.</param>
+        /// <returns>A Room object which provides access to chat events/actions.</returns>
+        /// <exception cref="System.Exception">
+        /// Thrown if you attempt to join a room you are currently in.
+        /// </exception>
         public Room JoinRoom(string host, int roomID)
         {
-            if (Rooms.Any(room => room.Host == host && room.ID == roomID))
+            if (Rooms.Any(room => room.Meta.Host == host && room.Meta.ID == roomID))
             {
                 throw new Exception("Cannot join a room you are already in.");
             }
 
-            if (Rooms.All(room => room.Host != host))
+            if (Rooms.All(room => room.Meta.Host != host))
             {
                 if (host.ToLowerInvariant() == "stackexchange.com")
                 {
@@ -103,8 +135,10 @@ namespace ChatExchangeDotNet
             }
 
             var r = new Room(cookieKey, host, roomID);
+            var rms = Rooms.ToList();
+            rms.Add(r);
 
-            Rooms.Add(r);
+            Rooms = new ReadOnlyCollection<Room>(rms);
 
             return r;
         }
@@ -115,11 +149,17 @@ namespace ChatExchangeDotNet
             disposed = true;
 
             if (Rooms?.Count > 0)
+            {
                 foreach (var room in Rooms)
+                {
                     room.Dispose();
+                }
+            }
 
             if (!string.IsNullOrEmpty(cookieKey))
+            {
                 RequestManager.Cookies.Remove(cookieKey);
+            }
 
             GC.SuppressFinalize(this);
         }
@@ -131,18 +171,26 @@ namespace ChatExchangeDotNet
             var getResContent = RequestManager.Get(cookieKey, "https://openid.stackexchange.com/account/login");
 
             if (string.IsNullOrEmpty(getResContent))
+            {
                 throw new Exception("Unable to find OpenID fkey.");
+            }
 
             var data = $"email={Uri.EscapeDataString(email)}&password=" +
                        $"{Uri.EscapeDataString(password)}&fkey=" +
                        CQ.Create(getResContent).GetInputValue("fkey");
 
-            using (var res = RequestManager.PostRaw(cookieKey, "https://openid.stackexchange.com/account/login/submit", data))
+            using (var res = RequestManager.PostRaw(cookieKey,
+                "https://openid.stackexchange.com/account/login/submit",
+                data))
             {
                 if (res == null)
+                {
                     throw new AuthenticationException("Unable to authenticate using OpenID.");
+                }
                 if (res.ResponseUri.ToString() != "https://openid.stackexchange.com/user")
+                {
                     throw new AuthenticationException("Invalid OpenID credentials.");
+                }
 
                 var html = res.GetContent();
                 var del = openidDel.Match(html).Value;
@@ -156,7 +204,9 @@ namespace ChatExchangeDotNet
             var getResContent = RequestManager.Get(cookieKey, $"http://{host}/users/login");
 
             if (string.IsNullOrEmpty(getResContent))
+            {
                 throw new Exception($"Unable to find fkey from {host}.");
+            }
 
             var fkey = CQ.Create(getResContent).GetInputValue("fkey");
 
@@ -167,10 +217,15 @@ namespace ChatExchangeDotNet
             var referrer = $"https://{host}/users/login?returnurl=" +
                            Uri.EscapeDataString($"http://{host}/");
 
-            using (var postRes = RequestManager.PostRaw(cookieKey, $"http://{host}/users/authenticate", data, referrer))
+            using (var postRes = RequestManager.PostRaw(cookieKey,
+                $"http://{host}/users/authenticate",
+                data,
+                referrer))
             {
                 if (postRes == null)
+                {
                     throw new AuthenticationException($"Unable to login to {host}.");
+                }
 
                 var html = postRes.GetContent();
                 HandleConfirmationPrompt(postRes.ResponseUri.ToString(), html);
@@ -183,11 +238,14 @@ namespace ChatExchangeDotNet
             var fkeyRes = RequestManager.Get(cookieKey, "https://stackexchange.com/users/login");
             var fkey = CQ.Create(fkeyRes).GetInputValue("fkey");
             var data = $"fkey={fkey}&oauth_version=&oauth_server=&openid_identifier={openidUrl}";
-            using (var res = RequestManager.PostRaw(cookieKey,
-                                         "http://stackexchange.com/users/authenticate",
-                                         data,
-                                         "https://stackexchange.com/users/login",
-                                         "https://stackexchange.com"))
+            var referrer = "https://stackexchange.com/users/login";
+            var origin = "https://stackexchange.com";
+
+            using (var res = RequestManager.PostRaw(cookieKey, 
+                "http://stackexchange.com/users/authenticate",
+                data,
+                referrer,
+                origin))
             {
                 var html = res.GetContent();
                 HandleConfirmationPrompt(res.ResponseUri.ToString(), html);
@@ -210,15 +268,18 @@ namespace ChatExchangeDotNet
             }
 
             if (id == 0)
+            {
                 throw new AuthenticationException("Unable to login to Stack Exchange.");
+            }
         }
 
         private void HandleConfirmationPrompt(string uri, string html)
         {
-            if (!uri.ToString().StartsWith("https://openid.stackexchange.com/account/prompt")) { return; }
+            if (!uri.ToString().StartsWith("https://openid.stackexchange.com/account/prompt")) return;
 
             var dom = CQ.Create(html);
-            var session = dom["input"].First(e => e.Attributes["name"] != null && e.Attributes["name"] == "session");
+            var session = dom["input"].First(e => e.Attributes["name"] != null &&
+                                                  e.Attributes["name"] == "session");
             var fkey = dom.GetInputValue("fkey");
             var data = "session=" + session["value"] + "&fkey=" + fkey;
 

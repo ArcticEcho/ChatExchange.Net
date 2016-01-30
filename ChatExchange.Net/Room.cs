@@ -34,14 +34,14 @@ using WebSocketSharp;
 namespace ChatExchangeDotNet
 {
     /// <summary>
-    /// Provides access to chat room functions, such as, message posting/editing/deleting/starring,
+    /// Provides access to chat room functions, such as: message posting/editing/deleting/starring/pinning,
     /// user kick-muting/access level changing, basic message/user retrieval and the ability to subscribe to events.
     /// </summary>
     public class Room : IDisposable
     {
         private static readonly Regex findUsers = new Regex(@"id:\s?(\d+),\sname", Extensions.RegexOpts);
         private static readonly Regex getId = new Regex(@"id: (?<id>\d+)", Extensions.RegexOpts);
-        private readonly AutoResetEvent throttleARE = new AutoResetEvent(false);
+        private readonly ManualResetEvent throttleARE = new ManualResetEvent(false);
         private readonly ManualResetEvent passWSRecMre = new ManualResetEvent(false);
         private readonly ManualResetEvent aggWSRecMre = new ManualResetEvent(false);
         private readonly ActionExecutor actEx;
@@ -51,25 +51,16 @@ namespace ChatExchangeDotNet
         private bool hasLeft;
         private string fkey;
         private KeyValuePair<string, DateTime> lastMsg;
-        private TimeSpan socketRecTimeout;
         private WebSocket socket;
         private EventManager evMan;
-
 
         # region Public properties/indexer.
 
         /// <summary>
-        /// If true, restarts the event listener
-        /// WebSocket after a period of inactivity.
-        /// Default set to true.
-        /// </summary>
-        public bool AggressiveWebSocketRecovery { get; set; } = true;
-
-        /// <summary>
         /// If true, removes (@Username) mentions and the message
-        /// reply prefix (:012345) from all messages. Default set to true.
+        /// reply prefix (:012345) from all messages. Default set to false.
         /// </summary>
-        public bool StripMention { get; set; } = true;
+        public bool StripMention { get; set; }
 
         /// <summary>
         /// If true, all Message instances will NOT initialise/update
@@ -80,50 +71,14 @@ namespace ChatExchangeDotNet
         public bool InitialisePrimaryContentOnly { get; set; } = false;
 
         /// <summary>
-        /// Specifies how long to attempt to recovery the
-        /// WebSocket after the connection closed;
-        /// after which, an error is passed to the InternalException
-        /// event and the room self-destructs.
-        /// (Default set to 15 minutes.)
-        /// </summary>
-        public TimeSpan WebSocketRecoveryTimeout
-        {
-            get { return socketRecTimeout; }
-
-            set
-            {
-                if (value.TotalSeconds < 15)
-                {
-                    throw new ArgumentOutOfRangeException("value", "Must be more then 15 seconds.");
-                }
-
-                socketRecTimeout = value;
-            }
-        }
-
-        /// <summary>
-        /// The host domain of the room.
-        /// </summary>
-        public string Host { get; private set; }
-
-        /// <summary>
-        /// The identification number of the room.
-        /// </summary>
-        public int ID { get; private set; }
-
-        /// <summary>
         /// Returns the currently logged in user.
         /// </summary>
         public User Me { get; private set; }
 
-        // Get room name.
-        //public string Name { get; private set; }
-
-        // Get room desc.
-        //public string Description { get; private set; }
-
-        // Get room tags.
-        //public string Tags { get; private set; }
+        /// <summary>
+        /// Returns an object containing meta data of the room.
+        /// </summary>
+        public RoomMetaInfo Meta { get; private set; }
 
         /// <summary>
         /// Provides a means to (dis)connect chat event listeners (Delegates).
@@ -131,10 +86,13 @@ namespace ChatExchangeDotNet
         public EventManager EventManager => evMan;
 
         /// <summary>
-        /// Gets the Message object associated with the specified message ID.
+        /// Retrieves a message from the room.
         /// </summary>
-        /// <param name="messageID"></param>
+        /// <param name="messageID">The ID of the message to fetch.</param>
         /// <returns>The Message object associated with the specified ID.</returns>
+        /// <exception cref="MessageNotFoundException">Thrown if the message could not be found.</exception>
+        /// <exception cref="WebException">Thrown if an unexpected network issue was encountered.</exception>
+        /// <exception cref="IndexOutOfRangeException">Thrown if the message ID was less than 0.</exception>
         public Message this[int messageID]
         {
             get
@@ -149,28 +107,21 @@ namespace ChatExchangeDotNet
 
 
 
-        /// <summary>
-        /// Provides access to chat room functions, such as, message posting/editing/deleting/starring,
-        /// user kick-muting/access level changing, basic message/user retrieval and the ability to subscribe to events.
-        /// </summary>
-        /// <param name="host">The host domain of the room (e.g., meta.stackexchange.com).</param>
-        /// <param name="ID">The room's identification number.</param>
-        public Room(string cookieKey, string host, int ID)
+        internal Room(string cookieKey, string host, int id)
         {
             if (string.IsNullOrEmpty(cookieKey)) throw new ArgumentNullException("cookieKey"); 
             if (string.IsNullOrEmpty(host)) throw new ArgumentNullException("'host' must not be null or empty.", "host"); 
-            if (ID < 0) throw new ArgumentOutOfRangeException("ID", "'ID' must not be negative."); 
+            if (id < 0) throw new ArgumentOutOfRangeException("id", "'id' must not be negative.");
 
-            this.ID = ID;
             this.cookieKey = cookieKey;
+            chatRoot = $"http://chat.{host}";
+
             evMan = new EventManager();
             actEx = new ActionExecutor(ref evMan);
-            chatRoot = $"http://chat.{host}";
-            socketRecTimeout = TimeSpan.FromMinutes(15);
-            Host = host;
-            Me = GetMe();
-
+            Meta = new RoomMetaInfo(host, id);
+            evMan.TrackRoomMetaInfo(Meta);
             SetFkey();
+            Me = GetMe();
 
             var count = GetGlobalEventCount();
             var url = GetSocketURL(count);
@@ -187,13 +138,13 @@ namespace ChatExchangeDotNet
 
 
 
-        public override int GetHashCode() => ID;
+        public override int GetHashCode() => Meta?.ID ?? -1;
 
-        //public override string ToString()
-        //{
-        //    return ""; // Return room name.
-        //}
+        public override string ToString() => Meta?.Name;
 
+        /// <summary>
+        /// Releases all resources used by the current instance.
+        /// </summary>
         public void Dispose()
         {
             if (dispose) return;
@@ -241,10 +192,9 @@ namespace ChatExchangeDotNet
         public void Leave()
         {
             if (hasLeft) return;
-
-            RequestManager.Post(cookieKey, $"{chatRoot}/chats/leave/{ID}", $"quiet=true&fkey={fkey}");
-
             hasLeft = true;
+
+            RequestManager.Post(cookieKey, $"{chatRoot}/chats/leave/{Meta.ID}", $"quiet=true&fkey={fkey}");
 
             Dispose();
         }
@@ -253,7 +203,9 @@ namespace ChatExchangeDotNet
         /// Retrieves a message from the room.
         /// </summary>
         /// <param name="messageID">The ID of the message to fetch.</param>
-        /// <returns>A Message object representing the requested message, or null if the message could not be found.</returns>
+        /// <returns>A Message object representing the requested message.</returns>
+        /// <exception cref="MessageNotFoundException">Thrown if the message could not be found.</exception>
+        /// <exception cref="WebException">Thrown if an unexpected network issue is encountered.</exception>
         public Message GetMessage(int messageID)
         {
             string resContent;
@@ -277,11 +229,11 @@ namespace ChatExchangeDotNet
 
             if (string.IsNullOrEmpty(resContent))
             {
-                throw new Exception($"Unable to fetch data for message {messageID}.");
+                throw new MessageNotFoundException();
             }
 
             var lastestDom = CQ.Create(resContent).Select(".monologue").Last();
-            var content = Message.GetMessageContent(Host, messageID, StripMention);
+            var content = Message.GetMessageContent(Meta.Host, messageID, StripMention);
 
             if (content == null) throw new MessageNotFoundException();
 
@@ -299,7 +251,7 @@ namespace ChatExchangeDotNet
         /// <param name="userID">The user ID to look up.</param>
         public User GetUser(int userID)
         {
-            var u = new User(Host, ID, userID, cookieKey);
+            var u = new User(Meta, userID, cookieKey);
 
             evMan.TrackUser(u);
 
@@ -311,7 +263,7 @@ namespace ChatExchangeDotNet
         /// </summary>
         public HashSet<User> GetPingableUsers()
         {
-            var json = RequestManager.Get(cookieKey, $"http://chat.{Host}/rooms/pingable/{ID}");
+            var json = RequestManager.Get(cookieKey, $"http://chat.{Meta.Host}/rooms/pingable/{Meta.ID}");
 
             if (string.IsNullOrEmpty(json)) return null;
 
@@ -321,7 +273,7 @@ namespace ChatExchangeDotNet
             foreach (var user in data)
             {
                 var userID = int.Parse(user[0].ToString());
-                users.Add(new User(Host, ID, userID, true));
+                users.Add(new User(Meta, userID, true));
             }
 
             return users;
@@ -333,7 +285,7 @@ namespace ChatExchangeDotNet
         /// </summary>
         public HashSet<User> GetCurrentUsers()
         {
-            var html = RequestManager.Get(cookieKey, $"http://chat.{Host}/rooms/{ID}/");
+            var html = RequestManager.Get(cookieKey, $"http://chat.{Meta.Host}/rooms/{Meta.ID}/");
             var doc = CQ.CreateDocument(html);
             var obj = doc.Select("script")[3];
             var ids = findUsers.Matches(obj.InnerText);
@@ -345,7 +297,7 @@ namespace ChatExchangeDotNet
 
                 if (int.TryParse(id.Groups[1].Value, out userID))
                 {
-                    users.Add(new User(Host, ID, userID, true));
+                    users.Add(new User(Meta, userID, true));
                 }
             }
 
@@ -358,20 +310,34 @@ namespace ChatExchangeDotNet
         /// Posts a new message in the room.
         /// </summary>
         /// <param name="message">The message to post.</param>
-        /// <returns>A Message object representing the newly posted message (if successful), otherwise returns null.</returns>
+        /// <returns>
+        /// A Message object representing the newly posted message
+        /// (if successful), otherwise returns null.
+        /// </returns>
+        /// <exception cref="ArgumentException">
+        /// Thrown if the message is null or empty
+        /// upon calling the argument's .ToString() method.
+        /// </exception>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown if the current instance has been disposed.
+        /// </exception>
+        /// <exception cref="InsufficientReputationException">
+        /// Thrown if the current user does not have enough
+        /// reputation (20) to post a message.
+        /// </exception>
         public Message PostMessage(object message)
         {
-            if (message == null || string.IsNullOrEmpty(message.ToString()))
+            if (string.IsNullOrEmpty(message?.ToString()))
             {
                 throw new ArgumentException("'message' cannot be null or return an empty/null string upon calling .ToString().", "message");
             }
-            if (hasLeft)
+            if (dispose)
             {
-                throw new InvalidOperationException("Cannot post message when you have left the room.");
+                throw new ObjectDisposedException(GetType().Name);
             }
             if (Me.Reputation < 20)
             {
-                throw new Exception("You must have at least 20 reputation to post a message.");
+                throw new InsufficientReputationException(20);
             }
 
             var ex = CheckDupeMsg(message.ToString());
@@ -382,9 +348,9 @@ namespace ChatExchangeDotNet
                 while (!dispose)
                 {
                     var data = $"text={Uri.EscapeDataString(message.ToString()).Replace("%5Cn", "%0A")}&fkey={fkey}";
-                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/chats/{ID}/messages/new", data);
+                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/chats/{Meta.ID}/messages/new", data);
 
-                    if (string.IsNullOrEmpty(resContent) || hasLeft) return null;
+                    if (string.IsNullOrEmpty(resContent) || dispose) return null;
                     if (HandleThrottling(resContent)) continue;
 
                     var json = JsonObject.Parse(resContent);
@@ -408,16 +374,15 @@ namespace ChatExchangeDotNet
         }
 
         /// <summary>
-        /// Posts a new message in the room without: parsing the
+        /// Posts a new message in the room without parsing the
         /// action's response or throwing any exceptions.
-        /// (Benchmarks show an approximate performance increase of
-        /// 3.5x-9.5x depending on network capabilities.)
+        /// (Use this method for greater performance.)
         /// </summary>
         /// <param name="message">The message to post.</param>
         /// <returns>True if the message was successfully posted, otherwise false.</returns>
-        public bool PostMessageFast(object message)
+        public bool PostMessageLight(object message)
         {
-            if (message == null || string.IsNullOrEmpty(message.ToString()) || hasLeft ||
+            if (message == null || string.IsNullOrEmpty(message.ToString()) || dispose ||
                 CheckDupeMsg(message.ToString()) != null || Me.Reputation < 20)
             {
                 return false;
@@ -428,9 +393,9 @@ namespace ChatExchangeDotNet
                 while (!dispose)
                 {
                     var data = "text=" + Uri.EscapeDataString(message.ToString()).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
-                    var resContent = RequestManager.Post(cookieKey, chatRoot + "/chats/" + ID + "/messages/new", data);
+                    var resContent = RequestManager.Post(cookieKey, chatRoot + "/chats/" + Meta.ID + "/messages/new", data);
 
-                    if (string.IsNullOrEmpty(resContent) || hasLeft) return false;
+                    if (string.IsNullOrEmpty(resContent) || dispose) return false;
                     if (HandleThrottling(resContent)) continue;
 
                     return JsonObject.Parse(resContent).ContainsKey("id");
@@ -442,41 +407,204 @@ namespace ChatExchangeDotNet
             return (bool)actEx.ExecuteAction(action);
         }
 
-        public Message PostReply(int targetMessageID, object message) =>
-            PostMessage($":{targetMessageID} {message}");
-
-        public Message PostReply(Message targetMessage, object message) =>
-            PostMessage($":{targetMessage.ID} {message}");
-
-        public bool PostReplyFast(int targatMessageID, object message) =>
-            PostMessageFast($":{targatMessageID} {message}");
-
-        public bool PostReplyFast(Message targatMessage, object message) =>
-            PostMessageFast($":{targatMessage.ID} {message}");
-
-        public bool EditMessage(Message oldMessage, object newMessage) =>
-            EditMessage(oldMessage.ID, newMessage);
-
-        public bool EditMessage(int messageID, object newMessage)
+        /// <summary>
+        /// Posts a chat message in reply to another
+        /// (this will "ping" the target message's author).
+        /// </summary>
+        /// <param name="targetMessageID">The ID of the message to reply to.</param>
+        /// <param name="message">The message to send.</param>
+        /// <returns>
+        /// A Message object representing the newly posted message
+        /// (if successful), otherwise returns null.
+        /// </returns>
+        /// <exception cref="ArgumentException">
+        /// Thrown if the message is null or empty
+        /// upon calling the argument's .ToString() method.
+        /// </exception>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// Thrown if the target message's ID is less than 0
+        /// </exception>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown if the current instance has been disposed.
+        /// </exception>
+        /// <exception cref="InsufficientReputationException">
+        /// Thrown if the current user does not have enough
+        /// reputation (20) to post a message.
+        /// </exception>
+        public Message PostReply(int targetMessageID, object message)
         {
-            if (newMessage == null || string.IsNullOrEmpty(newMessage.ToString()))
+            if (string.IsNullOrEmpty(message?.ToString()))
             {
-                throw new ArgumentException("'newMessage' cannot be null or return an " +
-                    "empty/null string upon calling .ToString().", "newMessage");
+                throw new ArgumentException("'message' cannot be null or return an empty/null string upon calling .ToString().", "message");
             }
-            if (hasLeft)
+            if (targetMessageID < 0)
             {
-                throw new InvalidOperationException("Cannot edit message when you have left the room.");
+                throw new ArgumentOutOfRangeException("targetMessageID", "The message's ID must be more than 0.");
+            }
+
+            return PostMessage($":{targetMessageID} {message}");
+        }
+
+        /// <summary>
+        /// Posts a chat message in reply to another
+        /// (this will "ping" the target message's author).
+        /// </summary>
+        /// <param name="targetMessage">The message to reply to.</param>
+        /// <param name="message">The message to send.</param>
+        /// <returns>
+        /// A Message object representing the newly posted message
+        /// (if successful), otherwise returns null.
+        /// </returns>
+        /// <exception cref="ArgumentException">
+        /// Thrown if the message is null or empty
+        /// upon calling the argument's .ToString() method.
+        /// </exception>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown if the target message is null.
+        /// </exception>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown if the current instance has been disposed.
+        /// </exception>
+        /// <exception cref="InsufficientReputationException">
+        /// Thrown if the current user does not have enough
+        /// reputation (20) to post a message.
+        /// </exception>
+        public Message PostReply(Message targetMessage, object message)
+        {
+            if (string.IsNullOrEmpty(message?.ToString()))
+            {
+                throw new ArgumentException("'message' cannot be null or return an empty/null string upon calling .ToString().", "message");
+            }
+            if (targetMessage == null)
+            {
+                throw new ArgumentNullException("targetMessage", "'targetMessage' cannot be null.");
+            }
+
+            return PostMessage($":{targetMessage.ID} {message}");
+        }
+
+        /// <summary>
+        /// Posts a chat message in reply to another
+        /// (this will "ping" the target message's author),
+        /// without parsing the action's response or
+        /// throwing any exceptions.
+        /// (Use this method for greater performance.)
+        /// </summary>
+        /// <param name="targetMessageID">The ID of the message to reply to.</param>
+        /// <param name="message">The message to send.</param>
+        /// <returns>True if the message was successfully posted, otherwise false.</returns>
+        public bool PostReplyLight(int targetMessageID, object message)
+        {
+            if (string.IsNullOrEmpty(message?.ToString()) || targetMessageID < 0)
+            {
+                return false;
+            }
+
+            return PostMessageLight($":{targetMessageID} {message}");
+        }
+
+        /// <summary>
+        /// Posts a chat message in reply to another,
+        /// this will "ping" the target message's author.
+        /// (Use this method for greater performance.)
+        /// </summary>
+        /// <param name="targetMessage">The message to reply to.</param>
+        /// <param name="message">The message to send.</param>
+        /// <returns>True if the message was successfully posted, otherwise false.</returns>
+        public bool PostReplyLight(Message targetMessage, object message)
+        {
+            if (string.IsNullOrEmpty(message?.ToString()) || (targetMessage?.ID ?? -1) < 0)
+            {
+                return false;
+            }
+
+            return PostMessageLight($":{targetMessage.ID} {message}");
+        }
+
+        /// <summary>
+        /// Replaces the content of an existing chat message.
+        /// (Users that aren't moderators have a 2 minute
+        /// "grace period" which allows you to edit your message,
+        /// after which the message is "locked" and can not be altered.)
+        /// </summary>
+        /// <param name="message">A message to edit.</param>
+        /// <param name="newContent">The new content of the message.</param>
+        /// <returns>True if the edit was successful, otherwise false.</returns>
+        /// <exception cref="ArgumentException">
+        /// Thrown if the new content is null or empty
+        /// upon calling the argument's .ToString() method.
+        /// </exception>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown if the message is null.
+        /// </exception>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown if the current instance has been disposed.
+        /// </exception>
+        /// <exception cref="InsufficientReputationException">
+        /// Thrown if the current user does not have enough
+        /// reputation (20) to edit a message.
+        /// </exception>
+        public bool EditMessage(Message message, object newContent)
+        {
+            if (message == null)
+            {
+                throw new ArgumentNullException("message", "'message' cannot be null.");
+            }
+
+            return EditMessage(message.ID, newContent);
+        }
+
+        /// <summary>
+        /// Replaces the content of an existing chat message.
+        /// (Users that aren't moderators have a 2 minute
+        /// "grace period" which allows you to edit your message,
+        /// after which the message is "locked" and can not be altered.)
+        /// </summary>
+        /// <param name="messageID">The ID of a message to edit.</param>
+        /// <param name="newContent">The new content of the message.</param>
+        /// <returns>True if the edit was successful, otherwise false.</returns>
+        /// <exception cref="ArgumentException">
+        /// Thrown if the message is null or empty
+        /// upon calling the argument's .ToString() method.
+        /// </exception>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// Thrown if the target message's ID is less than 0.
+        /// </exception>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown if the current instance has been disposed.
+        /// </exception>
+        /// <exception cref="InsufficientReputationException">
+        /// Thrown if the current user does not have enough
+        /// reputation (20) to edit a message.
+        /// </exception>
+        public bool EditMessage(int messageID, object newContent)
+        {
+            if (string.IsNullOrEmpty(newContent?.ToString()))
+            {
+                throw new ArgumentException("'newContent' cannot be null or return an " +
+                    "empty/null string upon calling .ToString().", "newContent");
+            }
+            if (messageID < 0)
+            {
+                throw new ArgumentOutOfRangeException("messageID", "'messageID' cannot be less than 0.");
+            }
+            if (dispose)
+            {
+                throw new ObjectDisposedException(GetType().Name);
+            }
+            if (Me.Reputation < 20)
+            {
+                throw new InsufficientReputationException(20);
             }
 
             var action = new ChatAction(ActionType.EditMessage, new Func<object>(() =>
             {
                 while (!dispose)
                 {
-                    var data = $"text={Uri.EscapeDataString(newMessage.ToString()).Replace("%5Cn", "%0A")}&fkey={fkey}";
+                    var data = $"text={Uri.EscapeDataString(newContent.ToString()).Replace("%5Cn", "%0A")}&fkey={fkey}";
                     var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/messages/{messageID}", data);
 
-                    if (string.IsNullOrEmpty(resContent) || hasLeft) return false;
+                    if (string.IsNullOrEmpty(resContent) || dispose) return false;
                     if (HandleThrottling(resContent)) continue;
 
                     return resContent == "\"ok\"";
@@ -487,6 +615,8 @@ namespace ChatExchangeDotNet
 
             return (bool?)actEx.ExecuteAction(action) ?? false;
         }
+
+        //TODO: Finish off XML comments.
 
         public bool DeleteMessage(Message message) => DeleteMessage(message.ID);
 
@@ -628,7 +758,7 @@ namespace ChatExchangeDotNet
                 while (true)
                 {
                     var data = $"userID={userID}&fkey={fkey}";
-                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/rooms/kickmute/{ID}", data);
+                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/rooms/kickmute/{Meta.ID}", data);
 
                     if (string.IsNullOrEmpty(resContent)) return false;
                     if (HandleThrottling(resContent)) continue;
@@ -688,7 +818,7 @@ namespace ChatExchangeDotNet
                         }
                     }
 
-                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/rooms/setuseraccess/{ID}", data);
+                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/rooms/setuseraccess/{Meta.ID}", data);
 
                     if (string.IsNullOrEmpty(resContent)) return false;
                     if (HandleThrottling(resContent)) continue;
@@ -746,12 +876,12 @@ namespace ChatExchangeDotNet
             var e = dom[".topbar-menu-links a"][0];
             var id = int.Parse(e.Attributes["href"].Split('/')[2]);
 
-            return new User(Host, ID, id, cookieKey);
+            return new User(Meta, id, cookieKey);
         }
 
         private void SetFkey()
         {
-            var resContent = RequestManager.Get(cookieKey, $"{chatRoot}/rooms/{ID}");
+            var resContent = RequestManager.Get(cookieKey, $"{chatRoot}/rooms/{Meta.ID}");
             var ex = new Exception("Could not get fkey.");
 
             if (string.IsNullOrEmpty(resContent)) throw ex;
@@ -766,11 +896,11 @@ namespace ChatExchangeDotNet
         private int GetGlobalEventCount()
         {
             var data = $"mode=Events&msgCount=0&fkey={fkey}";
-            var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/chats/{ID}/events", data);
+            var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/chats/{Meta.ID}/events", data);
 
             if (string.IsNullOrEmpty(resContent))
             {
-                throw new Exception($"Could not get 'eventtime' for room {ID} on {Host}.");
+                throw new Exception($"Could not get 'eventtime' for room {Meta.ID} on {Meta.Host}.");
             }
 
             return JsonObject.Parse(resContent).Get<int>("time");
@@ -778,8 +908,8 @@ namespace ChatExchangeDotNet
 
         private string GetSocketURL(int eventTime)
         {
-            var data = $"roomid={ID}&fkey={fkey}";
-            var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/ws-auth", data, $"{chatRoot}/rooms/{ID}", chatRoot);
+            var data = $"roomid={Meta.ID}&fkey={fkey}";
+            var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/ws-auth", data, $"{chatRoot}/rooms/{Meta.ID}", chatRoot);
 
             if (string.IsNullOrEmpty(resContent)) throw new Exception("Could not get WebSocket URL.");
 
@@ -796,7 +926,7 @@ namespace ChatExchangeDotNet
 
             while (!dispose)
             {
-                if (AggressiveWebSocketRecovery && (DateTime.UtcNow - lastData).TotalSeconds > 30)
+                if ((DateTime.UtcNow - lastData).TotalSeconds > 30)
                 {
                     SetFkey();
                     var count = GetGlobalEventCount();
@@ -828,38 +958,6 @@ namespace ChatExchangeDotNet
 
             socket.OnError += (o, oo) => evMan.CallListeners(EventType.InternalException, false, oo.Exception);
 
-            socket.OnClose += (o, oo) =>
-            {
-                // Beware, ugly code ahead...
-                if (!AggressiveWebSocketRecovery && (!oo.WasClean || oo.Code != (ushort)CloseStatusCode.Normal))
-                {
-                    // The socket closed abnormally, probably best to restart it (at 15 second intervals).
-                    for (var i = 0; i < socketRecTimeout.TotalMinutes * 4; i++)
-                    {
-                        if (dispose) return;
-
-                        try
-                        {
-                            SetFkey();
-                            var count = GetGlobalEventCount();
-                            var url = GetSocketURL(count);
-                            InitialiseSocket(url);
-                            return;
-                        }
-                        catch (Exception ex)
-                        {
-                            evMan.CallListeners(EventType.InternalException, false, ex);
-                        }
-
-                        passWSRecMre.WaitOne(TimeSpan.FromSeconds(15));
-                    }
-
-                    // We failed to restart the socket; dispose of the object and log the error.
-                    evMan.CallListeners(EventType.InternalException, false, new Exception("Could not restart WebSocket; now disposing this Room object."));
-                    Dispose();
-                }
-            };
-
             socket.Connect();
         }
 
@@ -868,7 +966,7 @@ namespace ChatExchangeDotNet
             evMan.CallListeners(EventType.DataReceived, false, json);
 
             var obj = JsonObject.Parse(json);
-            var data = obj.Get<Dictionary<string, List<Dictionary<string, object>>>>("r" + ID);
+            var data = obj.Get<Dictionary<string, List<Dictionary<string, object>>>>("r" + Meta.ID);
 
             if (!data.ContainsKey("e") || data["e"] == null) return;
 
@@ -876,7 +974,7 @@ namespace ChatExchangeDotNet
             {
                 var eventType = (EventType)int.Parse(message["event_type"].ToString());
 
-                if (int.Parse(message["room_id"].ToString()) != ID) continue;
+                if (int.Parse(message["room_id"].ToString()) != Meta.ID) continue;
 
                 evMan.HandleEvent(eventType, this, ref evMan, message);
             }

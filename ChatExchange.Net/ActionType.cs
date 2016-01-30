@@ -22,7 +22,7 @@
 
 namespace ChatExchangeDotNet
 {
-    public enum ActionType
+    internal enum ActionType
     {
         PostMessage,
         EditMessage,

@@ -24,6 +24,9 @@ using System;
 
 namespace ChatExchangeDotNet
 {
+    /// <summary>
+    /// Represents errors that occur during authentication.
+    /// </summary>
     public class AuthenticationException : Exception
     {
         public AuthenticationException()
@@ -42,6 +45,52 @@ namespace ChatExchangeDotNet
         }
     }
 
+    /// <summary>
+    /// Represents errors that occur when an attempted action requires more reputation to execute.
+    /// </summary>
+    public class InsufficientReputationException : Exception
+    {
+        /// <summary>
+        /// The amount of reputation required to successfully execute the action.
+        /// </summary>
+        public int ReputationRequired { get; }
+
+
+
+        public InsufficientReputationException() : base("You need more reputation to execute this action.")
+        {
+
+        }
+
+        public InsufficientReputationException(int reputationRequired) : base("You need more reputation to execute this action.")
+        {
+            ReputationRequired = reputationRequired;
+        }
+
+        public InsufficientReputationException(string message) : base(message)
+        {
+
+        }
+
+        public InsufficientReputationException(string message, int reputationRequired) : base(message)
+        {
+            ReputationRequired = reputationRequired;
+        }
+
+        public InsufficientReputationException(string message, Exception innerException) : base(message, innerException)
+        {
+
+        }
+
+        public InsufficientReputationException(string message, int reputationRequired, Exception innerException) : base(message, innerException)
+        {
+            ReputationRequired = reputationRequired;
+        }
+    }
+
+    /// <summary>
+    /// Represents an error that occurs when a requested message is not found.
+    /// </summary>
     public class MessageNotFoundException : Exception
     {
         public MessageNotFoundException() : base("The requested message was not found.")
@@ -60,6 +109,9 @@ namespace ChatExchangeDotNet
         }
     }
 
+    /// <summary>
+    /// Represents an error that occurs when an attempt to post a duplicate message is made.
+    /// </summary>
     public class DuplicateMessageException : Exception
     {
         public DuplicateMessageException() : base("An attempt to post a duplicate message has been made.")

@@ -57,9 +57,9 @@ namespace ChatExchangeDotNet
             if (author == null) throw new ArgumentNullException("author");
 
             evMan = eventManager;
-            Content = GetMessageContent(room.Host, messageID, room.StripMention);
-            Host = room.Host;
-            RoomID = room.ID;
+            Content = GetMessageContent(room.Meta.Host, messageID, room.StripMention);
+            Host = room.Meta.Host;
+            RoomID = room.Meta.ID;
             ID = messageID;
             ParentID = parentID;
             Author = author;
@@ -82,7 +82,7 @@ namespace ChatExchangeDotNet
 
 
 
-        public static string GetMessageContent(string host, int messageID, bool stripMention = true)
+        public static string GetMessageContent(string host, int messageID, bool stripMention = false)
         {
             try
             {

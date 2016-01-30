@@ -38,8 +38,10 @@ namespace Example
             // Join a room by specifying its URL (returns a Room object).
             var sandbox = client.JoinRoom("http://chat.stackexchange.com/rooms/1/sandbox");
 
-            // Post a new message in the room (if successful, returns a Message object, otherwise returns null).
-            // (If you have no use of the returned Message object, I'd recommend using .PostMessageFast() instead.)
+            // Post a new message in the room (if successful, returns
+            // a Message object, otherwise returns null).
+            // (If you have no use of the returned Message object,
+            // I'd recommend using .PostMessageFast() instead.)
             var myMessage = sandbox.PostMessage("Hello world!");
 
             // Listen to the InternalException event for any exceptions that may arise during execution.
@@ -53,7 +55,8 @@ namespace Example
                 // Print the new message (with the author's name).
                 Console.WriteLine(message.Author.Name + ": " + message.Content);
 
-                // If the message contains "3... 2... 1...", post "KA-BOOM!" (this is simply an [awful] example).
+               // If the message contains "3... 2... 1...", post "KA-BOOM!"
+               // (this is simply an [awful] example).
                 if (message.Content.Contains("3... 2... 1..."))
                 {
                     // Create a new MessageBuilder to format our message.
@@ -78,7 +81,8 @@ namespace Example
                 Console.WriteLine("'Welcome' message successfully posted: " + success);
             }));
 
-            // Wait for the user to press the "Q" key before we exit (not the best way to do this, but it'll suffice).
+            // Wait for the user to press the "Q" key before we exit (not
+            // the best way to do this, but it'll suffice).
             while (char.ToLower(Console.ReadKey(true).KeyChar) != 'q')
             {
                 Thread.Sleep(500);
@@ -86,9 +90,11 @@ namespace Example
 
             // Not necessary for safe disposal, but still, it's nice to "physically"
             // leave the room rather than letting timeouts figure out that we've gone.
+            // NOTE: Calling .Leave() also disposes the room for us.
             sandbox.Leave();
 
-            // Safely dispose of the client object (which'll also clean up all created room instances).
+            // Safely dispose of the client object (which'll also clean up any
+            // undisposed created room instances).
             client.Dispose();
         }
     }

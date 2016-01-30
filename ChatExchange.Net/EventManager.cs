@@ -45,7 +45,7 @@ namespace ChatExchangeDotNet
 
 
 
-        public EventManager()
+        internal EventManager()
         {
             events = new ConcurrentDictionary<EventType, IEventListener>();
             trackDict = new ConcurrentDictionary<Guid, TrackedObject>();
@@ -186,6 +186,49 @@ namespace ChatExchangeDotNet
                         if (targetUser.ID == user.ID && user != null)
                         {
                             user.IsRoomOwner = newAccess == UserRoomAccess.Owner;
+                        }
+                    })
+                }
+            };
+
+            trackDict[id] = obj;
+
+            return id;
+        }
+
+        internal Guid TrackRoomMetaInfo(RoomMetaInfo meta)
+        {
+            if (meta == null) throw new ArgumentNullException("meta");
+
+            var id = Guid.NewGuid();
+            var obj = new TrackedObject
+            {
+                Object = meta,
+                ID = id,
+                Listeners = new Dictionary<EventType, Delegate>
+                {
+                    [EventType.MessagePosted] = new Action<Message>(msg =>
+                    {
+                        if (meta != null)
+                        {
+                            meta.AllTimeMessages++;
+                            meta.LastMessage = DateTime.UtcNow;
+                        }
+                    }),
+                    [EventType.MessageMovedOut] = new Action<Message>(msg =>
+                    {
+                        if (meta != null)
+                        {
+                            meta.AllTimeMessages--;
+                        }
+                    }),
+                    [EventType.RoomMetaChanged] = new Action<User, string, string, string[]>((u, n, d, t) =>
+                    {
+                        if (meta != null)
+                        {
+                            meta.Name = n;
+                            meta.Description = d;
+                            meta.Tags = t;
                         }
                     })
                 }

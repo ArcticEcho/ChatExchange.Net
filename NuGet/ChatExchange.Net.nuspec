@@ -28,5 +28,6 @@
     </metadata>
     <files>
         <file src="..\ChatExchange.Net\bin\Release\ChatExchange.Net.dll" target="lib\ChatExchange.Net.dll" />
+        <file src="..\ChatExchange.Net\bin\Release\ChatExchange.Net.xml" target="lib\ChatExchange.Net.xml" />
     </files>
 </package>

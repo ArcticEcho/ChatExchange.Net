@@ -26,25 +26,58 @@ using ServiceStack.Text;
 
 namespace ChatExchangeDotNet
 {
+    /// <summary>
+    /// Provides various pieces of information for a given chat user.
+    /// </summary>
     public class User
     {
         private string cookieKey;
 
+        /// <summary>
+        /// Returns the user's name.
+        /// </summary>
         public string Name { get; private set; }
-        public int ID { get; private set; }
-        public int Reputation { get; private set; }
-        public bool IsPingable { get; private set; }
-        public bool IsMod { get; private set; }
-        public int RoomID { get; private set; }
-        public string Host { get; private set; }
 
+        /// <summary>
+        /// Returns the user's unique identification number.
+        /// </summary>
+        public int ID { get; private set; }
+
+        /// <summary>
+        /// Returns the amount of reputation the user has.
+        /// </summary>
+        public int Reputation { get; private set; }
+
+        /// <summary>
+        /// Returns true if the user can be "pinged" from the room, otherwise false.
+        /// </summary>
+        public bool IsPingable { get; private set; }
+
+        /// <summary>
+        /// Returns true if the user is a moderator.
+        /// </summary>
+        public bool IsMod { get; private set; }
+
+        /// <summary>
+        /// Returns true if the user is an owner of the room, otherwise false.
+        /// </summary>
         public bool IsRoomOwner { get; internal set; }
 
+        /// <summary>
+        /// The room's ID to which this data is valid.
+        /// </summary>
+        public int RoomID { get; private set; }
+
+        /// <summary>
+        /// The host domain to which this data is valid.
+        /// </summary>
+        public string Host { get; private set; }
 
 
-        public User(string host, int roomID, int userID)
+
+        internal User(RoomMetaInfo meta, int userID)
         {
-            var ex = FetchUserData(host, roomID, userID, null, null);
+            var ex = FetchUserData(meta.Host, meta.ID, userID, null, null);
 
             if (ex != null)
             {
@@ -52,9 +85,9 @@ namespace ChatExchangeDotNet
             }
         }
 
-        public User(string host, int roomID, int userID, bool isPingable)
+        internal User(RoomMetaInfo meta, int userID, bool isPingable)
         {
-            var ex = FetchUserData(host, roomID, userID, isPingable, null);
+            var ex = FetchUserData(meta.Host, meta.ID, userID, isPingable, null);
 
             if (ex != null)
             {
@@ -62,9 +95,9 @@ namespace ChatExchangeDotNet
             }
         }
 
-        public User(string host, int roomID, int userID, string cookieKey)
+        internal User(RoomMetaInfo meta, int userID, string cookieKey)
         {
-            var ex = FetchUserData(host, roomID, userID, null, cookieKey);
+            var ex = FetchUserData(meta.Host, meta.ID, userID, null, cookieKey);
 
             if (ex != null)
             {
