@@ -304,6 +304,19 @@ namespace ChatExchangeDotNet
             return users;
         }
 
+        /// <summary>
+        /// Fetches a list of users with "room owner" privileges.
+        /// </summary>
+        public HashSet<User> GetRoomOwners()
+        {
+            var dom = CQ.CreateFromUrl($"{chatRoot}/rooms/info/{Meta.ID}");
+
+            foreach (var user in dom["[id^=owner-user"])
+            {
+                //TODO: continue implementation.
+            }
+        }
+
         #region Normal user chat commands.
 
         /// <summary>
