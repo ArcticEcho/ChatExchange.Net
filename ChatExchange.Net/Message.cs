@@ -27,6 +27,9 @@ using CsQuery;
 
 namespace ChatExchangeDotNet
 {
+    /// <summary>
+    /// Represents a chat message.
+    /// </summary>
     public class Message : IDisposable
     {
         private readonly Regex messageEdits = new Regex("<div class=\"message\"", Extensions.RegexOpts);
@@ -35,17 +38,56 @@ namespace ChatExchangeDotNet
 
         internal bool DisposeObject { get; private set; }
 
+        /// <summary>
+        /// The host domain of the chat message.
+        /// </summary>
         public string Host { get; private set; }
+
+        /// <summary>
+        /// The room's ID in which the message resides.
+        /// </summary>
         public int RoomID { get; private set; }
+
+        /// <summary>
+        /// The unique identification number of the message.
+        /// </summary>
         public int ID { get; private set; }
+
+        /// <summary>
+        /// The ID of the message to which this message is replying to.
+        /// Set to -1 if the message is not a reply.
+        /// </summary>
         public int ParentID { get; private set; }
+
+        /// <summary>
+        /// The author of the message.
+        /// </summary>
         public User Author { get; private set; }
 
         // Kept updated by the room's EventManager (hence the internal set).
+        /// <summary>
+        /// The content/body of the message.
+        /// </summary>
         public string Content { get; internal set; }
+
+        /// <summary>
+        /// Indicates if the message is currently deleted.
+        /// </summary>
         public bool IsDeleted { get; internal set; }
+
+        /// <summary>
+        /// The number of stars the message currently has.
+        /// </summary>
         public int StarCount { get; internal set; }
+
+        /// <summary>
+        /// The number of pins the message currently has.
+        /// </summary>
         public int PinCount { get; internal set; }
+
+        /// <summary>
+        /// The current number of edits this message has received.
+        /// </summary>
         public int EditCount { get; internal set; }
 
 
@@ -81,7 +123,22 @@ namespace ChatExchangeDotNet
         }
 
 
-
+        /// <summary>
+        /// Fetches the content of a message.
+        /// </summary>
+        /// <param name="host">
+        /// The host domain of the room in which the message resides.
+        /// </param>
+        /// <param name="messageID">
+        /// The unique identification number of the message to fetch.
+        /// </param>
+        /// <param name="stripMention">
+        /// If true, removes "pings" (@Username) and message reply prefixes (:123456).
+        /// </param>
+        /// <returns>The content of the message.</returns>
+        /// <exception cref="MessageNotFoundException">
+        /// Thrown if the message cannot be found (a result of an incorrect ID, or deletion).
+        /// </exception>
         public static string GetMessageContent(string host, int messageID, bool stripMention = false)
         {
             try
@@ -95,17 +152,11 @@ namespace ChatExchangeDotNet
                     return content == null ? null : WebUtility.HtmlDecode(stripMention ? content.StripMention() : content);
                 }
             }
-            catch (WebException ex)
+            catch (WebException ex) when (ex.Response != null && ((HttpWebResponse)ex.Response).StatusCode == HttpStatusCode.NotFound)
             {
                 // If the input is valid, we've probably hit a deleted message.
-                if (ex.Response != null && ((HttpWebResponse)ex.Response).StatusCode == HttpStatusCode.NotFound)
-                {
-                    throw new MessageNotFoundException();
-                }
-                else
-                {
-                    throw ex;
-                }
+
+                throw new MessageNotFoundException();
             }
         }
 
@@ -119,15 +170,9 @@ namespace ChatExchangeDotNet
             GC.SuppressFinalize(this);
         }
 
-        public override int GetHashCode()
-        {
-            return ID;
-        }
+        public override int GetHashCode() => ID;
 
-        public override string ToString()
-        {
-            return Content;
-        }
+        public override string ToString() => Content;
 
 
 

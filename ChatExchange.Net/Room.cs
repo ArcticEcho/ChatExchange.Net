@@ -305,16 +305,24 @@ namespace ChatExchangeDotNet
         }
 
         /// <summary>
-        /// Fetches a list of users with "room owner" privileges.
+        /// Fetches a list of users with the "room owner" privilege.
         /// </summary>
         public HashSet<User> GetRoomOwners()
         {
             var dom = CQ.CreateFromUrl($"{chatRoot}/rooms/info/{Meta.ID}");
+            var ros = new HashSet<User>();
 
-            foreach (var user in dom["[id^=owner-user"])
+            foreach (var user in dom["[id^=owner-user]"])
             {
-                //TODO: continue implementation.
+                var id = -1;
+
+                if (int.TryParse(new string(user.Id.Where(char.IsDigit).ToArray()), out id))
+                {
+                    ros.Add(GetUser(id));
+                }
             }
+
+            return ros;
         }
 
         #region Normal user chat commands.
@@ -342,7 +350,7 @@ namespace ChatExchangeDotNet
         {
             if (string.IsNullOrEmpty(message?.ToString()))
             {
-                throw new ArgumentException("'message' cannot be null or return an empty/null string upon calling .ToString().", "message");
+                throw new ArgumentException("'message' cannot be null or return an empty/null string upon calling the object's .ToString() method.", nameof(message));
             }
             if (dispose)
             {
@@ -448,11 +456,11 @@ namespace ChatExchangeDotNet
         {
             if (string.IsNullOrEmpty(message?.ToString()))
             {
-                throw new ArgumentException("'message' cannot be null or return an empty/null string upon calling .ToString().", "message");
+                throw new ArgumentException("'message' cannot be null or return an empty/null string upon calling the object's .ToString() method.", nameof(message));
             }
             if (targetMessageID < 0)
             {
-                throw new ArgumentOutOfRangeException("targetMessageID", "The message's ID must be more than 0.");
+                throw new ArgumentOutOfRangeException(nameof(targetMessageID), "The message's ID must be more than 0.");
             }
 
             return PostMessage($":{targetMessageID} {message}");
@@ -486,11 +494,11 @@ namespace ChatExchangeDotNet
         {
             if (string.IsNullOrEmpty(message?.ToString()))
             {
-                throw new ArgumentException("'message' cannot be null or return an empty/null string upon calling .ToString().", "message");
+                throw new ArgumentException("'message' cannot be null or return an empty/null string upon calling the object's .ToString() method.", nameof(message));
             }
             if (targetMessage == null)
             {
-                throw new ArgumentNullException("targetMessage", "'targetMessage' cannot be null.");
+                throw new ArgumentNullException(nameof(targetMessage), "'targetMessage' cannot be null.");
             }
 
             return PostMessage($":{targetMessage.ID} {message}");
@@ -536,19 +544,19 @@ namespace ChatExchangeDotNet
 
         /// <summary>
         /// Replaces the content of an existing chat message.
-        /// (Users that aren't moderators have a 2 minute
-        /// "grace period" which allows you to edit your message,
-        /// after which the message is "locked" and can not be altered.)
+        /// (Users who aren't moderators have a 2 minute
+        /// "grace period" which allows people to edit their messages,
+        /// after which the message is "locked" and can not be changed.)
         /// </summary>
         /// <param name="message">A message to edit.</param>
         /// <param name="newContent">The new content of the message.</param>
-        /// <returns>True if the edit was successful, otherwise false.</returns>
+        /// <returns>True if the message was successfully edited, otherwise false.</returns>
         /// <exception cref="ArgumentException">
         /// Thrown if the new content is null or empty
         /// upon calling the argument's .ToString() method.
         /// </exception>
         /// <exception cref="ArgumentNullException">
-        /// Thrown if the message is null.
+        /// Thrown if 'message' is null.
         /// </exception>
         /// <exception cref="ObjectDisposedException">
         /// Thrown if the current instance has been disposed.
@@ -561,7 +569,7 @@ namespace ChatExchangeDotNet
         {
             if (message == null)
             {
-                throw new ArgumentNullException("message", "'message' cannot be null.");
+                throw new ArgumentNullException(nameof(message));
             }
 
             return EditMessage(message.ID, newContent);
@@ -569,13 +577,15 @@ namespace ChatExchangeDotNet
 
         /// <summary>
         /// Replaces the content of an existing chat message.
-        /// (Users that aren't moderators have a 2 minute
-        /// "grace period" which allows you to edit your message,
-        /// after which the message is "locked" and can not be altered.)
+        /// (Users who aren't moderators have a 2 minute
+        /// "grace period" which allows people to edit their messages,
+        /// after which the message is "locked" and can not be changed.)
         /// </summary>
         /// <param name="messageID">The ID of a message to edit.</param>
         /// <param name="newContent">The new content of the message.</param>
-        /// <returns>True if the edit was successful, otherwise false.</returns>
+        /// <returns>
+        /// True if the message was successfully edited, otherwise false.
+        /// </returns>
         /// <exception cref="ArgumentException">
         /// Thrown if the message is null or empty
         /// upon calling the argument's .ToString() method.
@@ -595,11 +605,11 @@ namespace ChatExchangeDotNet
             if (string.IsNullOrEmpty(newContent?.ToString()))
             {
                 throw new ArgumentException("'newContent' cannot be null or return an " +
-                    "empty/null string upon calling .ToString().", "newContent");
+                    "empty/null string upon calling .ToString().", nameof(newContent));
             }
             if (messageID < 0)
             {
-                throw new ArgumentOutOfRangeException("messageID", "'messageID' cannot be less than 0.");
+                throw new ArgumentOutOfRangeException(nameof(messageID), "'messageID' cannot be less than 0.");
             }
             if (dispose)
             {
@@ -629,15 +639,71 @@ namespace ChatExchangeDotNet
             return (bool?)actEx.ExecuteAction(action) ?? false;
         }
 
-        //TODO: Finish off XML comments.
+        /// <summary>
+        /// Deletes the specified message.
+        /// (Users who aren't moderators have a 2 minute
+        /// "grace period" which allows people to delete their messages,
+        /// after which the message is "locked" and can not be changed.)
+        /// </summary>
+        /// <param name="message">The message to delete.</param>
+        /// <returns>
+        /// True if the message was successfully deleted, otherwise false.
+        /// </returns>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown if 'message' is null.
+        /// </exception>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown if the current instance has been disposed.
+        /// </exception>
+        /// <exception cref="InsufficientReputationException">
+        /// Thrown if the current user does not have enough
+        /// reputation (20) to delete a message.
+        /// </exception>
+        public bool DeleteMessage(Message message)
+        {
+            if (message == null)
+            {
+                throw new ArgumentNullException(nameof(message));
+            }
 
-        public bool DeleteMessage(Message message) => DeleteMessage(message.ID);
+            return DeleteMessage(message.ID);
+        }
 
+        /// <summary>
+        /// Deletes the specified message.
+        /// (Users who aren't moderators have a 2 minute
+        /// "grace period" which allows people to delete their messages,
+        /// after which the message is "locked" and can not be changed.)
+        /// </summary>
+        /// <param name="messageID">
+        /// The unique identification number of the message to delete.
+        /// </param>
+        /// <returns>
+        /// True if the message was successfully deleted, otherwise false.
+        /// </returns>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// Thrown if 'messageID' is less than 0.
+        /// </exception>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown if the current instance has been disposed.
+        /// </exception>
+        /// <exception cref="InsufficientReputationException">
+        /// Thrown if the current user does not have enough
+        /// reputation (20) to delete a message.
+        /// </exception>
         public bool DeleteMessage(int messageID)
         {
-            if (hasLeft)
+            if (messageID < 0)
             {
-                throw new InvalidOperationException("Cannot delete message when you have left the room.");
+                throw new ArgumentOutOfRangeException(nameof(messageID), "'messageID' cannot be less than 0.");
+            }
+            if (dispose)
+            {
+                throw new ObjectDisposedException(GetType().Name);
+            }
+            if (Me.Reputation < 20)
+            {
+                throw new InsufficientReputationException(20);
             }
 
             var action = new ChatAction(ActionType.DeleteMessage, new Func<object>(() =>
@@ -646,7 +712,7 @@ namespace ChatExchangeDotNet
                 {
                     var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/messages/{messageID}/delete", $"fkey={fkey}");
 
-                    if (string.IsNullOrEmpty(resContent) || hasLeft) return false;
+                    if (string.IsNullOrEmpty(resContent) || dispose) return false;
                     if (HandleThrottling(resContent)) continue;
 
                     return resContent == "\"ok\"";
@@ -658,13 +724,65 @@ namespace ChatExchangeDotNet
             return (bool?)actEx.ExecuteAction(action) ?? false;
         }
 
-        public bool ToggleStar(Message message) => ToggleStar(message.ID);
+        /// <summary>
+        /// Stars or unstars a message.
+        /// </summary>
+        /// <param name="message">The message to star/unstar.</param>
+        /// <returns>
+        /// True if toggling the message's star was successful, otherwise false.
+        /// </returns>
+        /// <exception cref="ArgumentNullException"> 
+        /// Thrown if 'message' is null.
+        /// </exception>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown if the current instance has been disposed.
+        /// </exception>
+        /// <exception cref="InsufficientReputationException">
+        /// Thrown if the current user does not have enough
+        /// reputation (20) to toggle stars on a message.
+        /// </exception>
+        public bool ToggleStar(Message message)
+        {
+            if (message == null)
+            {
+                throw new ArgumentNullException(nameof(message));
+            }
 
+            return ToggleStar(message.ID);
+        }
+
+        /// <summary>
+        /// Stars or unstars a message.
+        /// </summary>
+        /// <param name="messageID">
+        /// The unique identification number of the message to star/unstar.
+        /// </param>
+        /// <returns>
+        /// True if toggling the message's star was successful, otherwise false.
+        /// </returns>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// Thrown if 'messageID' is less than 0.
+        /// </exception>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown if the current instance has been disposed.
+        /// </exception>
+        /// <exception cref="InsufficientReputationException">
+        /// Thrown if the current user does not have enough
+        /// reputation (20) to toggle stars on a message.
+        /// </exception>
         public bool ToggleStar(int messageID)
         {
-            if (hasLeft)
+            if (messageID < 0)
             {
-                throw new InvalidOperationException("Cannot toggle message star when you have left the room.");
+                throw new ArgumentOutOfRangeException(nameof(messageID), "'messageID' cannot be less than 0.");
+            }
+            if (dispose)
+            {
+                throw new ObjectDisposedException(GetType().Name);
+            }
+            if (Me.Reputation < 20)
+            {
+                throw new InsufficientReputationException(20);
             }
 
             var action = new ChatAction(ActionType.ToggleMessageStar, new Func<object>(() =>
@@ -673,7 +791,7 @@ namespace ChatExchangeDotNet
                 {
                     var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/messages/{messageID}/star", $"fkey={fkey}");
 
-                    if (string.IsNullOrEmpty(resContent) || hasLeft) return false;
+                    if (string.IsNullOrEmpty(resContent) || dispose) return false;
                     if (HandleThrottling(resContent)) continue;
 
                     return resContent == "\"ok\"";
@@ -697,7 +815,7 @@ namespace ChatExchangeDotNet
             {
                 throw new InvalidOperationException("Cannot clear message's stars when you have left the room.");
             }
-            if (!Me.IsMod || !Me.IsRoomOwner)
+            if (!Me.IsMod && !Me.IsRoomOwner)
             {
                 throw new InvalidOperationException("Unable to clear message stars. You have " +
                     "insufficient privileges (must be a room owner or moderator).");
@@ -727,7 +845,7 @@ namespace ChatExchangeDotNet
             {
                 throw new InvalidOperationException("Cannot clear message's stars when you have left the room.");
             }
-            if (!Me.IsMod || !Me.IsRoomOwner)
+            if (!Me.IsMod && !Me.IsRoomOwner)
             {
                 throw new InvalidOperationException("Unable to (un)pin a message. You have " +
                     "insufficient privileges (must be a room owner or moderator).");
@@ -760,7 +878,7 @@ namespace ChatExchangeDotNet
             {
                 throw new InvalidOperationException("Cannot clear message's stars when you have left the room.");
             }
-            if (!Me.IsMod || !Me.IsRoomOwner)
+            if (!Me.IsMod && !Me.IsRoomOwner)
             {
                 throw new InvalidOperationException("Unable to kick-mute user. You have " +
                     "insufficient privileges (must be a room owner or moderator).");
