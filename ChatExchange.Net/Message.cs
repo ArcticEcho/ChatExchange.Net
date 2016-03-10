@@ -178,7 +178,7 @@ namespace ChatExchangeDotNet
                         }
                     }
 
-                    return content;
+                    return content.Trim();
                 }
             }
             catch (WebException ex) when (ex.Response != null && ((HttpWebResponse)ex.Response).StatusCode == HttpStatusCode.NotFound)
