@@ -155,6 +155,11 @@ namespace ChatExchangeDotNet
 
                     if (stripMention)
                     {
+                        if (content.IsReply())
+                        {
+                            content = Regex.Replace(content, @"^:\d+\s", "");
+                        }
+
                         var users = room.PingableUsers;
                         foreach (var user in users)
                         {

@@ -34,7 +34,6 @@ namespace ChatExchangeDotNet
 {
     internal static class Extensions
     {
-        private static readonly Regex hasMention = new Regex(@"^:\d+\s|(\A|\s)@\S{3,}(\s|\Z)", RegexOpts);
         private static readonly Regex isReply = new Regex(@"^:\d+\s", RegexOpts);
 
         internal static RegexOptions RegexOpts { get; } = RegexOptions.Compiled | RegexOptions.CultureInvariant;
@@ -100,15 +99,9 @@ namespace ChatExchangeDotNet
             return userMessages;
         }
 
-        public static string StripMention(this string input, bool trim = true, string replaceWith = " ")
+        public static bool IsReply(this string message)
         {
-            var stripped = hasMention.Replace(input, replaceWith);
-            return trim ? stripped.Trim() : stripped;
-        }
-
-        public static bool IsReply(this string message, bool includeMention = false)
-        {
-            return !string.IsNullOrEmpty(message) && (includeMention ? hasMention.IsMatch(message) : isReply.IsMatch(message));
+            return !string.IsNullOrEmpty(message) && isReply.IsMatch(message);
         }
     }
 }
