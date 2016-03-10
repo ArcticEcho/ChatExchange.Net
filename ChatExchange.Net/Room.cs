@@ -42,11 +42,12 @@ namespace ChatExchangeDotNet
         private static readonly Regex findUsers = new Regex(@"id:\s?(\d+),\sname", Extensions.RegexOpts);
         private static readonly Regex getId = new Regex(@"id: (?<id>\d+)", Extensions.RegexOpts);
         private readonly ManualResetEvent throttleARE = new ManualResetEvent(false);
-        private readonly ManualResetEvent passWSRecMre = new ManualResetEvent(false);
-        private readonly ManualResetEvent aggWSRecMre = new ManualResetEvent(false);
+        private readonly ManualResetEvent pingableUsersSyncMre = new ManualResetEvent(false);
+        private readonly ManualResetEvent wsRecMre = new ManualResetEvent(false);
         private readonly ActionExecutor actEx;
         private readonly string chatRoot;
         private readonly string cookieKey;
+        private readonly Guid trackingToken;
         private bool dispose;
         private bool hasLeft;
         private string fkey;
@@ -69,6 +70,22 @@ namespace ChatExchangeDotNet
         /// Default set to false.
         /// </summary>
         public bool InitialisePrimaryContentOnly { get; set; } = false;
+
+        /// <summary>
+        /// A list of all users that are currently able to receive "ping"s.
+        /// </summary>
+        public HashSet<User> PingableUsers { get; private set; } = new HashSet<User>();
+
+        /// <summary>
+        /// A list of all users that are currently in the room.
+        /// (Pawcrafted by ProgramFOX.)
+        /// </summary>
+        public HashSet<User> CurrentUsers { get; private set; } = new HashSet<User>();
+
+        /// <summary>
+        /// A list of users with the "room owner" privilege.
+        /// </summary>
+        public HashSet<User> RoomOwners { get; private set; } = new HashSet<User>();
 
         /// <summary>
         /// Returns the currently logged in user.
@@ -127,8 +144,14 @@ namespace ChatExchangeDotNet
             var url = GetSocketURL(count);
 
             InitialiseSocket(url);
+            InitialiseRoomOwners();
+            InitialisePingableUsers();
+            InitialiseCurrentUsers();
+
+            trackingToken = evMan.TrackRoom(this);
 
             Task.Factory.StartNew(() => WSRecovery());
+            Task.Factory.StartNew(() => SyncPingableUsers());
         }
 
         ~Room()
@@ -138,9 +161,21 @@ namespace ChatExchangeDotNet
 
 
 
+        public override bool Equals(object obj)
+        {
+            if (obj == null) return false;
+            if (ReferenceEquals(this, obj)) return true;
+            if (GetHashCode() == obj.GetHashCode()) return true;
+
+            return false;
+        }
+
         public override int GetHashCode() => Meta?.ID ?? -1;
 
-        public override string ToString() => Meta?.Name;
+        /// <summary>
+        /// Returns a string that represents the current object.
+        /// </summary>
+        public override string ToString() => Meta?.Name ?? base.ToString();
 
         /// <summary>
         /// Releases all resources used by the current instance.
@@ -162,23 +197,14 @@ namespace ChatExchangeDotNet
                 }
             }
 
-            if (throttleARE != null)
-            {
-                throttleARE.Set(); // Release any threads currently being throttled.
-                throttleARE.Dispose();
-            }
+            throttleARE?.Set(); // Release any threads currently being throttled.
+            throttleARE?.Dispose();
 
-            if (passWSRecMre != null)
-            {
-                passWSRecMre.Set();
-                passWSRecMre.Dispose();
-            }
+            pingableUsersSyncMre?.Set();
+            pingableUsersSyncMre?.Dispose();
 
-            if (aggWSRecMre != null)
-            {
-                aggWSRecMre.Set();
-                aggWSRecMre.Dispose();
-            }
+            wsRecMre?.Set();
+            wsRecMre?.Dispose();
 
             actEx?.Dispose();
             evMan?.Dispose();
@@ -233,7 +259,7 @@ namespace ChatExchangeDotNet
             }
 
             var lastestDom = CQ.Create(resContent).Select(".monologue").Last();
-            var content = Message.GetMessageContent(Meta.Host, messageID, StripMention);
+            var content = Message.GetMessageContent(this, messageID, StripMention);
 
             if (content == null) throw new MessageNotFoundException();
 
@@ -256,73 +282,6 @@ namespace ChatExchangeDotNet
             evMan.TrackUser(u);
 
             return u;
-        }
-
-        /// <summary>
-        /// Fetches a list of all users that are currently able to receive "ping"s.
-        /// </summary>
-        public HashSet<User> GetPingableUsers()
-        {
-            var json = RequestManager.Get(cookieKey, $"http://chat.{Meta.Host}/rooms/pingable/{Meta.ID}");
-
-            if (string.IsNullOrEmpty(json)) return null;
-
-            var data = JsonSerializer.DeserializeFromString<HashSet<List<object>>>(json);
-            var users = new HashSet<User>();
-
-            foreach (var user in data)
-            {
-                var userID = int.Parse(user[0].ToString());
-                users.Add(new User(Meta, userID, true));
-            }
-
-            return users;
-        }
-
-        /// <summary>
-        /// Fetches a list of all users that are currently in the room.
-        /// (Pawcrafted by ProgramFOX.)
-        /// </summary>
-        public HashSet<User> GetCurrentUsers()
-        {
-            var html = RequestManager.Get(cookieKey, $"http://chat.{Meta.Host}/rooms/{Meta.ID}/");
-            var doc = CQ.CreateDocument(html);
-            var obj = doc.Select("script")[3];
-            var ids = findUsers.Matches(obj.InnerText);
-
-            var users = new HashSet<User>();
-            foreach (Match id in ids)
-            {
-                var userID = 0;
-
-                if (int.TryParse(id.Groups[1].Value, out userID))
-                {
-                    users.Add(new User(Meta, userID, true));
-                }
-            }
-
-            return users;
-        }
-
-        /// <summary>
-        /// Fetches a list of users with the "room owner" privilege.
-        /// </summary>
-        public HashSet<User> GetRoomOwners()
-        {
-            var dom = CQ.CreateFromUrl($"{chatRoot}/rooms/info/{Meta.ID}");
-            var ros = new HashSet<User>();
-
-            foreach (var user in dom["[id^=owner-user]"])
-            {
-                var id = -1;
-
-                if (int.TryParse(new string(user.Id.Where(char.IsDigit).ToArray()), out id))
-                {
-                    ros.Add(GetUser(id));
-                }
-            }
-
-            return ros;
         }
 
         #region Normal user chat commands.
@@ -994,6 +953,72 @@ namespace ChatExchangeDotNet
 
         #region Instantiation/event handling related methods.
 
+        private void SyncPingableUsers()
+        {
+            while (!dispose)
+            {
+                InitialisePingableUsers();
+                pingableUsersSyncMre.WaitOne(TimeSpan.FromDays(1));
+            }
+        }
+
+        private void InitialisePingableUsers()
+        {
+            var json = RequestManager.Get(cookieKey, $"http://chat.{Meta.Host}/rooms/pingable/{Meta.ID}");
+
+            if (string.IsNullOrEmpty(json)) throw new Exception("Unable to initialise PingableUsers.");
+
+            var data = JsonSerializer.DeserializeFromString<HashSet<List<object>>>(json);
+            var users = new HashSet<User>();
+
+            foreach (var user in data)
+            {
+                var userID = int.Parse(user[0].ToString());
+                users.Add(new User(Meta, userID, true));
+            }
+
+            PingableUsers = users;
+        }
+
+        private void InitialiseCurrentUsers()
+        {
+            var html = RequestManager.Get(cookieKey, $"http://chat.{Meta.Host}/rooms/{Meta.ID}/");
+            var doc = CQ.CreateDocument(html);
+            var obj = doc.Select("script")[3];
+            var ids = findUsers.Matches(obj.InnerText);
+
+            var users = new HashSet<User>();
+            foreach (Match id in ids)
+            {
+                var userID = 0;
+
+                if (int.TryParse(id.Groups[1].Value, out userID))
+                {
+                    users.Add(new User(Meta, userID, true));
+                }
+            }
+
+            CurrentUsers = users;
+        }
+
+        private void InitialiseRoomOwners()
+        {
+            var dom = CQ.CreateFromUrl($"{chatRoot}/rooms/info/{Meta.ID}");
+            var ros = new HashSet<User>();
+
+            foreach (var user in dom["[id^=owner-user]"])
+            {
+                var id = -1;
+
+                if (int.TryParse(new string(user.Id.Where(char.IsDigit).ToArray()), out id))
+                {
+                    ros.Add(GetUser(id));
+                }
+            }
+
+            RoomOwners = ros;
+        }
+
         private User GetMe()
         {
             var html = RequestManager.Get(cookieKey, $"{chatRoot}/chats/join/favorite");
@@ -1065,7 +1090,7 @@ namespace ChatExchangeDotNet
                     InitialiseSocket(url);
                 }
 
-                aggWSRecMre.WaitOne(TimeSpan.FromSeconds(15));
+                wsRecMre.WaitOne(TimeSpan.FromSeconds(15));
             }
         }
 

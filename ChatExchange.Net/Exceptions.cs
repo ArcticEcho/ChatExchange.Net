@@ -129,4 +129,43 @@ namespace ChatExchangeDotNet
 
         }
     }
+
+    /// <summary>
+    /// Represents an error that occurs when an attempt to post a duplicate message is made.
+    /// </summary>
+    public class UserNotFoundException : Exception
+    {
+
+        /// <summary>
+        /// The ID of the user that does not exist.
+        /// </summary>
+        public int UserID { get; }
+
+
+
+        public UserNotFoundException() : base("The specified user was not found.")
+        {
+
+        }
+
+        public UserNotFoundException(string message) : base(message)
+        {
+
+        }
+
+        public UserNotFoundException(string message, int userId) : base(message)
+        {
+            UserID = userId;
+        }
+
+        public UserNotFoundException(string message, Exception innerException) : base(message, innerException)
+        {
+
+        }
+
+        public UserNotFoundException(string message, int userId, Exception innerException) : base(message, innerException)
+        {
+            UserID = userId;
+        }
+    }
 }

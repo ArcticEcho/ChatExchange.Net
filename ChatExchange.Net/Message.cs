@@ -99,7 +99,7 @@ namespace ChatExchangeDotNet
             if (author == null) throw new ArgumentNullException("author");
 
             evMan = eventManager;
-            Content = GetMessageContent(room.Meta.Host, messageID, room.StripMention);
+            Content = GetMessageContent(room, messageID, room.StripMention);
             Host = room.Meta.Host;
             RoomID = room.Meta.ID;
             ID = messageID;
@@ -126,8 +126,8 @@ namespace ChatExchangeDotNet
         /// <summary>
         /// Fetches the content of a message.
         /// </summary>
-        /// <param name="host">
-        /// The host domain of the room in which the message resides.
+        /// <param name="room">
+        /// The room in which the message resides.
         /// </param>
         /// <param name="messageID">
         /// The unique identification number of the message to fetch.
@@ -139,17 +139,33 @@ namespace ChatExchangeDotNet
         /// <exception cref="MessageNotFoundException">
         /// Thrown if the message cannot be found (a result of an incorrect ID, or deletion).
         /// </exception>
-        public static string GetMessageContent(string host, int messageID, bool stripMention = false)
+        public static string GetMessageContent(Room room, int messageID, bool stripMention = false)
         {
             try
             {
-                using (var res = RequestManager.GetRaw("", $"http://chat.{host}/message/{messageID}?plain=true"))
+                using (var res = RequestManager.GetRaw("", $"http://chat.{room.Meta.Host}/message/{messageID}?plain=true"))
                 {
                     if (res?.StatusCode != HttpStatusCode.OK) return null;
 
                     var content = res.GetContent();
 
-                    return content == null ? null : WebUtility.HtmlDecode(stripMention ? content.StripMention() : content);
+                    if (content == null) return null;
+
+                    content = WebUtility.HtmlDecode(content);
+
+                    if (stripMention)
+                    {
+                        var users = room.PingableUsers;
+                        foreach (var user in users)
+                        {
+                            for (var i = user.Name.Length; i > 3; i--)
+                            {
+                                content = content.Replace(user.Name.Substring(0, i), "");
+                            }
+                        }
+                    }
+
+                    return content;
                 }
             }
             catch (WebException ex) when (ex.Response != null && ((HttpWebResponse)ex.Response).StatusCode == HttpStatusCode.NotFound)

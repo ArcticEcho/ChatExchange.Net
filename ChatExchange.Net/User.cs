@@ -22,6 +22,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Net;
 using ServiceStack.Text;
 
 namespace ChatExchangeDotNet
@@ -107,9 +108,60 @@ namespace ChatExchangeDotNet
 
 
 
+        public override bool Equals(object obj)
+        {
+            if (obj == null) return false;
+            if (ReferenceEquals(this, obj)) return true;
+            if (GetHashCode() == obj.GetHashCode()) return true;
+
+            return false;
+        }
+
+        public override int GetHashCode() => ID;
+
+        public override string ToString() => Name;
+
+        public void InvalidateCache() => FetchUserData(Host, RoomID, ID, null, cookieKey);
+
+        /// <summary>
+        /// Checks if a user exists.
+        /// </summary>
+        /// <param name="meta">The room meta required to check if the user exists.</param>
+        /// <param name="userId">The ID of the user to check.</param>
+        public static bool Exists(RoomMetaInfo meta, int userId)
+        {
+            if (meta == null) return false;
+
+            return Exists(meta.Host, userId);
+        }
+
+        /// <summary>
+        /// Checks if a user exists.
+        /// </summary>
+        /// <param name="host">The host to be check for the user.</param>
+        /// <param name="userId">The ID of the user to check.</param>
+        public static bool Exists(string host, int userId)
+        {
+            try
+            {
+                new WebClient().DownloadData($"http://chat.{host}/users/{userId}");
+            }
+            catch (WebException ex)
+            when (ex.Response != null &&
+                (((HttpWebResponse)ex.Response).StatusCode == HttpStatusCode.NotFound ||
+                ((HttpWebResponse)ex.Response).StatusCode == HttpStatusCode.InternalServerError))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+
+
         internal static bool CanPing(string cookieKey, string host, int roomID, int userID)
         {
-            var json = RequestManager.Get(cookieKey, "http://chat." + host + "/rooms/pingable/" + roomID);
+            var json = RequestManager.Get(cookieKey, $"http://chat.{host}/rooms/pingable/{roomID}");
             if (string.IsNullOrEmpty(json)) return false;
             var data = JsonSerializer.DeserializeFromString<HashSet<List<object>>>(json);
 
@@ -124,12 +176,6 @@ namespace ChatExchangeDotNet
             return false;
         }
 
-        public override int GetHashCode() => ID;
-
-        public override string ToString() => Name;
-
-        public void InvalidateCache() => FetchUserData(Host, RoomID, ID, null, cookieKey);
-
 
 
         private Exception FetchUserData(string host, int roomID, int userID, bool? isPingable, string cookieKey)
@@ -138,6 +184,8 @@ namespace ChatExchangeDotNet
             ID = userID;
             RoomID = roomID;
             Host = host;
+
+            if (!Exists(host, userID)) throw new UserNotFoundException();
 
             var resContent = RequestManager.Post("", "http://chat." + host + "/user/info", "ids=" + userID + "&roomid=" + roomID);
 

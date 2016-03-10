@@ -262,6 +262,62 @@ namespace ChatExchangeDotNet
             return id;
         }
 
+        internal Guid TrackRoom(Room room)
+        {
+            if (room == null) throw new ArgumentNullException("room");
+
+            var id = Guid.NewGuid();
+            var obj = new TrackedObject
+            {
+                Object = room,
+                ID = id,
+                Listeners = new Dictionary<EventType, Delegate>
+                {
+                    [EventType.UserEntered] = new Action<User>(user =>
+                    {
+                        if (room != null)
+                        {
+                            if (!room.PingableUsers.Contains(user))
+                            {
+                                room.PingableUsers.Add(user);
+                            }
+
+                            if (!room.CurrentUsers.Contains(user))
+                            {
+                                room.CurrentUsers.Add(user);
+                            }
+                        }
+                    }),
+                    [EventType.UserLeft] = new Action<User>(user =>
+                    {
+                        if (room != null && room.CurrentUsers.Contains(user))
+                        {
+                            room.CurrentUsers.Remove(user);
+                        }
+                    }),
+                    [EventType.UserAccessLevelChanged] = new Action<User, User, UserRoomAccess>((granter, targetUser, newAccess) =>
+                    {
+                        if (room != null)
+                        {
+                            if (room.RoomOwners.Contains(targetUser) && newAccess != UserRoomAccess.Owner)
+                            {
+                                room.RoomOwners.Remove(targetUser);
+                            }
+
+                            if (!room.RoomOwners.Contains(targetUser) && newAccess == UserRoomAccess.Owner)
+                            {
+                                room.RoomOwners.Add(targetUser);
+                            }
+                        }
+                    })
+                }
+            };
+
+            trackDict[id] = obj;
+
+            return id;
+        }
+
         internal void UntrackObject(Guid trackID)
         {
             if (trackID == null) throw new ArgumentNullException("trackID");
@@ -285,15 +341,7 @@ namespace ChatExchangeDotNet
 
                     Task.Factory.StartNew(() =>
                     {
-                        try
-                        {
-                            obj.Listeners[eventType].DynamicInvoke(args);
-                        }
-                        catch (Exception ex)
-                        {
-                            if (eventType == EventType.InternalException) throw ex; // Avoid infinite loop.
-                            CallListeners(EventType.InternalException, false, ex);
-                        }
+                        InvokeListener(obj.Listeners[eventType], eventType, args);
                     });
                 }
             });
@@ -306,20 +354,27 @@ namespace ChatExchangeDotNet
             {
                 Task.Factory.StartNew(() =>
                 {
-                    try
-                    {
-                        listener.DynamicInvoke(args);
-                    }
-                    catch (Exception ex)
-                    {
-                        if (eventType == EventType.InternalException) throw ex; // Avoid infinite loop.
-                        CallListeners(EventType.InternalException, false, ex);
-                    }
+                    InvokeListener(listener, eventType, args);
                 });
             }
         }
 
         internal void HandleEvent(EventType eventType, Room room, ref EventManager evMan, Dictionary<string, object> data) =>
             events[eventType].Execute(room, ref evMan, data);
+
+
+
+        private void InvokeListener(Delegate del, EventType ev, params object[] args)
+        {
+            try
+            {
+                del.DynamicInvoke(args);
+            }
+            catch (Exception ex)
+            {
+                if (ev == EventType.InternalException) throw ex; // Avoid infinite loop.
+                CallListeners(EventType.InternalException, false, ex);
+            }
+        }
     }
 }

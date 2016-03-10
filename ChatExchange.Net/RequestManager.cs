@@ -89,6 +89,9 @@ namespace ChatExchangeDotNet
         {
             if (uri == null) throw new ArgumentNullException("uri");
 
+            var wc = new WebClient();
+            
+
             var req = (HttpWebRequest)WebRequest.Create(uri);
             var meth = method.Trim().ToUpperInvariant();
 
