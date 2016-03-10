@@ -45,9 +45,12 @@ namespace ChatExchangeDotNet
         private readonly ManualResetEvent pingableUsersSyncMre = new ManualResetEvent(false);
         private readonly ManualResetEvent wsRecMre = new ManualResetEvent(false);
         private readonly ActionExecutor actEx;
+        private readonly Guid trackingToken;
+        private readonly string proxyUrl;
+        private readonly string proxyUsername;
+        private readonly string proxyPassword;
         private readonly string chatRoot;
         private readonly string cookieKey;
-        private readonly Guid trackingToken;
         private bool dispose;
         private bool hasLeft;
         private string fkey;
@@ -124,13 +127,16 @@ namespace ChatExchangeDotNet
 
 
 
-        internal Room(string cookieKey, string host, int id)
+        internal Room(string cookieKey, string host, int id, string proxyUrl, string proxyUsername, string proxyPassword)
         {
             if (string.IsNullOrEmpty(cookieKey)) throw new ArgumentNullException("cookieKey"); 
             if (string.IsNullOrEmpty(host)) throw new ArgumentNullException("'host' must not be null or empty.", "host"); 
             if (id < 0) throw new ArgumentOutOfRangeException("id", "'id' must not be negative.");
 
             this.cookieKey = cookieKey;
+            this.proxyUrl = proxyUrl;
+            this.proxyUsername = proxyUsername;
+            this.proxyPassword = proxyPassword;
             chatRoot = $"http://chat.{host}";
 
             evMan = new EventManager();
@@ -1099,6 +1105,11 @@ namespace ChatExchangeDotNet
             if (socket != null) socket.Close(CloseStatusCode.Normal);
 
             socket = new WebSocket(socketUrl) { Origin = chatRoot };
+
+            if (!string.IsNullOrWhiteSpace(proxyUrl))
+            {
+                socket.SetProxy(proxyUrl, proxyUsername, proxyPassword);
+            }
 
             socket.OnMessage += (o, oo) =>
             {

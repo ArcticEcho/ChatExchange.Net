@@ -39,6 +39,9 @@ namespace ChatExchangeDotNet
         private readonly Regex openidDel = new Regex("https://openid\\.stackexchange\\.com/user/.*?\"", Extensions.RegexOpts);
         private readonly Regex hostParser = new Regex("https?://(chat.)?|/.*", Extensions.RegexOpts);
         private readonly Regex idParser = new Regex(".*/rooms/|/.*", Extensions.RegexOpts);
+        private readonly string proxyUrl;
+        private readonly string proxyUsername;
+        private readonly string proxyPassword;
         private readonly string cookieKey;
         private string openidUrl;
         private bool disposed;
@@ -77,6 +80,17 @@ namespace ChatExchangeDotNet
             Rooms = new ReadOnlyCollection<Room>(new List<Room>());
 
             SEOpenIDLogin(email, password);
+        }
+
+        /// <summary>
+        /// Logs in with proxy support
+        /// </summary>
+        public Client(string email, string password, string proxyUrl, string proxyUsername, string proxyPassword)
+            : this(email, password)
+        {
+            this.proxyUrl = proxyUrl;
+            this.proxyUsername = proxyUsername;
+            this.proxyPassword = proxyPassword;
         }
 
 #pragma warning disable CS1591
@@ -134,7 +148,7 @@ namespace ChatExchangeDotNet
                 }
             }
 
-            var r = new Room(cookieKey, host, roomID);
+            var r = new Room(cookieKey, host, roomID, proxyUrl, proxyUsername, proxyPassword);
             var rms = Rooms.ToList();
             rms.Add(r);
 
