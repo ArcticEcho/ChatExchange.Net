@@ -158,10 +158,18 @@ namespace ChatExchangeDotNet
                         var users = room.PingableUsers;
                         foreach (var user in users)
                         {
-                            for (var i = user.Name.Length; i > 3; i--)
+                            var name = user.Name.Replace(" ", "");
+                            var reg = $@"(?i)\s?@{name.Substring(0, 3)}";
+                            for (var i = 3; i < name.Length; i++)
                             {
-                                content = content.Replace(user.Name.Substring(0, i), "");
+                                reg += $"({name[i]}";
                             }
+                            for (var i = 3; i < name.Length; i++)
+                            {
+                                reg += ")?";
+                            }
+
+                            content = Regex.Replace(content, reg, "");
                         }
                     }
 
