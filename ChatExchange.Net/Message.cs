@@ -164,17 +164,26 @@ namespace ChatExchangeDotNet
                         foreach (var user in users)
                         {
                             var name = user.Name.Replace(" ", "");
-                            var reg = $@"(?i)\s?@{name.Substring(0, 3)}";
-                            for (var i = 3; i < name.Length; i++)
+                            var pattern = @"(?i)\s?@";
+
+                            if (name.Length < 3)
                             {
-                                reg += $"({name[i]}";
+                                pattern += name;
                             }
-                            for (var i = 3; i < name.Length; i++)
+                            else
                             {
-                                reg += ")?";
+                                pattern += name.Substring(0, 3);
+                                for (var i = 3; i < name.Length; i++)
+                                {
+                                    pattern += $"({name[i]}";
+                                }
+                                for (var i = 3; i < name.Length; i++)
+                                {
+                                    pattern += ")?";
+                                }
                             }
 
-                            content = Regex.Replace(content, reg, "");
+                            content = Regex.Replace(content, pattern, "");
                         }
                     }
 
@@ -197,6 +206,15 @@ namespace ChatExchangeDotNet
             evMan.UntrackObject(trackID);
 
             GC.SuppressFinalize(this);
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (obj == null) return false;
+            if (ReferenceEquals(this, obj)) return true;
+            if (GetHashCode() == obj.GetHashCode()) return true;
+
+            return false;
         }
 
         public override int GetHashCode() => ID;

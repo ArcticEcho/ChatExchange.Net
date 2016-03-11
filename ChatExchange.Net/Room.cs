@@ -977,10 +977,12 @@ namespace ChatExchangeDotNet
             var data = JsonSerializer.DeserializeFromString<HashSet<List<object>>>(json);
             var users = new HashSet<User>();
 
-            foreach (var user in data)
+            foreach (var id in data)
             {
-                var userID = int.Parse(user[0].ToString());
-                users.Add(new User(Meta, userID, true));
+                var userID = int.Parse(id[0].ToString());
+                var user = new User(Meta, userID, true);
+                evMan.TrackUser(user);
+                users.Add(user);
             }
 
             PingableUsers = users;
@@ -1000,7 +1002,7 @@ namespace ChatExchangeDotNet
 
                 if (int.TryParse(id.Groups[1].Value, out userID))
                 {
-                    users.Add(new User(Meta, userID, true));
+                    users.Add(GetUser(userID));
                 }
             }
 
@@ -1037,8 +1039,11 @@ namespace ChatExchangeDotNet
             var dom = CQ.Create(html);
             var e = dom[".topbar-menu-links a"][0];
             var id = int.Parse(e.Attributes["href"].Split('/')[2]);
+            var user = new User(Meta, id, cookieKey);
 
-            return new User(Meta, id, cookieKey);
+            evMan.TrackUser(user);
+
+            return user;
         }
 
         private void SetFkey()
