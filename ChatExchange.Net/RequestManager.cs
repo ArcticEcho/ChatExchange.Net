@@ -21,129 +21,98 @@
 
 
 using System;
-using System.Net;
-using System.Text;
 using System.Collections.Generic;
+using System.Net;
+using System.Text.RegularExpressions;
+using RestSharp;
 
 namespace ChatExchangeDotNet
 {
-    /// <summary>
-    /// The core class used by CE.Net to make essential network requests.
-    /// </summary>
-    public static class RequestManager
+    internal static class RequestManager
     {
-        internal static Dictionary<string, CookieContainer> Cookies { get; private set; }
-
-        /// <summary>
-        /// The timeout to be used when making requests.
-        /// </summary>
-        public static TimeSpan Timeout { get; set; }
+        public static Dictionary<string, List<RestResponseCookie>> Cookies { get; set; } = new Dictionary<string, List<RestResponseCookie>>();
 
 
 
-        static RequestManager()
+        public static RestResponse SendRequest(RestRequest req)
         {
-            Timeout = TimeSpan.FromSeconds(100);
-            Cookies = new Dictionary<string, CookieContainer>();
+            return SendRequest(null, req);
         }
 
-
-
-        internal static HttpWebResponse PostRaw(string cookieKey, string uri, string content, string referrer = null, string origin = null)
+        public static RestResponse SendRequest(string cookieKey, RestRequest req)
         {
-            var req = GenerateRequest(cookieKey, uri, content, "POST", referrer, origin);
+            var reqUri = new Uri(req.Resource);
+            var baseReqUrl = reqUri.Scheme + "://" + reqUri.Host;
 
-            return GetResponse(req);
-        }
+            // RestSharp doesn't currently honour cookie headers
+            // upon redirect (which is crucial for authentication
+            // in our case). So I've implemented my own (crude)
+            // means of following redirects (302s) in the meantime.
+            var c = new RestClient(baseReqUrl) { FollowRedirects = false };
 
-        internal static HttpWebResponse GetRaw(string cookieKey, string uri)
-        {
-            var req = GenerateRequest(cookieKey, uri, null, "GET");
-
-            return GetResponse(req);
-        }
-
-        internal static string Post(string cookieKey, string uri, string content, string referrer = null, string origin = null)
-        {
-            var req = GenerateRequest(cookieKey, uri, content, "POST", referrer, origin);
-
-            using (var res = GetResponse(req))
+            if (!string.IsNullOrWhiteSpace(cookieKey) && Cookies.ContainsKey(cookieKey))
             {
-                return res.GetContent();
-            }
-        }
-
-        internal static string Get(string cookieKey, string uri)
-        {
-            var req = GenerateRequest(cookieKey, uri, null, "GET");
-
-            using (var res = GetResponse(req))
-            {
-                return res.GetContent();
-            }
-        }
-
-
-
-        private static HttpWebRequest GenerateRequest(string cookieKey, string uri, string content, string method, string referrer = null, string origin = null)
-        {
-            if (uri == null) throw new ArgumentNullException("uri");
-
-            var wc = new WebClient();
-            
-
-            var req = (HttpWebRequest)WebRequest.Create(uri);
-            var meth = method.Trim().ToUpperInvariant();
-
-            req.Method = meth;
-            req.CookieContainer = string.IsNullOrEmpty(cookieKey) ? null : Cookies[cookieKey];
-            req.Timeout = (int)Timeout.TotalMilliseconds;
-            req.Referer = referrer;
-
-            if (!string.IsNullOrEmpty(origin))
-            {
-                req.Headers.Add("Origin", origin);
-            }
-
-            if (meth == "POST")
-            {
-                var data = Encoding.UTF8.GetBytes(content);
-
-                req.ContentType = "application/x-www-form-urlencoded";
-                req.ContentLength = data.Length;
-
-                using (var dataStream = req.GetRequestStream())
+                foreach (var cookie in Cookies[cookieKey])
                 {
-                    dataStream.Write(data, 0, data.Length);
+                    if (cookie.Expired) continue;
+
+                    req.AddCookie(cookie.Name, cookie.Value);
                 }
             }
+
+            req.Resource = req.Resource.Remove(0, baseReqUrl.Length);
+
+            var res = (RestResponse)c.Execute(req);
+
+            if (!string.IsNullOrWhiteSpace(cookieKey) && res.Cookies != null && res.Cookies.Count > 0)
+            {
+                if (!Cookies.ContainsKey(cookieKey))
+                {
+                    Cookies[cookieKey] = new List<RestResponseCookie>();
+                }
+
+                foreach (var cookie in res.Cookies)
+                {
+                    Cookies[cookieKey].Add(cookie);
+                }
+            }
+
+            if (res.StatusCode == HttpStatusCode.Found || res.StatusCode == HttpStatusCode.Moved)
+            {
+                var url = Regex.Match(res.Content, "href=\"(\\S+)\">here<").Groups[1].Value;
+
+                if (!url.StartsWith("http"))
+                {
+                    url = baseReqUrl + url;
+                }
+
+                return SendRequest(cookieKey, GenerateRequest(Method.GET, url));
+            }
+
+            return res;
+        }
+
+        public static RestRequest GenerateRequest(Method meth, string endpoint)
+        {
+            return new RestRequest(endpoint, meth);
+        }
+
+        public static RestRequest GenerateRequest(Method meth, string endpoint, string referrer)
+        {
+            var req = GenerateRequest(meth, endpoint);
+
+            req.AddParameter("Referer", referrer, ParameterType.HttpHeader);
 
             return req;
         }
 
-        private static HttpWebResponse GetResponse(HttpWebRequest req, string cookieKey = null)
+        public static RestRequest GenerateRequest(Method meth, string endpoint, string referrer, string origin)
         {
-            if (req == null) throw new ArgumentNullException("req");
+            var req = GenerateRequest(meth, endpoint, referrer);
 
-            HttpWebResponse res = null;
+            req.AddParameter("Origin", origin, ParameterType.HttpHeader);
 
-            try
-            {
-                res = (HttpWebResponse)req.GetResponse();
-
-                if (!string.IsNullOrEmpty(cookieKey))
-                {
-                    Cookies[cookieKey].Add(res.Cookies);
-                }
-            }
-            // Check if we've been throttled.
-            catch (WebException ex) when (ex.Response != null && ((HttpWebResponse)ex.Response).StatusCode == HttpStatusCode.Conflict)
-            {
-                // Yep, we have.
-                res = (HttpWebResponse)ex.Response;
-            }
-
-            return res;
+            return req;
         }
     }
 }

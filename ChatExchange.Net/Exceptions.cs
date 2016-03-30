@@ -88,6 +88,47 @@ namespace ChatExchangeDotNet
         }
     }
 
+    public class InsufficientPermissionException : Exception
+    {
+        /// <summary>
+        /// The lowest permission level required to execute this action.
+        /// </summary>
+        public UserRoomAccess ReputationPermission { get; }
+
+
+
+        public InsufficientPermissionException() : base("You need greater permission to execute this action.")
+        {
+            
+        }
+
+        public InsufficientPermissionException(UserRoomAccess reputationPermission) : base("You need greater permission to execute this action.")
+        {
+            ReputationPermission = reputationPermission;
+        }
+
+        public InsufficientPermissionException(string message) : base(message)
+        {
+
+        }
+
+        public InsufficientPermissionException(string message, UserRoomAccess reputationPermission) : base(message)
+        {
+            ReputationPermission = reputationPermission;
+        }
+
+        public InsufficientPermissionException(string message, Exception innerException) : base(message, innerException)
+        {
+
+        }
+
+        public InsufficientPermissionException(string message, UserRoomAccess reputationPermission, Exception innerException) : base(message, innerException)
+        {
+            ReputationPermission = reputationPermission;
+        }
+    }
+
+
     /// <summary>
     /// Represents an error that occurs when a requested message is not found.
     /// </summary>

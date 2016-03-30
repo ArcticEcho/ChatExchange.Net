@@ -23,7 +23,9 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
+using RestSharp;
 using ServiceStack.Text;
+using static ChatExchangeDotNet.RequestManager;
 
 namespace ChatExchangeDotNet
 {
@@ -161,8 +163,10 @@ namespace ChatExchangeDotNet
 
         internal static bool CanPing(string cookieKey, string host, int roomID, int userID)
         {
-            var json = RequestManager.Get(cookieKey, $"http://chat.{host}/rooms/pingable/{roomID}");
+            var json = SendRequest(cookieKey, GenerateRequest(Method.GET, $"http://chat.{host}/rooms/pingable/{roomID}")).Content;
+
             if (string.IsNullOrEmpty(json)) return false;
+
             var data = JsonSerializer.DeserializeFromString<HashSet<List<object>>>(json);
 
             foreach (var user in data)
@@ -187,11 +191,15 @@ namespace ChatExchangeDotNet
 
             if (!Exists(host, userID)) throw new UserNotFoundException();
 
-            var resContent = RequestManager.Post("", "http://chat." + host + "/user/info", "ids=" + userID + "&roomid=" + roomID);
+            var req = GenerateRequest(Method.POST, "http://chat." + host + "/user/info");
+            req = req.AddData("ids", userID);
+            req = req.AddData("roomid", roomID);
+
+            var resContent = SendRequest(req).Content;
 
             if (!string.IsNullOrEmpty(resContent) && resContent.StartsWith("{\"users\":[{"))
             {
-                var json = JsonObject.Parse(resContent);
+                var json = ServiceStack.Text.JsonObject.Parse(resContent);
                 var data = json.Get<List<Dictionary<string, object>>>("users");
 
                 if (data.Count != 0)

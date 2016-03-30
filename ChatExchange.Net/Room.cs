@@ -28,8 +28,11 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using CsQuery;
+using RestSharp;
 using ServiceStack.Text;
 using WebSocketSharp;
+using static ChatExchangeDotNet.RequestManager;
+using JsonObject = ServiceStack.Text.JsonObject;
 
 namespace ChatExchangeDotNet
 {
@@ -226,7 +229,11 @@ namespace ChatExchangeDotNet
             if (hasLeft) return;
             hasLeft = true;
 
-            RequestManager.Post(cookieKey, $"{chatRoot}/chats/leave/{Meta.ID}", $"quiet=true&fkey={fkey}");
+            var req = GenerateRequest(Method.POST, $"{chatRoot}/chats/leave/{Meta.ID}");
+            req = req.AddData("quiet", "true"); // No idea what this param does.
+            req = req.AddData("fkey", fkey);
+
+            SendRequest(cookieKey, req);
 
             Dispose();
         }
@@ -244,7 +251,7 @@ namespace ChatExchangeDotNet
 
             try
             {
-                resContent = RequestManager.Get(cookieKey, $"{chatRoot}/messages/{messageID}/history");
+                resContent = SendRequest(cookieKey, GenerateRequest(Method.GET, $"{chatRoot}/messages/{messageID}/history")).Content;
             }
             catch (WebException ex)
             {
@@ -333,8 +340,12 @@ namespace ChatExchangeDotNet
             {
                 while (!dispose)
                 {
-                    var data = $"text={Uri.EscapeDataString(message.ToString()).Replace("%5Cn", "%0A")}&fkey={fkey}";
-                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/chats/{Meta.ID}/messages/new", data);
+                    var req = GenerateRequest(Method.POST, $"{chatRoot}/chats/{Meta.ID}/messages/new");
+
+                    req = req.AddData("text", Uri.EscapeDataString(message.ToString()).Replace("%5Cn", "%0A"), false);
+                    req = req.AddData("fkey", fkey);
+
+                    var resContent = SendRequest(cookieKey, req).Content;
 
                     if (string.IsNullOrEmpty(resContent) || dispose) return null;
                     if (HandleThrottling(resContent)) continue;
@@ -378,8 +389,12 @@ namespace ChatExchangeDotNet
             {
                 while (!dispose)
                 {
-                    var data = "text=" + Uri.EscapeDataString(message.ToString()).Replace("%5Cn", "%0A") + "&fkey=" + fkey;
-                    var resContent = RequestManager.Post(cookieKey, chatRoot + "/chats/" + Meta.ID + "/messages/new", data);
+                    var req = GenerateRequest(Method.POST, $"{chatRoot}/chats/{Meta.ID}/messages/new");
+
+                    req = req.AddData("text", Uri.EscapeDataString(message.ToString()).Replace("%5Cn", "%0A"), false);
+                    req = req.AddData("fkey", fkey);
+
+                    var resContent = SendRequest(cookieKey, req).Content;
 
                     if (string.IsNullOrEmpty(resContent) || dispose) return false;
                     if (HandleThrottling(resContent)) continue;
@@ -589,8 +604,12 @@ namespace ChatExchangeDotNet
             {
                 while (!dispose)
                 {
-                    var data = $"text={Uri.EscapeDataString(newContent.ToString()).Replace("%5Cn", "%0A")}&fkey={fkey}";
-                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/messages/{messageID}", data);
+                    var req = GenerateRequest(Method.POST, $"{chatRoot}/messages/{messageID}");
+
+                    req = req.AddData("text", Uri.EscapeDataString(newContent.ToString()).Replace("%5Cn", "%0A"), false);
+                    req = req.AddData("fkey", fkey);
+
+                    var resContent = SendRequest(cookieKey, req).Content;
 
                     if (string.IsNullOrEmpty(resContent) || dispose) return false;
                     if (HandleThrottling(resContent)) continue;
@@ -675,7 +694,11 @@ namespace ChatExchangeDotNet
             {
                 while (!dispose)
                 {
-                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/messages/{messageID}/delete", $"fkey={fkey}");
+                    var req = GenerateRequest(Method.POST, $"{chatRoot}/messages/{messageID}/delete");
+
+                    req = req.AddData("fkey", fkey);
+
+                    var resContent = SendRequest(cookieKey, req).Content;
 
                     if (string.IsNullOrEmpty(resContent) || dispose) return false;
                     if (HandleThrottling(resContent)) continue;
@@ -754,7 +777,11 @@ namespace ChatExchangeDotNet
             {
                 while (!dispose)
                 {
-                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/messages/{messageID}/star", $"fkey={fkey}");
+                    var req = GenerateRequest(Method.POST, $"{chatRoot}/messages/{messageID}/star");
+
+                    req = req.AddData("fkey", fkey);
+
+                    var resContent = SendRequest(cookieKey, req).Content;
 
                     if (string.IsNullOrEmpty(resContent) || dispose) return false;
                     if (HandleThrottling(resContent)) continue;
@@ -772,25 +799,78 @@ namespace ChatExchangeDotNet
 
         #region Owner chat commands.
 
-        public bool ClearMessageStars(Message message) => ClearMessageStars(message.ID);
+        /// <summary>
+        /// Removes all stars from a message.
+        /// </summary>
+        /// <param name="message">
+        /// The message to un-star.
+        /// </param>
+        /// <returns>
+        /// True if removing the message's stars was successful, otherwise false.
+        /// </returns>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown if 'message' is null.
+        /// </exception>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown if the current instance has been disposed.
+        /// </exception>
+        /// <exception cref="InsufficientPermissionException">
+        /// Thrown if the current user does not have enough permission to
+        /// execute this action (must be a room owner or moderator).
+        /// </exception>
+        public bool ClearMessageStars(Message message)
+        {
+            if (message == null)
+            {
+                throw new ArgumentNullException(nameof(message));
+            }
 
+            return ClearMessageStars(message.ID);
+        }
+
+        /// <summary>
+        /// Removes all stars from a message.
+        /// </summary>
+        /// <param name="messageID">
+        /// The unique identification number of the message to un-star.
+        /// </param>
+        /// <returns>
+        /// True if removing the message's stars was successful, otherwise false.
+        /// </returns>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// Thrown if 'messageID' is less than 0.
+        /// </exception>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown if the current instance has been disposed.
+        /// </exception>
+        /// <exception cref="InsufficientPermissionException">
+        /// Thrown if the current user does not have enough permission to
+        /// execute this action (must be a room owner or moderator).
+        /// </exception>
         public bool ClearMessageStars(int messageID)
         {
-            if (hasLeft)
+            if (messageID < 0)
             {
-                throw new InvalidOperationException("Cannot clear message's stars when you have left the room.");
+                throw new ArgumentOutOfRangeException(nameof(messageID), "'messageID' cannot be less than 0.");
+            }
+            if (dispose)
+            {
+                throw new ObjectDisposedException(GetType().Name);
             }
             if (!Me.IsMod && !Me.IsRoomOwner)
             {
-                throw new InvalidOperationException("Unable to clear message stars. You have " +
-                    "insufficient privileges (must be a room owner or moderator).");
+                throw new InsufficientPermissionException(UserRoomAccess.Owner);
             }
 
             var action = new ChatAction(ActionType.ClearMessageStars, new Func<object>(() =>
             {
                 while (true)
                 {
-                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/messages/{messageID}/unstar", $"fkey={fkey}");
+                    var req = GenerateRequest(Method.POST, $"{chatRoot}/messages/{messageID}/unstar");
+
+                    req = req.AddData("fkey", fkey);
+
+                    var resContent = SendRequest(cookieKey, req).Content;
 
                     if (string.IsNullOrEmpty(resContent)) return false;
                     if (HandleThrottling(resContent)) continue;
@@ -802,25 +882,78 @@ namespace ChatExchangeDotNet
             return (bool?)actEx.ExecuteAction(action) ?? false;
         }
 
-        public bool TogglePin(Message message) => TogglePin(message.ID);
+        /// <summary>
+        /// Pins a message to the top of the "starboard" for 14 days (unless manually unpinned).
+        /// </summary>
+        /// <param name="message">
+        /// The message to pin.
+        /// </param>
+        /// <returns>
+        /// True if pinning the message was successful, otherwise false.
+        /// </returns>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown if 'message' is null.
+        /// </exception>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown if the current instance has been disposed.
+        /// </exception>
+        /// <exception cref="InsufficientPermissionException">
+        /// Thrown if the current user does not have enough permission to
+        /// execute this action (must be a room owner or moderator).
+        /// </exception>
+        public bool TogglePin(Message message)
+        {
+            if (message == null)
+            {
+                throw new ArgumentNullException(nameof(message));
+            }
 
+            return TogglePin(message.ID);
+        }
+
+        /// <summary>
+        /// Pins a message to the top of the "starboard" for 14 days (unless manually unpinned).
+        /// </summary>
+        /// <param name="messageID">
+        /// The unique identification number of the message to pin.
+        /// </param>
+        /// <returns>
+        /// True if pinning the message was successful, otherwise false.
+        /// </returns>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// Thrown if 'messageID' is less than 0.
+        /// </exception>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown if the current instance has been disposed.
+        /// </exception>
+        /// <exception cref="InsufficientPermissionException">
+        /// Thrown if the current user does not have enough permission to
+        /// execute this action (must be a room owner or moderator).
+        /// </exception>
         public bool TogglePin(int messageID)
         {
-            if (hasLeft)
+            if (messageID < 0)
             {
-                throw new InvalidOperationException("Cannot clear message's stars when you have left the room.");
+                throw new ArgumentOutOfRangeException(nameof(messageID), "'messageID' cannot be less than 0.");
+            }
+            if (dispose)
+            {
+                throw new ObjectDisposedException(GetType().Name);
             }
             if (!Me.IsMod && !Me.IsRoomOwner)
             {
-                throw new InvalidOperationException("Unable to (un)pin a message. You have " +
-                    "insufficient privileges (must be a room owner or moderator).");
+                throw new InsufficientPermissionException(UserRoomAccess.Owner);
             }
 
             var action = new ChatAction(ActionType.ToggleMessagePin, new Func<object>(() =>
             {
                 while (true)
                 {
-                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/messages/{messageID}/owner-star", $"fkey={fkey}");
+                    var req = GenerateRequest(Method.POST, $"{chatRoot}/messages/{messageID}/owner-star");
+
+                    req = req.AddData("fkey", fkey);
+
+                    var resContent = SendRequest(cookieKey, req).Content;
 
                     if (string.IsNullOrEmpty(resContent)) return false;
                     if (HandleThrottling(resContent)) continue;
@@ -832,29 +965,83 @@ namespace ChatExchangeDotNet
             return (bool?)actEx.ExecuteAction(action) ?? false;
         }
 
+        /// <summary>
+        /// Kicks a user out of the room for a certain period of time
+        /// (the period increases with each successive kick).
+        /// After kicking a user three times, a moderator will be informed.
+        /// </summary>
+        /// <param name="user">
+        /// The user to kick.
+        /// </param>
+        /// <returns>
+        /// True if kicking the user was successful, otherwise false.
+        /// </returns>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown if 'user' is null.
+        /// </exception>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown if the current instance has been disposed.
+        /// </exception>
+        /// <exception cref="InsufficientPermissionException">
+        /// Thrown if the current user does not have enough permission to
+        /// execute this action (must be a room owner or moderator).
+        /// </exception>
         public bool KickMute(User user)
         {
+            if (user == null)
+            {
+                throw new ArgumentNullException(nameof(user));
+            }
+
             return KickMute(user.ID);
         }
 
+        /// <summary>
+        /// Kicks a user out of the room for a certain period of time
+        /// (the period increases with each successive kick).
+        /// After kicking a user three times, a moderator will be informed.
+        /// </summary>
+        /// <param name="userID">
+        /// The unique identification number of the user to kick.
+        /// </param>
+        /// <returns>
+        /// True if kicking the user was successful, otherwise false.
+        /// </returns>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// Thrown if 'userID' is less than 0.
+        /// </exception>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown if the current instance has been disposed.
+        /// </exception>
+        /// <exception cref="InsufficientPermissionException">
+        /// Thrown if the current user does not have enough permission to
+        /// execute this action (must be a room owner or moderator).
+        /// </exception>
         public bool KickMute(int userID)
         {
-            if (hasLeft)
+            if (userID < 0)
             {
-                throw new InvalidOperationException("Cannot clear message's stars when you have left the room.");
+                throw new ArgumentOutOfRangeException(nameof(userID), "'userID' cannot be less than 0.");
+            }
+            if (dispose)
+            {
+                throw new ObjectDisposedException(GetType().Name);
             }
             if (!Me.IsMod && !Me.IsRoomOwner)
             {
-                throw new InvalidOperationException("Unable to kick-mute user. You have " +
-                    "insufficient privileges (must be a room owner or moderator).");
+                throw new InsufficientPermissionException(UserRoomAccess.Owner);
             }
 
             var action = new ChatAction(ActionType.KickMute, new Func<object>(() =>
             {
                 while (true)
                 {
-                    var data = $"userID={userID}&fkey={fkey}";
-                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/rooms/kickmute/{Meta.ID}", data);
+                    var req = GenerateRequest(Method.POST, $"{chatRoot}/rooms/kickmute/{Meta.ID}");
+
+                    req = req.AddData("userID", userID);
+                    req = req.AddData("fkey", fkey);
+
+                    var resContent = SendRequest(cookieKey, req).Content;
 
                     if (string.IsNullOrEmpty(resContent)) return false;
                     if (HandleThrottling(resContent)) continue;
@@ -866,9 +1053,60 @@ namespace ChatExchangeDotNet
             return (bool?)actEx.ExecuteAction(action) ?? false;
         }
 
-        public bool SetUserRoomAccess(UserRoomAccess access, User user) =>
-            SetUserRoomAccess(access, user.ID);
+        /// <summary>
+        /// Changes a users access level to the room.
+        /// </summary>
+        /// <param name="user">
+        /// The user to grant a new permission level to.
+        /// </param>
+        /// <param name="access">
+        /// The new access level to grant to the user.
+        /// </param>
+        /// <returns>
+        /// True if changing the user's access level was successful, otherwise false.
+        /// </returns>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown if 'user' is null.
+        /// </exception>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown if the current instance has been disposed.
+        /// </exception>
+        /// <exception cref="InsufficientPermissionException">
+        /// Thrown if the current user does not have enough permission to
+        /// execute this action (must be a room owner or moderator).
+        /// </exception>
+        public bool SetUserRoomAccess(UserRoomAccess access, User user)
+        {
+            if (user == null)
+            {
+                throw new ArgumentNullException(nameof(user));
+            }
 
+            return SetUserRoomAccess(access, user.ID);
+        }
+
+        /// <summary>
+        /// Changes a users access level to the room.
+        /// </summary>
+        /// <param name="userID">
+        /// The unique identification number of the user to grant a new permission level to.
+        /// </param>
+        /// <param name="access">
+        /// The new access level to grant to the user.
+        /// </param>
+        /// <returns>
+        /// True if changing the user's access level was successful, otherwise false.
+        /// </returns>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// Thrown if 'userID' is less than 0.
+        /// </exception>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown if the current instance has been disposed.
+        /// </exception>
+        /// <exception cref="InsufficientPermissionException">
+        /// Thrown if the current user does not have enough permission to
+        /// execute this action (must be a room owner or moderator).
+        /// </exception>
         public bool SetUserRoomAccess(UserRoomAccess access, int userID)
         {
             if (hasLeft)
@@ -885,36 +1123,41 @@ namespace ChatExchangeDotNet
             {
                 while (true)
                 {
+                    var req = GenerateRequest(Method.POST, $"{chatRoot}/rooms/setuseraccess/{Meta.ID}");
+
+                    req = req.AddData("aclUserId", userID);
+                    req = req.AddData("fkey", fkey);
+
                     var data = $"fkey={fkey}&aclUserId={userID}&userAccess=";
 
                     switch (access)
                     {
                         case UserRoomAccess.Normal:
                         {
-                            data += "remove";
+                            req = req.AddData("userAccess", "remove");
                             break;
                         }
 
                         case UserRoomAccess.ExplicitReadOnly:
                         {
-                            data += "read-only";
+                            req = req.AddData("userAccess", "read-only");
                             break;
                         }
 
                         case UserRoomAccess.ExplicitReadWrite:
                         {
-                            data += "read-write";
+                            req = req.AddData("userAccess", "read-write");
                             break;
                         }
 
                         case UserRoomAccess.Owner:
                         {
-                            data += "owner";
+                            req = req.AddData("userAccess", "owner");
                             break;
                         }
                     }
 
-                    var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/rooms/setuseraccess/{Meta.ID}", data);
+                    var resContent = SendRequest(cookieKey, req).Content;
 
                     if (string.IsNullOrEmpty(resContent)) return false;
                     if (HandleThrottling(resContent)) continue;
@@ -970,7 +1213,7 @@ namespace ChatExchangeDotNet
 
         private void InitialisePingableUsers()
         {
-            var json = RequestManager.Get(cookieKey, $"http://chat.{Meta.Host}/rooms/pingable/{Meta.ID}");
+            var json = SendRequest(cookieKey, GenerateRequest(Method.GET, $"http://chat.{Meta.Host}/rooms/pingable/{Meta.ID}")).Content;
 
             if (string.IsNullOrEmpty(json)) throw new Exception("Unable to initialise PingableUsers.");
 
@@ -990,7 +1233,7 @@ namespace ChatExchangeDotNet
 
         private void InitialiseCurrentUsers()
         {
-            var html = RequestManager.Get(cookieKey, $"http://chat.{Meta.Host}/rooms/{Meta.ID}/");
+            var html = SendRequest(cookieKey, GenerateRequest(Method.GET, $"http://chat.{Meta.Host}/rooms/{Meta.ID}/")).Content;
             var doc = CQ.CreateDocument(html);
             var obj = doc.Select("script")[3];
             var ids = findUsers.Matches(obj.InnerText);
@@ -1029,7 +1272,7 @@ namespace ChatExchangeDotNet
 
         private User GetMe()
         {
-            var html = RequestManager.Get(cookieKey, $"{chatRoot}/chats/join/favorite");
+            var html = SendRequest(cookieKey, GenerateRequest(Method.GET, $"{chatRoot}/chats/join/favorite")).Content;
 
             if (string.IsNullOrEmpty(html))
             {
@@ -1048,7 +1291,8 @@ namespace ChatExchangeDotNet
 
         private void SetFkey()
         {
-            var resContent = RequestManager.Get(cookieKey, $"{chatRoot}/rooms/{Meta.ID}");
+            var resContent = SendRequest(cookieKey, GenerateRequest(Method.GET, $"{chatRoot}/rooms/{Meta.ID}")).Content;
+
             var ex = new Exception("Could not get fkey.");
 
             if (string.IsNullOrEmpty(resContent)) throw ex;
@@ -1062,8 +1306,12 @@ namespace ChatExchangeDotNet
 
         private int GetGlobalEventCount()
         {
-            var data = $"mode=Events&msgCount=0&fkey={fkey}";
-            var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/chats/{Meta.ID}/events", data);
+            var req = GenerateRequest(Method.POST, $"{chatRoot}/chats/{Meta.ID}/events");
+            req = req.AddData("mode", "events");
+            req = req.AddData("msgCount", 0);
+            req = req.AddData("fkey", fkey);
+
+            var resContent = SendRequest(cookieKey, req).Content;
 
             if (string.IsNullOrEmpty(resContent))
             {
@@ -1076,7 +1324,12 @@ namespace ChatExchangeDotNet
         private string GetSocketURL(int eventTime)
         {
             var data = $"roomid={Meta.ID}&fkey={fkey}";
-            var resContent = RequestManager.Post(cookieKey, $"{chatRoot}/ws-auth", data, $"{chatRoot}/rooms/{Meta.ID}", chatRoot);
+
+            var req = GenerateRequest(Method.POST, $"{chatRoot}/ws-auth", $"{chatRoot}/rooms/{Meta.ID}", chatRoot);
+            req = req.AddData("roomid", Meta.ID);
+            req = req.AddData("fkey", fkey);
+
+            var resContent = SendRequest(cookieKey, req).Content;
 
             if (string.IsNullOrEmpty(resContent)) throw new Exception("Could not get WebSocket URL.");
 

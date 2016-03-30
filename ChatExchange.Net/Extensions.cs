@@ -21,57 +21,53 @@
 
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Net;
-using System.Reflection;
 using System.Linq;
 using System.Text.RegularExpressions;
 using CsQuery;
-using System.IO;
+using RestSharp;
 
 namespace ChatExchangeDotNet
 {
     internal static class Extensions
     {
         private static readonly Regex isReply = new Regex(@"^:\d+\s", RegexOpts);
+        private const string reqContentType = "application/x-www-form-urlencoded";
 
         internal static RegexOptions RegexOpts { get; } = RegexOptions.Compiled | RegexOptions.CultureInvariant;
 
 
 
-        internal static string GetContent(this HttpWebResponse response)
+        internal static RestRequest AddData(this RestRequest req, string key, object value, bool escapeValue = true)
         {
-            if (response == null) { throw new ArgumentNullException("response"); }
+            var data = $"{key}=";
 
-            using (var strm = response.GetResponseStream())
-            using (var reader = new StreamReader(strm))
-                return reader.ReadToEnd();
-        }
-
-        internal static List<Cookie> GetCookies(this CookieContainer container)
-        {
-            var cookies = new List<Cookie>();
-            var table = (Hashtable)container.GetType().InvokeMember("m_domainTable", BindingFlags.NonPublic | BindingFlags.GetField | BindingFlags.Instance, null, container, new object[] { });
-
-            foreach (var key in table.Keys)
+            if (escapeValue)
             {
-                Uri uri;
-                var domain = key as string;
-
-                if (domain == null) continue;
-                if (domain.StartsWith("."))
-                    domain = domain.Substring(1);
-
-                var address = $"http://{domain}/";
-
-                if (Uri.TryCreate(address, UriKind.RelativeOrAbsolute, out uri) == false) continue;
-
-                foreach (Cookie cookie in container.GetCookies(uri))
-                    cookies.Add(cookie);
+                data += $"{Uri.EscapeDataString(value.ToString())}";
+            }
+            else
+            {
+                data += value.ToString();
             }
 
-            return cookies;
+            if (req.Parameters.Any(x => x.Name == reqContentType))
+            {
+                var v = (string)req.Parameters.Single(x => x.Name == reqContentType).Value;
+
+                if (!v.EndsWith("&"))
+                {
+                    data = "&" + data;
+                }
+
+                req.Parameters.Single(x => x.Name == reqContentType).Value += data;
+            }
+            else
+            {
+                req.AddParameter(reqContentType, data, ParameterType.RequestBody);
+            }
+
+            return req;
         }
 
         internal static string GetInputValue(this CQ input, string elementName)
@@ -79,6 +75,8 @@ namespace ChatExchangeDotNet
             var fkeyE = input["input"].FirstOrDefault(e => e.Attributes["name"] == elementName);
             return fkeyE?.Attributes["value"];
         }
+
+
 
         public static List<Message> GetMessagesByUser(this IEnumerable<Message> messages, User user)
         {

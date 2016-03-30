@@ -107,7 +107,11 @@ namespace ChatExchangeDotNet
             DateTime.TryParse(dom[".room-keycell"][0].ParentNode[1].InnerText, out firstMsg);
             FirstMessage = firstMsg;
 
-            var jsonRes = RequestManager.Post("", $"http://chat.{host}/chats/{roomID}/events", $"mode=Messages&msgCount=1");
+            var req = RequestManager.GenerateRequest(RestSharp.Method.POST, $"http://chat.{host}/chats/{roomID}/events");
+            req = req.AddData("mode", "messages");
+            req = req.AddData("msgCount", 1);
+
+            var jsonRes = RequestManager.SendRequest(req).Content;
             var json = JsonSerializer.DeserializeFromString<Dictionary<string, Dictionary<string, object>[]>>(jsonRes);
             var lastMsg = 0;
             int.TryParse(json["events"][0]["time_stamp"].ToString(), out lastMsg);

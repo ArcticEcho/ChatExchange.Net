@@ -24,6 +24,8 @@ using System;
 using System.Net;
 using System.Text.RegularExpressions;
 using CsQuery;
+using RestSharp;
+using static ChatExchangeDotNet.RequestManager;
 
 namespace ChatExchangeDotNet
 {
@@ -110,7 +112,7 @@ namespace ChatExchangeDotNet
 
             if (!room.InitialisePrimaryContentOnly)
             {
-                var historyHtml = RequestManager.Get("", $"http://chat.{Host}/messages/{ID}/history");
+                var historyHtml = SendRequest(GenerateRequest(Method.GET, $"http://chat.{Host}/messages/{ID}/history")).Content;
 
                 SetStarPinCount(historyHtml);
                 EditCount = GetEditCount(historyHtml);
@@ -143,52 +145,51 @@ namespace ChatExchangeDotNet
         {
             try
             {
-                using (var res = RequestManager.GetRaw("", $"http://chat.{room.Meta.Host}/message/{messageID}?plain=true"))
+                var res = SendRequest(GenerateRequest(Method.GET, $"http://chat.{room.Meta.Host}/message/{messageID}?plain=true"));
+
+                if (res?.StatusCode != HttpStatusCode.OK) return null;
+
+                var content = res.Content;
+
+                if (string.IsNullOrWhiteSpace(res.Content)) return null;
+
+                content = WebUtility.HtmlDecode(content);
+
+                if (stripMention)
                 {
-                    if (res?.StatusCode != HttpStatusCode.OK) return null;
-
-                    var content = res.GetContent();
-
-                    if (content == null) return null;
-
-                    content = WebUtility.HtmlDecode(content);
-
-                    if (stripMention)
+                    if (content.IsReply())
                     {
-                        if (content.IsReply())
-                        {
-                            content = Regex.Replace(content, @"^:\d+\s", "");
-                        }
-
-                        var users = room.PingableUsers;
-                        foreach (var user in users)
-                        {
-                            var name = user.Name.Replace(" ", "");
-                            var pattern = @"(?i)\s?@";
-
-                            if (name.Length < 3)
-                            {
-                                pattern += name;
-                            }
-                            else
-                            {
-                                pattern += name.Substring(0, 3);
-                                for (var i = 3; i < name.Length; i++)
-                                {
-                                    pattern += $"({name[i]}";
-                                }
-                                for (var i = 3; i < name.Length; i++)
-                                {
-                                    pattern += ")?";
-                                }
-                            }
-
-                            content = Regex.Replace(content, pattern, "");
-                        }
+                        content = Regex.Replace(content, @"^:\d+\s", "");
                     }
 
-                    return content.Trim();
+                    var users = room.PingableUsers;
+                    foreach (var user in users)
+                    {
+                        var name = user.Name.Replace(" ", "");
+                        var pattern = @"(?i)\s?@";
+
+                        if (name.Length < 3)
+                        {
+                            pattern += name;
+                        }
+                        else
+                        {
+                            pattern += name.Substring(0, 3);
+                            for (var i = 3; i < name.Length; i++)
+                            {
+                                pattern += $"({name[i]}";
+                            }
+                            for (var i = 3; i < name.Length; i++)
+                            {
+                                pattern += ")?";
+                            }
+                        }
+
+                        content = Regex.Replace(content, pattern, "");
+                    }
                 }
+
+                return content.Trim();
             }
             catch (WebException ex) when (ex.Response != null && ((HttpWebResponse)ex.Response).StatusCode == HttpStatusCode.NotFound)
             {
