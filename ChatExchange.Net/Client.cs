@@ -190,7 +190,7 @@ namespace ChatExchangeDotNet
 
             if (getRes == null || string.IsNullOrWhiteSpace(getRes.Content))
             {
-                throw new WebException("Invalid response received while logging in. (#189)");
+                throw new WebException("Invalid response received while logging in. (#193)");
             }
 
             var req = GenerateRequest(Method.POST, "https://openid.stackexchange.com/account/login/submit", getRes.ResponseUri.OriginalString, "https://openid.stackexchange.com");
@@ -203,7 +203,7 @@ namespace ChatExchangeDotNet
 
             if (postRes == null)
             {
-                throw new WebException("Invalid response received while logging in. (#202)");
+                throw new WebException("Invalid response received while logging in. (#206)");
             }
             if (postRes.ResponseUri.ToString() != "https://openid.stackexchange.com/user")
             {
@@ -224,7 +224,7 @@ namespace ChatExchangeDotNet
 
             if (getRes == null || string.IsNullOrWhiteSpace(getRes.Content))
             {
-                throw new WebException("Invalid response received while logging in. (#222)");
+                throw new WebException("Invalid response received while logging in. (#227)");
             }
 
             var referrer = $"https://{host}/users/login?returnurl=" + Uri.EscapeDataString($"http://{host}/");
@@ -238,7 +238,7 @@ namespace ChatExchangeDotNet
 
             if (postRes == null || string.IsNullOrWhiteSpace(postRes.Content))
             {
-                throw new WebException($"Invalid response received while logging into {host}. (#239)");
+                throw new WebException($"Invalid response received while logging into {host}. (#241)");
             }
 
             HandleConfirmationPrompt(postRes.ResponseUri.ToString(), postRes.Content);
