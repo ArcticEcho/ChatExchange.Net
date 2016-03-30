@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
     <metadata>
         <id>ChatExchange.Net</id>
@@ -18,6 +18,7 @@
                 <dependency id="CsQuery" version="1.3.4" />
                 <dependency id="ServiceStack.Text" version="4.0.40" />
                 <dependency id="WebSocketSharp" version="1.0.3-rc9" />
+                <dependency id="RestSharp" version="105.2.3" />
             </group>
         </dependencies>
         <frameworkAssemblies>
@@ -28,6 +29,6 @@
     </metadata>
     <files>
         <file src="..\ChatExchange.Net\bin\Release\ChatExchange.Net.dll" target="lib\ChatExchange.Net.dll" />
-        <file src="..\ChatExchange.Net\bin\Release\ChatExchange.Net.xml" target="lib\ChatExchange.Net.xml" />
+        <file src="..\ChatExchange.Net\bin\Release\ChatExchange.Net.XML" target="lib\ChatExchange.Net.xml" />
     </files>
 </package>
