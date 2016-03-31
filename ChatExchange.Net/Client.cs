@@ -111,15 +111,19 @@ namespace ChatExchangeDotNet
         /// </summary>
         /// <param name="roomUrl">The URL of the chat room to join.</param>
         /// <returns>A Room object which provides access to chat events/actions.</returns>
-        /// <exception cref="System.Exception">
+        /// <param name="loadUsersAsync">
+        /// Specifies whether the Room object should fetch the: room owners,
+        /// current users and pingable users lists asynchronously (true) or not (false).
+        /// </param>
+        /// <exception cref="Exception">
         /// Thrown if you attempt to join a room you are currently in.
         /// </exception>
-        public Room JoinRoom(string roomUrl)
+        public Room JoinRoom(string roomUrl, bool loadUsersAsync = false)
         {
             var host = hostParser.Replace(roomUrl, "");
             var id = int.Parse(idParser.Replace(roomUrl, ""));
 
-            return JoinRoom(host, id);
+            return JoinRoom(host, id, loadUsersAsync);
         }
 
         /// <summary>
@@ -129,11 +133,15 @@ namespace ChatExchangeDotNet
         /// The host domain of the chat room.
         /// For example: meta.stackexchange.com</param>
         /// <param name="roomID">The unique identification number of the room.</param>
+        /// <param name="loadUsersAsync">
+        /// Specifies whether the Room object should fetch the: room owners,
+        /// current users and pingable users lists asynchronously (true) or not (false).
+        /// </param>
         /// <returns>A Room object which provides access to chat events/actions.</returns>
-        /// <exception cref="System.Exception">
+        /// <exception cref="Exception">
         /// Thrown if you attempt to join a room you are currently in.
         /// </exception>
-        public Room JoinRoom(string host, int roomID)
+        public Room JoinRoom(string host, int roomID, bool loadUsersAsync = false)
         {
             if (Rooms.Any(room => room.Meta.Host == host && room.Meta.ID == roomID))
             {
@@ -152,7 +160,7 @@ namespace ChatExchangeDotNet
                 }
             }
 
-            var r = new Room(cookieKey, host, roomID, proxyUrl, proxyUsername, proxyPassword);
+            var r = new Room(cookieKey, host, roomID, proxyUrl, proxyUsername, proxyPassword, loadUsersAsync);
             var rms = Rooms.ToList();
             rms.Add(r);
 

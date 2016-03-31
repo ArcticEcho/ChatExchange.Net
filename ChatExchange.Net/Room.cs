@@ -130,7 +130,7 @@ namespace ChatExchangeDotNet
 
 
 
-        internal Room(string cookieKey, string host, int id, string proxyUrl, string proxyUsername, string proxyPassword)
+        internal Room(string cookieKey, string host, int id, string proxyUrl, string proxyUsername, string proxyPassword, bool loadUsersAsync)
         {
             if (string.IsNullOrEmpty(cookieKey)) throw new ArgumentNullException("cookieKey"); 
             if (string.IsNullOrEmpty(host)) throw new ArgumentNullException("'host' must not be null or empty.", "host"); 
@@ -153,9 +153,22 @@ namespace ChatExchangeDotNet
             var url = GetSocketURL(count);
 
             InitialiseSocket(url);
-            InitialiseRoomOwners();
-            InitialisePingableUsers();
-            InitialiseCurrentUsers();
+
+            if (loadUsersAsync)
+            {
+                Task.Factory.StartNew(() =>
+                {
+                    InitialiseRoomOwners();
+                    InitialisePingableUsers();
+                    InitialiseCurrentUsers();
+                });
+            }
+            else
+            {
+                InitialiseRoomOwners();
+                InitialisePingableUsers();
+                InitialiseCurrentUsers();
+            }
 
             trackingToken = evMan.TrackRoom(this);
 
@@ -1346,12 +1359,19 @@ namespace ChatExchangeDotNet
 
             while (!dispose)
             {
-                if ((DateTime.UtcNow - lastData).TotalSeconds > 30)
+                try
                 {
-                    SetFkey();
-                    var count = GetGlobalEventCount();
-                    var url = GetSocketURL(count);
-                    InitialiseSocket(url);
+                    if ((DateTime.UtcNow - lastData).TotalSeconds > 30)
+                    {
+                        SetFkey();
+                        var count = GetGlobalEventCount();
+                        var url = GetSocketURL(count);
+                        InitialiseSocket(url);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    evMan.CallListeners(EventType.InternalException, false, ex);
                 }
 
                 wsRecMre.WaitOne(TimeSpan.FromSeconds(15));
