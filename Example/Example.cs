@@ -41,7 +41,7 @@ namespace Example
             // Post a new message in the room (if successful, returns
             // a Message object, otherwise returns null).
             // (If you have no use of the returned Message object,
-            // I'd recommend using .PostMessageFast() instead.)
+            // I'd recommend using .PostMessageLight() instead.)
             var myMessage = sandbox.PostMessage("Hello world!");
 
             // Listen to the InternalException event for any exceptions that may arise during execution.
