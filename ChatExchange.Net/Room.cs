@@ -158,15 +158,15 @@ namespace ChatExchangeDotNet
             {
                 Task.Factory.StartNew(() =>
                 {
-                    InitialiseRoomOwners();
                     InitialisePingableUsers();
+                    InitialiseRoomOwners();
                     InitialiseCurrentUsers();
                 });
             }
             else
             {
-                InitialiseRoomOwners();
                 InitialisePingableUsers();
+                InitialiseRoomOwners();
                 InitialiseCurrentUsers();
             }
 
@@ -1235,6 +1235,7 @@ namespace ChatExchangeDotNet
 
             foreach (var id in data)
             {
+                Thread.Sleep(1000);
                 var userID = int.Parse(id[0].ToString());
                 var user = new User(Meta, userID, true);
                 evMan.TrackUser(user);
@@ -1254,11 +1255,21 @@ namespace ChatExchangeDotNet
             var users = new HashSet<User>();
             foreach (Match id in ids)
             {
-                var userID = 0;
+                var userID = -1;
 
                 if (int.TryParse(id.Groups[1].Value, out userID))
                 {
-                    users.Add(GetUser(userID));
+                    var u = PingableUsers.SingleOrDefault(x => x.ID == userID);
+                    if (u == null)
+                    {
+                        Thread.Sleep(1000);
+                        users.Add(GetUser(userID));
+                    }
+                    else
+                    {
+                        evMan.TrackUser(u);
+                        users.Add(u);
+                    }
                 }
             }
 
@@ -1276,7 +1287,17 @@ namespace ChatExchangeDotNet
 
                 if (int.TryParse(new string(user.Id.Where(char.IsDigit).ToArray()), out id))
                 {
-                    ros.Add(GetUser(id));
+                    var u = PingableUsers.SingleOrDefault(x => x.ID == id);
+                    if (u == null)
+                    {
+                        Thread.Sleep(1000);
+                        ros.Add(GetUser(id));
+                    }
+                    else
+                    {
+                        evMan.TrackUser(u);
+                        ros.Add(u);
+                    }
                 }
             }
 

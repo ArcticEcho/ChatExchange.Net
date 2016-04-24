@@ -206,7 +206,7 @@ namespace ChatExchangeDotNet
                 {
                     [EventType.UserAccessLevelChanged] = new Action<User, User, UserRoomAccess>((granter, targetUser, newAccess) =>
                     {
-                        if (targetUser.ID == user.ID && user != null)
+                        if (targetUser.ID == user?.ID)
                         {
                             user.IsRoomOwner = newAccess == UserRoomAccess.Owner;
                         }
@@ -243,6 +243,13 @@ namespace ChatExchangeDotNet
                         if (meta != null)
                         {
                             meta.AllTimeMessages--;
+                        }
+                    }),
+                    [EventType.MessageMovedIn] = new Action<Message>(msg =>
+                    {
+                        if (meta != null)
+                        {
+                            meta.AllTimeMessages++;
                         }
                     }),
                     [EventType.RoomMetaChanged] = new Action<User, string, string, string[]>((u, n, d, t) =>
