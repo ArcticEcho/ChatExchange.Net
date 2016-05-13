@@ -36,9 +36,8 @@ namespace ChatExchangeDotNet
         private readonly ManualResetEvent consumerClosed = new ManualResetEvent(false);
         private readonly Thread consumerThread;
         private readonly EventManager evMan;
+        private Action<long, object> ActionCompleted;
         private bool disposed;
-        private delegate void ActionCompletedEventHandler(long actionKey, object returnedData);
-        private event ActionCompletedEventHandler ActionCompleted;
 
 
 
@@ -78,8 +77,7 @@ namespace ChatExchangeDotNet
             var key = queuedActions.Keys.Count == 0 ? 0 : queuedActions.Keys.Max() + 1;
             var mre = new ManualResetEvent(false);
             object data = null;
-
-            ActionCompleted += (k, d) =>
+            var evFunc = new Action<long, object>((k, d) =>
             {
                 if (k == key)
                 {
@@ -87,7 +85,9 @@ namespace ChatExchangeDotNet
                     // Action completed, notify the waiting thread.
                     mre.Set();
                 }
-            };
+            });
+
+            ActionCompleted += evFunc;
 
             // Add the action to the queue for processing.
             queuedActions[key] = action;
@@ -98,6 +98,7 @@ namespace ChatExchangeDotNet
             // The action's been processed; remove it from the queue.
             ChatAction temp;
             queuedActions.TryRemove(key, out temp);
+            ActionCompleted -= evFunc;
 
             return data;
         }
@@ -110,10 +111,11 @@ namespace ChatExchangeDotNet
             {
                 Thread.Sleep(50);
 
-               if (queuedActions.IsEmpty) continue;
+                if (queuedActions.IsEmpty) continue;
 
                 var action = new ActionPair(long.MinValue, null);
                 object data = null;
+
                 try
                 {
                     action = GetNextAction();

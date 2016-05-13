@@ -23,7 +23,7 @@
 using System;
 using System.Collections.Generic;
 using CsQuery;
-using ServiceStack.Text;
+using Jil;
 
 namespace ChatExchangeDotNet
 {
@@ -112,9 +112,10 @@ namespace ChatExchangeDotNet
             req = req.AddData("msgCount", 1);
 
             var jsonRes = RequestManager.SendRequest(req).Content;
-            var json = JsonSerializer.DeserializeFromString<Dictionary<string, Dictionary<string, object>[]>>(jsonRes);
+            var json = JSON.Deserialize<Dictionary<string, object>>(jsonRes);
+            var events = JSON.Deserialize<Dictionary<string, object>[]>(json["events"].ToString());
             var lastMsg = 0;
-            int.TryParse(json["events"][0]["time_stamp"].ToString(), out lastMsg);
+            int.TryParse(events[0]["time_stamp"].ToString(), out lastMsg);
             LastMessage = new DateTime(1970, 1, 1).AddSeconds(lastMsg);
 
             var totalMsg = -1;

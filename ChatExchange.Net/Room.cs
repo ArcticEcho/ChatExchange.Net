@@ -28,11 +28,10 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using CsQuery;
+using Jil;
 using RestSharp;
-using ServiceStack.Text;
 using WebSocketSharp;
 using static ChatExchangeDotNet.RequestManager;
-using JsonObject = ServiceStack.Text.JsonObject;
 
 namespace ChatExchangeDotNet
 {
@@ -303,7 +302,13 @@ namespace ChatExchangeDotNet
         /// <param name="userID">The user ID to look up.</param>
         public User GetUser(int userID)
         {
-            var u = new User(Meta, userID, cookieKey);
+            var u = PingableUsers.SingleOrDefault(x => x.ID == userID);
+
+            if (u == null)
+            {
+                u = new User(Meta, userID, cookieKey);
+                PingableUsers.Add(u);
+            }
 
             evMan.TrackUser(u);
 
@@ -363,11 +368,11 @@ namespace ChatExchangeDotNet
                     if (string.IsNullOrEmpty(resContent) || dispose) return null;
                     if (HandleThrottling(resContent)) continue;
 
-                    var json = JsonObject.Parse(resContent);
+                    var json = JSON.Deserialize<Dictionary<string, object>>(resContent);
                     var messageID = -1;
                     if (json.ContainsKey("id"))
                     {
-                        messageID = json.Get<int>("id");
+                        messageID = int.Parse(json["id"].ToString());
                     }
                     else
                     {
@@ -412,7 +417,7 @@ namespace ChatExchangeDotNet
                     if (string.IsNullOrEmpty(resContent) || dispose) return false;
                     if (HandleThrottling(resContent)) continue;
 
-                    return JsonObject.Parse(resContent).ContainsKey("id");
+                    return JSON.Deserialize<Dictionary<string, object>>(resContent).ContainsKey("id");
                 }
 
                 return false;
@@ -1230,7 +1235,7 @@ namespace ChatExchangeDotNet
 
             if (string.IsNullOrEmpty(json)) throw new Exception("Unable to initialise PingableUsers.");
 
-            var data = JsonSerializer.DeserializeFromString<HashSet<List<object>>>(json);
+            var data = JSON.Deserialize<HashSet<List<object>>>(json);
             var users = new HashSet<User>();
 
             foreach (var id in data)
@@ -1352,7 +1357,9 @@ namespace ChatExchangeDotNet
                 throw new Exception($"Could not get 'eventtime' for room {Meta.ID} on {Meta.Host}.");
             }
 
-            return JsonObject.Parse(resContent).Get<int>("time");
+            var timeObj = JSON.Deserialize<Dictionary<string, object>>(resContent)["time"];
+
+            return int.Parse(timeObj.ToString());
         }
 
         private string GetSocketURL(int eventTime)
@@ -1367,7 +1374,9 @@ namespace ChatExchangeDotNet
 
             if (string.IsNullOrEmpty(resContent)) throw new Exception("Could not get WebSocket URL.");
 
-            return JsonObject.Parse(resContent).Get<string>("url") + "?l=" + eventTime;
+            var baseUrl = JSON.Deserialize<Dictionary<string, string>>(resContent)["url"];
+
+            return baseUrl + "?l=" + eventTime;
         }
 
         private void WSRecovery()
@@ -1431,12 +1440,14 @@ namespace ChatExchangeDotNet
         {
             evMan.CallListeners(EventType.DataReceived, false, json);
 
-            var obj = JsonObject.Parse(json);
-            var data = obj.Get<Dictionary<string, List<Dictionary<string, object>>>>("r" + Meta.ID);
+            var obj = JSON.Deserialize<Dictionary<string, object>>(json);
+            var r = JSON.Deserialize<Dictionary<string, object>>(obj["r" + Meta.ID].ToString());
 
-            if (!data.ContainsKey("e") || data["e"] == null) return;
+            if (!r.ContainsKey("e") || r["e"] == null) return;
 
-            foreach (var message in data["e"])
+            var msgs = JSON.Deserialize<Dictionary<string, object>[]>(r["e"].ToString());
+
+            foreach (var message in msgs)
             {
                 var eventType = (EventType)int.Parse(message["event_type"].ToString());
 

@@ -24,7 +24,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using RestSharp;
-using ServiceStack.Text;
+using Jil;
 using static ChatExchangeDotNet.RequestManager;
 
 namespace ChatExchangeDotNet
@@ -167,7 +167,7 @@ namespace ChatExchangeDotNet
 
             if (string.IsNullOrEmpty(json)) return false;
 
-            var data = JsonSerializer.DeserializeFromString<HashSet<List<object>>>(json);
+            var data = JSON.Deserialize<HashSet<List<object>>>(json);
 
             foreach (var user in data)
             {
@@ -199,20 +199,19 @@ namespace ChatExchangeDotNet
 
             if (!string.IsNullOrEmpty(resContent) && resContent.StartsWith("{\"users\":[{"))
             {
-                var json = ServiceStack.Text.JsonObject.Parse(resContent);
-                var data = json.Get<List<Dictionary<string, object>>>("users");
+                var data = JSON.DeserializeDynamic(resContent);
 
                 if (data.Count != 0)
                 {
-                    Name = (string)data[0]["name"];
-                    Reputation = int.Parse(data[0]["reputation"].ToString());
-                    if (data[0].ContainsKey("is_moderator") && data[0]["is_moderator"] != null)
+                    Name = data.users[0]["name"];
+                    Reputation = data.users[0]["reputation"];
+                    if (data.users[0].ContainsKey("is_moderator") && data.users[0]["is_moderator"] != null)
                     {
-                        IsMod = bool.Parse(data[0]["is_moderator"].ToString());
+                        IsMod = data.users[0]["is_moderator"];
                     }
-                    if (data[0].ContainsKey("is_owner") && data[0]["is_owner"] != null)
+                    if (data.users[0].ContainsKey("is_owner") && data.users[0]["is_owner"] != null)
                     {
-                        IsRoomOwner = bool.Parse(data[0]["is_owner"].ToString());
+                        IsRoomOwner = data.users[0]["is_owner"];
                     }
                 }
 
