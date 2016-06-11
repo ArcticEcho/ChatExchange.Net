@@ -50,10 +50,9 @@ namespace ChatExchangeDotNet.EventListeners
             var id = int.Parse(data["message_id"].ToString());
             var parentID = int.Parse(data["parent_id"].ToString());
             var parent = room[parentID];
-            var author = room.GetUser(authorID);
-            var message = new Message(room, ref evMan, id, author, parentID);
+            var child = new Message(room, ref evMan, id, authorID);
 
-            evMan.CallListeners(EventType.MessageReply, authorID == room.Me.ID, parent, message);
+            evMan.CallListeners(EventType.MessageReply, authorID == room.Me.ID, parent, child);
         }
     }
 }

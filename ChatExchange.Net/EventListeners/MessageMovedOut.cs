@@ -46,14 +46,8 @@ namespace ChatExchangeDotNet.EventListeners
         {
             var authorID = int.Parse(data["user_id"].ToString());
             var id = int.Parse(data["message_id"].ToString());
-            var parentID = -1;
 
-            if (data.ContainsKey("parent_id") && data["parent_id"] != null)
-            {
-                parentID = int.Parse(data["parent_id"].ToString());
-            }
-
-            var message = new Message(room, ref evMan, id, room.GetUser(authorID), parentID);
+            var message = new Message(room, ref evMan, id, authorID);
 
             evMan.CallListeners(EventType.MessageMovedOut, authorID == room.Me.ID, message);
         }

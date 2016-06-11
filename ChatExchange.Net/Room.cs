@@ -284,14 +284,8 @@ namespace ChatExchangeDotNet
             }
 
             var lastestDom = CQ.Create(resContent).Select(".monologue").Last();
-            var content = Message.GetMessageContent(this, messageID, StripMention);
-
-            if (content == null) throw new MessageNotFoundException();
-
-            var parentID = content.IsReply() ? int.Parse(content.Substring(1, content.IndexOf(' '))) : -1;
             var authorID = int.Parse(lastestDom[".username a"].First().Attr("href").Split('/')[2]);
-            var author = GetUser(authorID);
-            var message = new Message(this, ref evMan, messageID, author, parentID);
+            var message = new Message(this, ref evMan, messageID, authorID);
 
             return message;
         }

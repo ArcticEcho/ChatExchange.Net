@@ -94,19 +94,32 @@ namespace ChatExchangeDotNet
 
 
 
-        internal Message(Room room, ref EventManager eventManager, int messageID, User author, int parentID = -1)
+        internal Message(Room room, ref EventManager eventManager, int messageID, int authorID)
         {
-            if (room == null) throw new ArgumentException("room");
-            if (messageID < 0) throw new ArgumentOutOfRangeException("messageID", "'messageID' can not be less than 0.");
-            if (author == null) throw new ArgumentNullException("author");
+            if (room == null) throw new ArgumentException(nameof(room));
+            if (messageID < 0) throw new ArgumentOutOfRangeException(nameof(messageID), "'messageID' can not be less than 0.");
 
             evMan = eventManager;
             Content = GetMessageContent(room, messageID, room.StripMention);
+
+            if (Content == null)
+            {
+                throw new MessageNotFoundException();
+            }
+
             Host = room.Meta.Host;
             RoomID = room.Meta.ID;
             ID = messageID;
-            ParentID = parentID;
-            Author = author;
+            Author = room.GetUser(authorID);
+
+            if (Content.IsReply())
+            {
+                ParentID = int.Parse(Content.Substring(1, Content.IndexOf(' ')));
+            }
+            else
+            {
+                ParentID = -1;
+            }
 
             trackID = eventManager.TrackMessage(this, room.InitialisePrimaryContentOnly);
 
@@ -195,7 +208,7 @@ namespace ChatExchangeDotNet
             {
                 // If the input is valid, we've probably hit a deleted message.
 
-                throw new MessageNotFoundException();
+                return null;
             }
         }
 
