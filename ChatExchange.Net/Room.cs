@@ -60,6 +60,8 @@ namespace ChatExchangeDotNet
         private WebSocket socket;
         private EventManager evMan;
 
+        internal string[] Usernames { get; private set; }
+
         # region Public properties/indexer.
 
         /// <summary>
@@ -148,9 +150,10 @@ namespace ChatExchangeDotNet
             SetFkey();
             Me = GetMe();
 
+            InitialiseUsernames();
+
             var count = GetGlobalEventCount();
             var url = GetSocketURL(count);
-
             InitialiseSocket(url);
 
             if (loadUsersAsync)
@@ -1218,16 +1221,37 @@ namespace ChatExchangeDotNet
         {
             while (!dispose)
             {
+                InitialiseUsernames();
                 InitialisePingableUsers();
                 pingableUsersSyncMre.WaitOne(TimeSpan.FromDays(1));
             }
+        }
+
+        private void InitialiseUsernames()
+        {
+            var json = SendRequest(cookieKey, GenerateRequest(Method.GET, $"http://chat.{Meta.Host}/rooms/pingable/{Meta.ID}")).Content;
+
+            if (string.IsNullOrEmpty(json)) throw new Exception("Unable to fetch pingable users list.");
+
+            var data = JSON.Deserialize<HashSet<List<object>>>(json);
+            var names = new HashSet<string>();
+
+            foreach (var u in data)
+            {
+                var name = u[1].ToString();
+                name = name.Substring(1, name.Length - 2);
+
+                names.Add(name);
+            }
+
+            Usernames = names.ToArray();
         }
 
         private void InitialisePingableUsers()
         {
             var json = SendRequest(cookieKey, GenerateRequest(Method.GET, $"http://chat.{Meta.Host}/rooms/pingable/{Meta.ID}")).Content;
 
-            if (string.IsNullOrEmpty(json)) throw new Exception("Unable to initialise PingableUsers.");
+            if (string.IsNullOrEmpty(json)) throw new Exception("Unable to fetch pingable users list.");
 
             var data = JSON.Deserialize<HashSet<List<object>>>(json);
             var users = new HashSet<User>();

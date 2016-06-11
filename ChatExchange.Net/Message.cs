@@ -175,24 +175,24 @@ namespace ChatExchangeDotNet
                         content = Regex.Replace(content, @"^:\d+\s", "");
                     }
 
-                    var users = room.PingableUsers;
-                    foreach (var user in users)
+                    var names = room.Usernames;
+                    foreach (var name in names)
                     {
-                        var name = user.Name.Replace(" ", "");
+                        var n = name.Replace(" ", "");
                         var pattern = @"(?i)\s?@";
 
-                        if (name.Length < 3)
+                        if (n.Length < 3)
                         {
-                            pattern += name;
+                            pattern += n;
                         }
                         else
                         {
-                            pattern += name.Substring(0, 3);
-                            for (var i = 3; i < name.Length; i++)
+                            pattern += n.Substring(0, 3);
+                            for (var i = 3; i < n.Length; i++)
                             {
-                                pattern += $"({name[i]}";
+                                pattern += $"({n[i]}";
                             }
-                            for (var i = 3; i < name.Length; i++)
+                            for (var i = 3; i < n.Length; i++)
                             {
                                 pattern += ")?";
                             }
