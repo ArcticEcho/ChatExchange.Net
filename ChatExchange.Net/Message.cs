@@ -21,6 +21,7 @@
 
 
 using System;
+using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
 using CsQuery;
@@ -175,30 +176,35 @@ namespace ChatExchangeDotNet
                         content = Regex.Replace(content, @"^:\d+\s", "");
                     }
 
-                    var names = room.Usernames;
-                    foreach (var name in names)
+                    var ping = Regex.Match(content, @"@\S+");
+
+                    while (ping.Success)
                     {
-                        var n = name.Replace(" ", "");
-                        var pattern = @"(?i)\s?@";
+                        var pingedName = ping.Value.Remove(0, 1);
+                        var nameMatchesPing = false;
+                        var names = room.Usernames;
 
-                        if (n.Length < 3)
+                        for (var i = pingedName.Length; i > 2; i--)
                         {
-                            pattern += n;
-                        }
-                        else
-                        {
-                            pattern += n.Substring(0, 3);
-                            for (var i = 3; i < n.Length; i++)
+                            foreach (var name in names)
                             {
-                                pattern += $"({n[i]}";
+                                var n = name.Replace(" ", "");
+                                if (n.Length >= i && pingedName == n.Substring(0, i))
+                                {
+                                    nameMatchesPing = true;
+                                    break;
+                                }
                             }
-                            for (var i = 3; i < n.Length; i++)
-                            {
-                                pattern += ")?";
-                            }
+
+                            if (nameMatchesPing) break;
                         }
 
-                        content = Regex.Replace(content, pattern, "");
+                        if (nameMatchesPing)
+                        {
+                            content = content.Remove(ping.Index, ping.Length);
+                        }
+
+                        ping = ping.NextMatch();
                     }
                 }
 
