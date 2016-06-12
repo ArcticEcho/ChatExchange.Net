@@ -101,17 +101,12 @@ namespace ChatExchangeDotNet
             if (messageID < 0) throw new ArgumentOutOfRangeException(nameof(messageID), "'messageID' can not be less than 0.");
 
             evMan = eventManager;
-            Content = GetMessageContent(room, messageID, room.StripMention);
+            Content = GetMessageText(room, messageID);
 
             if (Content == null)
             {
                 throw new MessageNotFoundException();
             }
-
-            Host = room.Meta.Host;
-            RoomID = room.Meta.ID;
-            ID = messageID;
-            Author = room.GetUser(authorID);
 
             if (Content.IsReply())
             {
@@ -121,6 +116,16 @@ namespace ChatExchangeDotNet
             {
                 ParentID = -1;
             }
+
+            if (room.StripMention)
+            {
+                Content = StripMentions(room, Content);
+            }
+
+            Host = room.Meta.Host;
+            RoomID = room.Meta.ID;
+            ID = messageID;
+            Author = room.GetUser(authorID);
 
             trackID = eventManager.TrackMessage(this, room.InitialisePrimaryContentOnly);
 
@@ -155,7 +160,7 @@ namespace ChatExchangeDotNet
         /// <exception cref="MessageNotFoundException">
         /// Thrown if the message cannot be found (a result of an incorrect ID, or deletion).
         /// </exception>
-        public static string GetMessageContent(Room room, int messageID, bool stripMention = false)
+        public static string GetMessageText(Room room, int messageID)
         {
             try
             {
@@ -169,45 +174,6 @@ namespace ChatExchangeDotNet
 
                 content = WebUtility.HtmlDecode(content);
 
-                if (stripMention)
-                {
-                    if (content.IsReply())
-                    {
-                        content = Regex.Replace(content, @"^:\d+\s", "");
-                    }
-
-                    var ping = Regex.Match(content, @"@\S+");
-
-                    while (ping.Success)
-                    {
-                        var pingedName = ping.Value.Remove(0, 1);
-                        var nameMatchesPing = false;
-                        var names = room.Usernames;
-
-                        for (var i = pingedName.Length; i > 2; i--)
-                        {
-                            foreach (var name in names)
-                            {
-                                var n = name.Replace(" ", "");
-                                if (n.Length >= i && pingedName == n.Substring(0, i))
-                                {
-                                    nameMatchesPing = true;
-                                    break;
-                                }
-                            }
-
-                            if (nameMatchesPing) break;
-                        }
-
-                        if (nameMatchesPing)
-                        {
-                            content = content.Remove(ping.Index, ping.Length);
-                        }
-
-                        ping = ping.NextMatch();
-                    }
-                }
-
                 return content.Trim();
             }
             catch (WebException ex) when (ex.Response != null && ((HttpWebResponse)ex.Response).StatusCode == HttpStatusCode.NotFound)
@@ -216,6 +182,48 @@ namespace ChatExchangeDotNet
 
                 return null;
             }
+        }
+
+        public static string StripMentions(Room room, string messageText)
+        {
+            if (messageText.IsReply())
+            {
+                messageText = Regex.Replace(messageText, @"^:\d+\s", "");
+            }
+
+            var ping = Regex.Match(messageText, @"@\S+");
+            var stripped = messageText;
+
+            while (ping.Success)
+            {
+                var pingedName = ping.Value.Remove(0, 1);
+                var nameMatchesPing = false;
+                var names = room.Usernames;
+
+                for (var i = pingedName.Length; i > 2; i--)
+                {
+                    foreach (var name in names)
+                    {
+                        var n = name.Replace(" ", "");
+                        if (n.Length >= i && pingedName == n.Substring(0, i))
+                        {
+                            nameMatchesPing = true;
+                            break;
+                        }
+                    }
+
+                    if (nameMatchesPing) break;
+                }
+
+                if (nameMatchesPing)
+                {
+                    stripped = stripped.Remove(ping.Index, ping.Length);
+                }
+
+                ping = ping.NextMatch();
+            }
+
+            return stripped.Trim();
         }
 
         public void Dispose()
