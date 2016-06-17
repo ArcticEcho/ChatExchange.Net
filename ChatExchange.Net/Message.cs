@@ -196,7 +196,7 @@ namespace ChatExchangeDotNet
 
             while (ping.Success)
             {
-                var pingedName = ping.Value.Remove(0, 1);
+                var pingedName = ping.Value.Remove(0, 1).ToLowerInvariant();
                 var nameMatchesPing = false;
                 var names = room.Usernames;
 
@@ -204,7 +204,7 @@ namespace ChatExchangeDotNet
                 {
                     foreach (var name in names)
                     {
-                        var n = name.Replace(" ", "");
+                        var n = name.Replace(" ", "").ToLowerInvariant();
                         if (n.Length >= i && pingedName == n.Substring(0, i))
                         {
                             nameMatchesPing = true;
