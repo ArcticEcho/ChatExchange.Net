@@ -24,6 +24,11 @@ using System;
 using System.Threading;
 using ChatExchangeDotNet;
 
+// This is a small example program to demonstrate 
+// some of this library's basic functions. See our
+// wiki for more detailed information:
+// https://github.com/ArcticEcho/ChatExchange.Net/wiki
+
 namespace Example
 {
     public class Example
