@@ -1399,7 +1399,7 @@ namespace ChatExchangeDotNet
 
         private void WSRecovery()
         {
-            var lastData = DateTime.MaxValue;
+            var lastData = DateTime.UtcNow;
             evMan.ConnectListener(EventType.DataReceived, new Action<string>(json =>
             {
                 lastData = DateTime.UtcNow;
