@@ -143,7 +143,7 @@ namespace ChatExchangeDotNet
         /// </exception>
         public Room JoinRoom(string host, int roomID, bool loadUsersAsync = false)
         {
-            if (Rooms.Any(room => room.Meta.Host == host && room.Meta.ID == roomID))
+            if (Rooms.Any(room => room.Meta.Host == host && room.Meta.ID == roomID && !room.dispose))
             {
                 throw new Exception("Cannot join a room you are already in.");
             }
