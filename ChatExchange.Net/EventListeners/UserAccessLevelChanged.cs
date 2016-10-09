@@ -49,7 +49,8 @@ namespace ChatExchangeDotNet.EventListeners
         {
             var granterID = int.Parse(data["user_id"].ToString());
             var targetUserID = int.Parse(data["target_user_id"].ToString());
-            var content = (string)data["content"];
+            var content = data["content"].ToString();
+            content = content.Substring(1, content.Length - 2);
             var granter = room.GetUser(granterID);
             var targetUser = room.GetUser(targetUserID);
             var newAccessLevel = UserRoomAccess.Normal;
