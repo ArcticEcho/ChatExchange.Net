@@ -22,6 +22,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Net;
 using CsQuery;
 using Jil;
 
@@ -127,13 +128,13 @@ namespace ChatExchangeDotNet
         {
             var dom = CQ.CreateFromUrl($"http://chat.{host}/rooms/info/{id}");
 
-            name = dom[".subheader h1"][0].InnerText;
-            description = dom[".roomcard-xxl p"][0].InnerText;
+            name = WebUtility.HtmlDecode(dom[".subheader h1"][0].InnerText);
+            description = WebUtility.HtmlDecode(dom[".roomcard-xxl p"][0].InnerText);
 
             var ts = new List<string>();
             foreach (var t in dom[".tag"])
             {
-                ts.Add(t.InnerText);
+                ts.Add(WebUtility.HtmlDecode(t.InnerText));
             }
             tags = ts.ToArray();
 

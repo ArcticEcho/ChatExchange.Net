@@ -53,12 +53,12 @@ namespace ChatExchangeDotNet
         private readonly string proxyPassword;
         private readonly string chatRoot;
         private readonly string cookieKey;
-        private bool dispose;
         private bool hasLeft;
         private string fkey;
         private KeyValuePair<string, DateTime> lastMsg;
         private WebSocket socket;
         private EventManager evMan;
+        internal bool dispose;
 
         internal string[] Usernames { get; private set; }
 
