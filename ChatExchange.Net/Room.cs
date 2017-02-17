@@ -1384,7 +1384,7 @@ namespace ChatExchangeDotNet
         {
             var data = $"roomid={Meta.ID}&fkey={fkey}";
 
-            var req = GenerateRequest(Method.POST, $"{chatRoot}/ws-auth", $"{chatRoot}/rooms/{Meta.ID}", chatRoot);
+            var req = GenerateRequest(Method.POST, $"{chatRoot}/ws-auth");
             req = req.AddData("roomid", Meta.ID);
             req = req.AddData("fkey", fkey);
 

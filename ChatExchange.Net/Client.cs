@@ -282,7 +282,7 @@ namespace ChatExchangeDotNet
             var dom = CQ.Create(res.Content);
             var id = 0;
 
-            foreach (var e in dom[".topbar a"])
+            foreach (var e in dom[".so-header a"])
             {
                 if (userUrl.IsMatch(e.OuterHTML))
                 {
