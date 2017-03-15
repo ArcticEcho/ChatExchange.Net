@@ -76,25 +76,16 @@ namespace ChatExchangeDotNet
             return fkeyE?.Attributes["value"];
         }
 
-
-
-        public static List<Message> GetMessagesByUser(this IEnumerable<Message> messages, User user)
+        public static IEnumerable<Message> GetMessagesByUser(this IEnumerable<Message> messages, User user)
         {
-            if (user == null) throw new ArgumentNullException("user");
-            return messages.GetMessagesByUser(user.ID);
+            var id = user?.ID ?? throw new ArgumentNullException(nameof(user));
+            return messages.GetMessagesByUser(id);
         }
 
-        public static List<Message> GetMessagesByUser(this IEnumerable<Message> messages, int userID)
+        public static IEnumerable<Message> GetMessagesByUser(this IEnumerable<Message> messages, int userID)
         {
-            if (messages == null) throw new ArgumentNullException("messages");
-
-            var userMessages = new List<Message>();
-
-            foreach (var m in messages)
-                if (m.Author.ID == userID)
-                    userMessages.Add(m);
-
-            return userMessages;
+            return (messages ?? throw new ArgumentNullException(nameof(messages)))
+                .Where(m => m.Author.ID == userID);
         }
 
         public static bool IsReply(this string message)
