@@ -29,7 +29,7 @@ using RestSharp;
 
 namespace ChatExchangeDotNet
 {
-    public static class Extensions
+    internal static class Extensions
     {
         private static readonly Regex isReply = new Regex(@"^:\d+\s", RegexOpts);
         private const string reqContentType = "application/x-www-form-urlencoded";
