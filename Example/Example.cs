@@ -60,8 +60,8 @@ namespace Example
                 // Print the new message (with the author's name).
                 Console.WriteLine(message.Author.Name + ": " + message.Content);
 
-               // If the message contains "3... 2... 1...", post "KA-BOOM!"
-               // (this is simply an [awful] example).
+                // If the message contains "3... 2... 1...", post "KA-BOOM!"
+                // (this is simply an [awful] example).
                 if (message.Content.Contains("3... 2... 1..."))
                 {
                     // Create a new MessageBuilder to format our message.
