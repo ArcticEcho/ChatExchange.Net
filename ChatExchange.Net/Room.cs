@@ -30,7 +30,6 @@ using System.Threading.Tasks;
 using CsQuery;
 using Jil;
 using RestSharp;
-using WebSocketSharp;
 using static ChatExchangeDotNet.RequestManager;
 
 namespace ChatExchangeDotNet
@@ -174,7 +173,6 @@ namespace ChatExchangeDotNet
 
             trackingToken = evMan.TrackRoom(this);
 
-            Task.Factory.StartNew(() => WSRecovery());
             Task.Factory.StartNew(() => SyncPingableUsers());
         }
 
@@ -209,17 +207,7 @@ namespace ChatExchangeDotNet
             if (dispose) return;
             dispose = true;
 
-            if ((socket?.ReadyState ?? WebSocketState.Closed) == WebSocketState.Open)
-            {
-                try
-                {
-                    socket.Close(CloseStatusCode.Normal);
-                }
-                catch (Exception ex)
-                {
-                    evMan.CallListeners(EventType.InternalException, false, ex);
-                }
-            }
+            socket.Dispose();
 
             throttleARE?.Set(); // Release any threads currently being throttled.
             throttleARE?.Dispose();
@@ -1301,7 +1289,9 @@ namespace ChatExchangeDotNet
 
         private void InitialiseRoomOwners()
         {
-            var dom = CQ.CreateFromUrl($"{chatRoot}/rooms/info/{Meta.ID}");
+            var req = new RestRequest($"{chatRoot}/rooms/info/{Meta.ID}", Method.GET);
+            var html = SendRequest(req).Content;
+            var dom = CQ.Create(html);
             var ros = new HashSet<User>();
 
             foreach (var user in dom["[id^=owner-user]"])
@@ -1397,51 +1387,17 @@ namespace ChatExchangeDotNet
             return baseUrl + "?l=" + eventTime;
         }
 
-        private void WSRecovery()
-        {
-            var lastData = DateTime.UtcNow;
-            evMan.ConnectListener(EventType.DataReceived, new Action<string>(json =>
-            {
-                lastData = DateTime.UtcNow;
-            }));
-
-            while (!dispose)
-            {
-                try
-                {
-                    if ((DateTime.UtcNow - lastData).TotalSeconds > 30)
-                    {
-                        SetFkey();
-                        var count = GetGlobalEventCount();
-                        var url = GetSocketURL(count);
-                        InitialiseSocket(url);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    evMan.CallListeners(EventType.InternalException, false, ex);
-                }
-
-                wsRecMre.WaitOne(TimeSpan.FromSeconds(15));
-            }
-        }
-
         private void InitialiseSocket(string socketUrl)
         {
-            if (socket != null) socket.Close(CloseStatusCode.Normal);
+            socket = new WebSocket();
 
-            socket = new WebSocket(socketUrl) { Origin = chatRoot };
+            socket.OnError += ex => evMan.CallListeners(EventType.InternalException, false, ex);
 
-            if (!string.IsNullOrWhiteSpace(proxyUrl))
-            {
-                socket.SetProxy(proxyUrl, proxyUsername, proxyPassword);
-            }
-
-            socket.OnMessage += (o, oo) =>
+            socket.OnMessage += m =>
             {
                 try
                 {
-                    HandleData(oo.Data);
+                    HandleData(m);
                 }
                 catch (Exception ex)
                 {
@@ -1449,9 +1405,14 @@ namespace ChatExchangeDotNet
                 }
             };
 
-            socket.OnError += (o, oo) => evMan.CallListeners(EventType.InternalException, false, oo.Exception);
+            socket.OnReconnectNeeded += () =>
+            {
+                SetFkey();
+                var count = GetGlobalEventCount();
+                return GetSocketURL(count);
+            };
 
-            socket.Connect();
+            socket.Connect(socketUrl);
         }
 
         private void HandleData(string json)
