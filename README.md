@@ -5,4 +5,4 @@ A .Net library (requiring .Net 4.5, or the Mono equivalent) for interacting with
 
 -----
 
-<sup><sup>Related libraries: [ChatExchange](https://github.com/Manishearth/ChatExchange) (Python), [JChatExchange](https://github.com/Vincentyification/JChatExchange) (Java, currently in private-beta) and [stackexchange-chatty](https://github.com/KeyboardFire/stackexchange-chatty) (Ruby).</sup></sup>
+<sup><sup>Related libraries: [ChatExchange](https://github.com/Manishearth/ChatExchange) (Python)) and [stackexchange-chatty](https://github.com/KeyboardFire/stackexchange-chatty) (Ruby).</sup></sup>
