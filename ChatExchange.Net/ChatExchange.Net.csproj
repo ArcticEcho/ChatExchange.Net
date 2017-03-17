@@ -3,6 +3,14 @@
   <PropertyGroup>
     <TargetFramework>netstandard1.6</TargetFramework>
     <RootNamespace>ChatExchangeDotNet</RootNamespace>
+    
+    <PackageId>ChatExchange.Net</PackageId>
+    <PackageVersion>6.0.0</PackageVersion>
+    <Authors>Samuel Kamber</Authors>
+    <Description>A library for interacting with Stack Exchange chat rooms.</Description>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageReleaseNotes>Upgrade library to use .NET Core.</PackageReleaseNotes>
+    <ProjectUrl>>https://github.com/ArcticEcho/ChatExchange.Net</ProjectUrl>
   </PropertyGroup>
 
   <ItemGroup>

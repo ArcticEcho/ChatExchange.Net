@@ -1,18 +1,13 @@
-version: 5.3.{build}.10
+version: 6.0.{build}.0
+
+os: Visual Studio 2017
 
 configuration: Release
 
 platform: Any CPU
 
-assembly_info:
-  patch: true
-  file: ChatExchange.Net\Properties\AssemblyInfo.cs
-  assembly_version: '5.3.0.10'
-  assembly_file_version: '{version}'
-  assembly_informational_version: '5.3.10-beta'
-
 before_build:
-- nuget restore
+- dotnet restore
 
 build:
   project: ChatExchange.Net.sln
@@ -20,7 +15,7 @@ build:
   verbosity: minimal
 
 after_build:
-- ps: .\NuGet\pack.ps1
+- ps: msbuild /t:pack /p:Configuration=Release
 
 artifacts:
 - path: ChatExchange.Net\bin\Release\ChatExchange.Net.dll
