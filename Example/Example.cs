@@ -41,7 +41,7 @@ namespace Example
             var client = new Client("some-email@address.com", "MySuperStr0ngPa55word");
 
             // Join a room by specifying its URL (returns a Room object).
-            var sandbox = client.JoinRoom("http://chat.stackexchange.com/rooms/1/sandbox");
+            var sandbox = client.JoinRoom("https://chat.stackoverflow.com/rooms/68414/socvr-testing-facility", true);
 
             // Post a new message in the room (if successful, returns
             // a Message object, otherwise returns null).
@@ -60,8 +60,8 @@ namespace Example
                 // Print the new message (with the author's name).
                 Console.WriteLine(message.Author.Name + ": " + message.Content);
 
-               // If the message contains "3... 2... 1...", post "KA-BOOM!"
-               // (this is simply an [awful] example).
+                // If the message contains "3... 2... 1...", post "KA-BOOM!"
+                // (this is simply an [awful] example).
                 if (message.Content.Contains("3... 2... 1..."))
                 {
                     // Create a new MessageBuilder to format our message.

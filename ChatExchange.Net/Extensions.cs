@@ -25,50 +25,17 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using CsQuery;
-using RestSharp;
 
 namespace ChatExchangeDotNet
 {
-    internal static class Extensions
+    public static class Extensions
     {
-        private static readonly Regex isReply = new Regex(@"^:\d+\s", RegexOpts);
+        private static readonly Regex isReply = new Regex(@"^:\d+\s\S", RegexOpts);
         private const string reqContentType = "application/x-www-form-urlencoded";
 
         internal static RegexOptions RegexOpts { get; } = RegexOptions.Compiled | RegexOptions.CultureInvariant;
 
 
-
-        internal static RestRequest AddData(this RestRequest req, string key, object value, bool escapeValue = true)
-        {
-            var data = $"{key}=";
-
-            if (escapeValue)
-            {
-                data += $"{Uri.EscapeDataString(value.ToString())}";
-            }
-            else
-            {
-                data += value.ToString();
-            }
-
-            if (req.Parameters.Any(x => x.Name == reqContentType))
-            {
-                var v = (string)req.Parameters.Single(x => x.Name == reqContentType).Value;
-
-                if (!v.EndsWith("&"))
-                {
-                    data = "&" + data;
-                }
-
-                req.Parameters.Single(x => x.Name == reqContentType).Value += data;
-            }
-            else
-            {
-                req.AddParameter(reqContentType, data, ParameterType.RequestBody);
-            }
-
-            return req;
-        }
 
         internal static string GetInputValue(this CQ input, string elementName)
         {
@@ -76,25 +43,16 @@ namespace ChatExchangeDotNet
             return fkeyE?.Attributes["value"];
         }
 
-
-
-        public static List<Message> GetMessagesByUser(this IEnumerable<Message> messages, User user)
+        public static IEnumerable<Message> GetMessagesByUser(this IEnumerable<Message> messages, User user)
         {
-            if (user == null) throw new ArgumentNullException("user");
-            return messages.GetMessagesByUser(user.ID);
+            var id = user?.ID ?? throw new ArgumentNullException(nameof(user));
+            return messages.GetMessagesByUser(id);
         }
 
-        public static List<Message> GetMessagesByUser(this IEnumerable<Message> messages, int userID)
+        public static IEnumerable<Message> GetMessagesByUser(this IEnumerable<Message> messages, int userID)
         {
-            if (messages == null) throw new ArgumentNullException("messages");
-
-            var userMessages = new List<Message>();
-
-            foreach (var m in messages)
-                if (m.Author.ID == userID)
-                    userMessages.Add(m);
-
-            return userMessages;
+            return (messages ?? throw new ArgumentNullException(nameof(messages)))
+                .Where(m => m.Author.ID == userID);
         }
 
         public static bool IsReply(this string message)

@@ -23,7 +23,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
-using RestSharp;
+//using RestSharp;
 using Jil;
 using static ChatExchangeDotNet.RequestManager;
 
@@ -144,26 +144,22 @@ namespace ChatExchangeDotNet
         /// <param name="userId">The ID of the user to check.</param>
         public static bool Exists(string host, int userId)
         {
-            try
+            var req = new HttpReq
             {
-                new WebClient().DownloadData($"http://chat.{host}/users/{userId}");
-            }
-            catch (WebException ex)
-            when (ex.Response != null &&
-                (((HttpWebResponse)ex.Response).StatusCode == HttpStatusCode.NotFound ||
-                ((HttpWebResponse)ex.Response).StatusCode == HttpStatusCode.InternalServerError))
-            {
-                return false;
-            }
+                Endpoint = $"http://chat.{host}/users/{userId}",
+                Method = HttpMethod.GET
+            };
 
-            return true;
+            var res = SendRequest(req);
+
+            return res.StatusCode == HttpStatusCode.OK;
         }
 
 
 
         internal static bool CanPing(string cookieKey, string host, int roomID, int userID)
         {
-            var json = SendRequest(cookieKey, GenerateRequest(Method.GET, $"http://chat.{host}/rooms/pingable/{roomID}")).Content;
+            var json = SimpleGet($"http://chat.{host}/rooms/pingable/{roomID}", cookieKey);
 
             if (string.IsNullOrEmpty(json)) return false;
 
@@ -191,15 +187,19 @@ namespace ChatExchangeDotNet
 
             if (!Exists(host, userID)) throw new UserNotFoundException();
 
-            var req = GenerateRequest(Method.POST, "http://chat." + host + "/user/info");
-            req = req.AddData("ids", userID);
-            req = req.AddData("roomid", roomID);
-
-            var resContent = SendRequest(req).Content;
-
-            if (!string.IsNullOrEmpty(resContent) && resContent.StartsWith("{\"users\":[{"))
+            var req = new HttpReq
             {
-                var data = JSON.DeserializeDynamic(resContent);
+                Endpoint = "http://chat." + host + "/user/info",
+                Method = HttpMethod.POST,
+            };
+            req.AddDataKVPair("ids", userID.ToString());
+            req.AddDataKVPair("roomid", roomID.ToString());
+
+            var resData = SendRequest(req).Data;
+
+            if (!string.IsNullOrEmpty(resData) && resData.StartsWith("{\"users\":[{"))
+            {
+                var data = JSON.DeserializeDynamic(resData);
 
                 if (data.Count != 0)
                 {

@@ -27,7 +27,6 @@ using System.Text.RegularExpressions;
 using CsQuery;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
-using RestSharp;
 using static ChatExchangeDotNet.RequestManager;
 
 namespace ChatExchangeDotNet
@@ -43,11 +42,7 @@ namespace ChatExchangeDotNet
         private readonly Regex idParser = new Regex(".*/rooms/|/.*", Extensions.RegexOpts);
         private readonly string accountEmail;
         private readonly string accountPassword;
-        private readonly string proxyUrl;
-        private readonly string proxyUsername;
-        private readonly string proxyPassword;
         private readonly string cookieKey;
-        private string openidUrl;
         private bool disposed;
 
         /// <summary>
@@ -76,25 +71,14 @@ namespace ChatExchangeDotNet
             accountPassword = password;
             cookieKey = email.Split('@')[0];
 
-            if (Cookies.ContainsKey(cookieKey))
+            if (HasCookieKey(cookieKey))
             {
                 throw new Exception("Cannot create multiple instances of the same user.");
             }
 
+            AddCookieKey(cookieKey);
+
             Rooms = new ReadOnlyCollection<Room>(new List<Room>());
-
-            SEOpenIDLogin();
-        }
-
-        /// <summary>
-        /// Logs in with proxy support
-        /// </summary>
-        public Client(string email, string password, string proxyUrl, string proxyUsername, string proxyPassword)
-            : this(email, password)
-        {
-            this.proxyUrl = proxyUrl;
-            this.proxyUsername = proxyUsername;
-            this.proxyPassword = proxyPassword;
         }
 
 #pragma warning disable CS1591
@@ -152,7 +136,7 @@ namespace ChatExchangeDotNet
             {
                 if (host.ToLowerInvariant() == "stackexchange.com")
                 {
-                    SEChatLogin();
+                    //TODO: Support chat.se.
                 }
                 else
                 {
@@ -160,7 +144,7 @@ namespace ChatExchangeDotNet
                 }
             }
 
-            var r = new Room(cookieKey, host, roomID, proxyUrl, proxyUsername, proxyPassword, loadUsersAsync);
+            var r = new Room(cookieKey, host, roomID, loadUsersAsync);
             var rms = Rooms.ToList();
             rms.Add(r);
 
@@ -184,7 +168,7 @@ namespace ChatExchangeDotNet
 
             if (!string.IsNullOrEmpty(cookieKey))
             {
-                Cookies.Remove(cookieKey);
+                RemoveCookieKey(cookieKey);
             }
 
             GC.SuppressFinalize(this);
@@ -192,94 +176,61 @@ namespace ChatExchangeDotNet
 
 
 
-        private void SEOpenIDLogin()
-        {
-            var getRes = SendRequest(cookieKey, GenerateRequest(Method.GET, "https://openid.stackexchange.com/account/login"));
-
-            if (getRes == null || string.IsNullOrWhiteSpace(getRes.Content))
-            {
-                throw new WebException("Invalid response received while logging in. (#193)");
-            }
-
-            var req = GenerateRequest(Method.POST, "https://openid.stackexchange.com/account/login/submit", getRes.ResponseUri.OriginalString, "https://openid.stackexchange.com");
-
-            req = req.AddData("email", accountEmail);
-            req = req.AddData("password", accountPassword);
-            req = req.AddData("fkey", CQ.Create(getRes.Content).GetInputValue("fkey"));
-
-            var postRes = SendRequest(cookieKey, req);
-
-            if (postRes == null)
-            {
-                throw new WebException("Invalid response received while logging in. (#206)");
-            }
-            if (postRes.ResponseUri.ToString() != "https://openid.stackexchange.com/user")
-            {
-                throw new AuthenticationException("Invalid OpenID credentials.");
-            }
-
-            Cookies[cookieKey] = Cookies[cookieKey].Where(x => x.Name != "anon").ToList();
-
-            var html = postRes.Content;
-            var del = openidDel.Match(html).Value;
-
-            openidUrl = del.Remove(del.Length - 1, 1);
-        }
-
         private void SiteLogin(string host)
         {
-            var getRes = SendRequest(cookieKey, GenerateRequest(Method.GET, $"http://{host}/users/login"));
+            var fkeyHtml = SimpleGet($"https://{host}/users/login", cookieKey);
 
-            if (getRes == null || string.IsNullOrWhiteSpace(getRes.Content))
+            if (string.IsNullOrWhiteSpace(fkeyHtml))
             {
-                throw new WebException("Invalid response received while logging in. (#227)");
+                throw new Exception("Invalid response received while logging in. (Unable to get fkey.)");
             }
 
-            var referrer = $"https://{host}/users/login?returnurl=" + Uri.EscapeDataString($"http://{host}/");
-
-            var req = GenerateRequest(Method.POST, $"http://{host}/users/authenticate", referrer);
-
-            req = req.AddData("fkey", CQ.Create(getRes.Content).GetInputValue("fkey"));
-            req = req.AddData("openid_identifier", openidUrl);
-
-            var postRes = SendRequest(cookieKey, req);
-
-            if (postRes == null || string.IsNullOrWhiteSpace(postRes.Content))
+            var fkey = CQ.Create(fkeyHtml).GetInputValue("fkey");
+            var req = new HttpReq
             {
-                throw new WebException($"Invalid response received while logging into {host}. (#241)");
+                Endpoint = $"https://{host}/users/login",
+                Method = HttpMethod.POST,
+                CookieKey = cookieKey,
+                Referrer = $"https://{host}/users/login",
+                Origin = $"https://{host}",
+                CookieFilter = new Func<Cookie, bool>(c =>
+                {
+                    return c.Name == "prov" || c.Name == "fkey";
+                })
+            };
+
+            req.AddDataKVPair("fkey", fkey);
+            req.AddDataKVPair("ssrc", "");
+            req.AddDataKVPair("email", accountEmail);
+            req.AddDataKVPair("password", accountPassword);
+            req.AddDataKVPair("oauth_version", "");
+            req.AddDataKVPair("oauth_server", "");
+            req.AddDataKVPair("openid_username", "");
+            req.AddDataKVPair("openid_identifier", "");
+
+            var cookie = new Cookie
+            {
+                Name = "fkey",
+                Value = fkey,
+                Domain = host
+            };
+
+            AddCookie(cookieKey, cookie);
+
+            var postRes = SendRequest(req);
+
+            if (postRes == null || string.IsNullOrWhiteSpace(postRes.Data))
+            {
+                throw new Exception($"Invalid response received while logging into {host}. (#241)");
             }
 
-            HandleConfirmationPrompt(postRes.ResponseUri.ToString(), postRes.Content);
-            TryFetchUserID(postRes.ResponseUri.Host);
-        }
-
-        private void SEChatLogin()
-        {
-            var fkeyRes = SendRequest(cookieKey, GenerateRequest(Method.GET, "https://stackexchange.com/users/login"));
-            var fkey = CQ.Create(fkeyRes.Content).GetInputValue("fkey");
-
-            var endpoint = "http://stackexchange.com/users/authenticate";
-            var referrer = "https://stackexchange.com/users/login";
-            var origin = "https://stackexchange.com";
-
-            var req = GenerateRequest(Method.POST, endpoint, referrer, origin);
-
-            req = req.AddData("fkey", fkey);
-            req = req.AddData("openid_identifier", openidUrl);
-            req = req.AddData("oauth_version", "");
-            req = req.AddData("oauth_server", "");
-
-            var res = SendRequest(cookieKey, req);
-
-            HandleConfirmationPrompt(res.ResponseUri.ToString(), res.Content);
-            TryFetchUserID(res.ResponseUri.Host);
+            TryFetchUserID(host);
         }
 
         private void TryFetchUserID(string host)
         {
-            var res = SendRequest(cookieKey, GenerateRequest(Method.GET, $"http://{host}/users/current"));
-
-            var dom = CQ.Create(res.Content);
+            var html = SimpleGet($"https://{host}/users/current", cookieKey);
+            var dom = CQ.Create(html);
             var id = 0;
 
             foreach (var e in dom[".so-header a"])
@@ -294,46 +245,6 @@ namespace ChatExchangeDotNet
             if (id == 0)
             {
                 throw new AuthenticationException("Unable to login to Stack Exchange.");
-            }
-        }
-
-        private void HandleConfirmationPrompt(string uri, string html)
-        {
-            var resUrl = uri.ToString();
-
-            if (resUrl.StartsWith("https://openid.stackexchange.com/account/prompt"))
-            {
-                var dom = CQ.Create(html);
-                var session = dom["input"].First(e => e.Attributes["name"] != null &&
-                                                      e.Attributes["name"] == "session")["value"];
-                var fkey = dom.GetInputValue("fkey");
-
-                var req = GenerateRequest(Method.POST, "https://openid.stackexchange.com/account/prompt/submit");
-
-                req = req.AddData("session", session);
-                req = req.AddData("fkey", fkey);
-
-                SendRequest(cookieKey, req);
-            }
-            else if (resUrl.StartsWith("https://openid.stackexchange.com/account/login"))
-            {
-                var dom = CQ.Create(html);
-                var session = dom["input"].First(e => e.Attributes["name"] != null &&
-                                                      e.Attributes["name"] == "session")["value"];
-                var fkey = dom.GetInputValue("fkey");
-
-                var endpoint = "https://openid.stackexchange.com/account/login/submit";
-                var origin = "https://openid.stackexchange.com";
-                var referrer = $"https://openid.stackexchange.com/account/login?session={session}";
-
-                var req = GenerateRequest(Method.POST, endpoint, referrer, origin);
-
-                req = req.AddData("email", accountEmail);
-                req = req.AddData("password", accountPassword);
-                req = req.AddData("session", session);
-                req = req.AddData("fkey", fkey);
-
-                var res = SendRequest(cookieKey, req);
             }
         }
     }
