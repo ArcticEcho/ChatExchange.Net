@@ -21,11 +21,9 @@
 
 
 using System;
-using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
 using CsQuery;
-using RestSharp;
 using static ChatExchangeDotNet.RequestManager;
 
 namespace ChatExchangeDotNet
@@ -131,7 +129,7 @@ namespace ChatExchangeDotNet
 
             if (!room.InitialisePrimaryContentOnly)
             {
-                var historyHtml = SendRequest(GenerateRequest(Method.GET, $"http://chat.{Host}/messages/{ID}/history")).Content;
+                var historyHtml = SimpleGet($"http://chat.{Host}/messages/{ID}/history");
 
                 SetStarPinCount(historyHtml);
                 EditCount = GetEditCount(historyHtml);
@@ -164,13 +162,19 @@ namespace ChatExchangeDotNet
         {
             try
             {
-                var res = SendRequest(GenerateRequest(Method.GET, $"http://chat.{room.Meta.Host}/message/{messageID}?plain=true"));
+                var req = new HttpReq
+                {
+                    Endpoint = $"http://chat.{room.Meta.Host}/message/{messageID}?plain=true",
+                    Method = HttpMethod.GET
+                };
 
-                if (res?.StatusCode != HttpStatusCode.OK) return null;
+                var res = SendRequest(req);
 
-                var content = res.Content;
+                if (res.StatusCode != HttpStatusCode.OK) return null;
 
-                if (string.IsNullOrWhiteSpace(res.Content)) return null;
+                var content = res.Data;
+
+                if (string.IsNullOrWhiteSpace(res.Data)) return null;
 
                 content = WebUtility.HtmlDecode(content);
 

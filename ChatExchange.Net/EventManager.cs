@@ -57,7 +57,7 @@ namespace ChatExchangeDotNet
             events = new ConcurrentDictionary<EventType, IEventListener>();
             trackDict = new ConcurrentDictionary<Guid, TrackedObject>();
 
-            var types = Assembly.GetExecutingAssembly().GetTypes();
+            var types = typeof(EventManager).GetTypeInfo().Assembly.GetTypes();
             var eventTypes = types.Where(t => t.Namespace == "ChatExchangeDotNet.EventListeners");
 
             foreach (EventType chatEvent in Enum.GetValues(typeof(EventType)))
