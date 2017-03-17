@@ -10,7 +10,15 @@
     <Description>A library for interacting with Stack Exchange chat rooms.</Description>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <PackageReleaseNotes>Upgrade library to use .NET Core.</PackageReleaseNotes>
-    <ProjectUrl>>https://github.com/ArcticEcho/ChatExchange.Net</ProjectUrl>
+    <ProjectUrl>&gt;https://github.com/ArcticEcho/ChatExchange.Net</ProjectUrl>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DocumentationFile>bin\Debug\netstandard1.6\ChatExchange.Net.xml</DocumentationFile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DocumentationFile>bin\Release\netstandard1.6\ChatExchange.Net.xml</DocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
