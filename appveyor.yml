@@ -15,9 +15,9 @@ after_build:
 - ps: msbuild ChatExchange.Net /t:pack /p:Configuration=Release
 
 artifacts:
-- path: ChatExchange.Net\bin\Release\ChatExchange.Net.dll
+- path: ChatExchange.Net\bin\Release\netstandard1.6\ChatExchange.Net.dll
   name: ChatExchange.Net.dll
-- path: ChatExchange.Net\bin\Release\ChatExchange.Net.xml
+- path: ChatExchange.Net\bin\Release\netstandard1.6\ChatExchange.Net.xml
   name: ChatExchange.Net.xml
 - path: '**\ChatExchange.Net*.nupkg'
   
