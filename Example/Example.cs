@@ -41,7 +41,7 @@ namespace Example
             var client = new Client("some-email@address.com", "MySuperStr0ngPa55word");
 
             // Join a room by specifying its URL (returns a Room object).
-            var sandbox = client.JoinRoom("http://chat.stackexchange.com/rooms/1/sandbox");
+            var sandbox = client.JoinRoom("https://chat.stackoverflow.com/rooms/68414/socvr-testing-facility", true);
 
             // Post a new message in the room (if successful, returns
             // a Message object, otherwise returns null).

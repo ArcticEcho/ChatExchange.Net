@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
@@ -10,8 +9,9 @@ namespace ChatExchangeDotNet
     internal class WebSocket : IDisposable
     {
         private CancellationTokenSource cTkn;
-        private DateTime lastMsg = DateTime.MinValue;
+        private DateTime lastMsg = DateTime.MaxValue;
         private string socketUrl;
+        private string orgn;
         private bool connected;
         private bool stop;
         private bool dispose;
@@ -29,6 +29,7 @@ namespace ChatExchangeDotNet
 
         public WebSocket()
         {
+            cTkn = new CancellationTokenSource();
             Task.Run(() => WSRecovery());
         }
 
@@ -39,14 +40,16 @@ namespace ChatExchangeDotNet
 
 
 
-        public void Connect(string url)
+        public void Connect(string url, string origin)
         {
             if (connected)
             {
                 throw new Exception("WebSocket is already connected.");
             }
 
+            connected = true;
             socketUrl = url;
+            orgn = origin;
             Task.Run(() => ListenerLoop());
         }
 
@@ -57,6 +60,7 @@ namespace ChatExchangeDotNet
                 throw new Exception("WebSocket is already disconnected.");
             }
 
+            connected = false;
             stop = true;
             cTkn.Cancel();
         }
@@ -81,19 +85,30 @@ namespace ChatExchangeDotNet
                 {
                    using (var socket = new ClientWebSocket())
                     {
+                        socket.Options.SetRequestHeader("Origin", orgn);
                         socket.ConnectAsync(new Uri(socketUrl), CancellationToken.None).Wait();
-                        while (!stop)
+
+                        while (!stop && socket.State == WebSocketState.Open)
                         {
                             var buffer = new ArraySegment<byte>(new byte[5 * 1024]);
-                            socket.ReceiveAsync(buffer, cTkn.Token);
-                            var strMsg = Encoding.UTF8.GetString(buffer.Array);
+                            var res = socket.ReceiveAsync(buffer, cTkn.Token).Result;
+
+                            if (res.MessageType != WebSocketMessageType.Text) continue;
+
+                            var strMsg = Encoding.UTF8.GetString(buffer.Array, 0, res.Count);
+
                             OnMessage.Invoke(strMsg);
+
                             lastMsg = DateTime.UtcNow;
                         }
-                        socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None).Wait();
+
+                        if (socket.State == WebSocketState.Open)
+                        {
+                            socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None).Wait();
+                        }
                     }
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex?.InnerException.Message != "Unable to connect to the remote server")
                 {
                     OnError.Invoke(ex);
                     Thread.Sleep(5000);
@@ -114,7 +129,7 @@ namespace ChatExchangeDotNet
                     {
                         socketUrl = OnReconnectNeeded.Invoke();
                         Disconnect();
-                        Connect(socketUrl);
+                        Connect(socketUrl, orgn);
                     }
                 }
                 catch (Exception ex)
@@ -122,7 +137,7 @@ namespace ChatExchangeDotNet
                     OnError.Invoke(ex);
                 }
 
-                Thread.Sleep(1000);
+                Thread.Sleep(5000);
             }
         }
     }

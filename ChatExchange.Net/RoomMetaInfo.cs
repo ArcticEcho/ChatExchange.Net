@@ -25,6 +25,8 @@ using System.Collections.Generic;
 using System.Net;
 using CsQuery;
 using Jil;
+//using RestSharp;
+using static ChatExchangeDotNet.RequestManager;
 
 namespace ChatExchangeDotNet
 {
@@ -96,9 +98,7 @@ namespace ChatExchangeDotNet
             Host = host;
             ID = roomID;
 
-            string name, desc;
-            string[] tags;
-            var dom = GetRoomStringMeta(host, roomID, out name, out desc, out tags);
+            var dom = GetRoomStringMeta(host, roomID, out var name, out var desc, out var tags);
 
             Name = name;
             Description = desc;
@@ -108,15 +108,18 @@ namespace ChatExchangeDotNet
             DateTime.TryParse(dom[".room-keycell"][0].ParentNode[1].InnerText, out firstMsg);
             FirstMessage = firstMsg;
 
-            var req = RequestManager.GenerateRequest(RestSharp.Method.POST, $"http://chat.{host}/chats/{roomID}/events");
-            req = req.AddData("mode", "messages");
-            req = req.AddData("msgCount", 1);
+            var req = new HttpReq
+            {
+                Endpoint = $"http://chat.{host}/chats/{roomID}/events",
+                Method = HttpMethod.POST
+            };
+            req.AddDataKVPair("mode", "messages");
+            req.AddDataKVPair("msgCount", "1");
 
-            var jsonRes = RequestManager.SendRequest(req).Content;
+            var jsonRes = SendRequest(req).Data;
             var json = JSON.Deserialize<Dictionary<string, object>>(jsonRes);
             var events = JSON.Deserialize<Dictionary<string, object>[]>(json["events"].ToString());
-            var lastMsg = 0;
-            int.TryParse(events[0]["time_stamp"].ToString(), out lastMsg);
+            int.TryParse(events[0]["time_stamp"].ToString(), out var lastMsg);
             LastMessage = new DateTime(1970, 1, 1).AddSeconds(lastMsg);
 
             var totalMsg = -1;
@@ -126,7 +129,8 @@ namespace ChatExchangeDotNet
 
         internal static CQ GetRoomStringMeta(string host, int id, out string name, out string description, out string[] tags)
         {
-            var dom = CQ.CreateFromUrl($"http://chat.{host}/rooms/info/{id}");
+            var html = SimpleGet($"http://chat.{host}/rooms/info/{id}");
+            var dom = CQ.Create(html);
 
             name = WebUtility.HtmlDecode(dom[".subheader h1"][0].InnerText);
             description = WebUtility.HtmlDecode(dom[".roomcard-xxl p"][0].InnerText);

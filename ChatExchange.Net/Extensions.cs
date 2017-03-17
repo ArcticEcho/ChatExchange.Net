@@ -25,11 +25,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using CsQuery;
-using RestSharp;
 
 namespace ChatExchangeDotNet
 {
-    internal static class Extensions
+    public static class Extensions
     {
         private static readonly Regex isReply = new Regex(@"^:\d+\s", RegexOpts);
         private const string reqContentType = "application/x-www-form-urlencoded";
@@ -37,38 +36,6 @@ namespace ChatExchangeDotNet
         internal static RegexOptions RegexOpts { get; } = RegexOptions.Compiled | RegexOptions.CultureInvariant;
 
 
-
-        internal static RestRequest AddData(this RestRequest req, string key, object value, bool escapeValue = true)
-        {
-            var data = $"{key}=";
-
-            if (escapeValue)
-            {
-                data += $"{Uri.EscapeDataString(value.ToString())}";
-            }
-            else
-            {
-                data += value.ToString();
-            }
-
-            if (req.Parameters.Any(x => x.Name == reqContentType))
-            {
-                var v = (string)req.Parameters.Single(x => x.Name == reqContentType).Value;
-
-                if (!v.EndsWith("&"))
-                {
-                    data = "&" + data;
-                }
-
-                req.Parameters.Single(x => x.Name == reqContentType).Value += data;
-            }
-            else
-            {
-                req.AddParameter(reqContentType, data, ParameterType.RequestBody);
-            }
-
-            return req;
-        }
 
         internal static string GetInputValue(this CQ input, string elementName)
         {

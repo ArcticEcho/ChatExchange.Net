@@ -29,7 +29,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using CsQuery;
 using Jil;
-using RestSharp;
 using static ChatExchangeDotNet.RequestManager;
 
 namespace ChatExchangeDotNet
@@ -47,9 +46,6 @@ namespace ChatExchangeDotNet
         private readonly ManualResetEvent wsRecMre = new ManualResetEvent(false);
         private readonly ActionExecutor actEx;
         private readonly Guid trackingToken;
-        private readonly string proxyUrl;
-        private readonly string proxyUsername;
-        private readonly string proxyPassword;
         private readonly string chatRoot;
         private readonly string cookieKey;
         private bool hasLeft;
@@ -130,16 +126,13 @@ namespace ChatExchangeDotNet
 
 
 
-        internal Room(string cookieKey, string host, int id, string proxyUrl, string proxyUsername, string proxyPassword, bool loadUsersAsync)
+        internal Room(string cookieKey, string host, int id, bool loadUsersAsync)
         {
             if (string.IsNullOrEmpty(cookieKey)) throw new ArgumentNullException("cookieKey"); 
             if (string.IsNullOrEmpty(host)) throw new ArgumentNullException("'host' must not be null or empty.", "host"); 
             if (id < 0) throw new ArgumentOutOfRangeException("id", "'id' must not be negative.");
 
             this.cookieKey = cookieKey;
-            this.proxyUrl = proxyUrl;
-            this.proxyUsername = proxyUsername;
-            this.proxyPassword = proxyPassword;
             chatRoot = $"http://chat.{host}";
 
             evMan = new EventManager();
@@ -232,11 +225,16 @@ namespace ChatExchangeDotNet
             if (hasLeft) return;
             hasLeft = true;
 
-            var req = GenerateRequest(Method.POST, $"{chatRoot}/chats/leave/{Meta.ID}");
-            req = req.AddData("quiet", "true"); // No idea what this param does.
-            req = req.AddData("fkey", fkey);
+            var req = new HttpReq
+            {
+                Endpoint = $"{chatRoot}/chats/leave/{Meta.ID}",
+                Method = HttpMethod.POST,
+                CookieKey = cookieKey
+            };
+            req.AddDataKVPair("quiet", "true"); // No idea what this param does.
+            req.AddDataKVPair("fkey", fkey);
 
-            SendRequest(cookieKey, req);
+            SendRequest(req);
 
             Dispose();
         }
@@ -254,7 +252,7 @@ namespace ChatExchangeDotNet
 
             try
             {
-                resContent = SendRequest(cookieKey, GenerateRequest(Method.GET, $"{chatRoot}/messages/{messageID}/history")).Content;
+                resContent = SimpleGet($"{chatRoot}/messages/{messageID}/history", cookieKey);
             }
             catch (WebException ex)
             {
@@ -343,12 +341,18 @@ namespace ChatExchangeDotNet
             {
                 while (!dispose)
                 {
-                    var req = GenerateRequest(Method.POST, $"{chatRoot}/chats/{Meta.ID}/messages/new");
+                    var req = new HttpReq
+                    {
+                        Endpoint = $"{chatRoot}/chats/{Meta.ID}/messages/new",
+                        Method = HttpMethod.POST,
+                        CookieKey = cookieKey,
+                        EscapeData = false
+                    };
 
-                    req = req.AddData("text", Uri.EscapeDataString(message.ToString()).Replace("%5Cn", "%0A"), false);
-                    req = req.AddData("fkey", fkey);
+                    req.AddDataKVPair("text", Uri.EscapeDataString(message.ToString()).Replace("%5Cn", "%0A"));
+                    req.AddDataKVPair("fkey", fkey);
 
-                    var resContent = SendRequest(cookieKey, req).Content;
+                    var resContent = SendRequest(req).Data;
 
                     if (string.IsNullOrEmpty(resContent) || dispose) return null;
                     if (HandleThrottling(resContent)) continue;
@@ -392,12 +396,18 @@ namespace ChatExchangeDotNet
             {
                 while (!dispose)
                 {
-                    var req = GenerateRequest(Method.POST, $"{chatRoot}/chats/{Meta.ID}/messages/new");
+                    var req = new HttpReq
+                    {
+                        Endpoint = $"{chatRoot}/chats/{Meta.ID}/messages/new",
+                        Method = HttpMethod.POST,
+                        CookieKey = cookieKey,
+                        EscapeData = false
+                    };
 
-                    req = req.AddData("text", Uri.EscapeDataString(message.ToString()).Replace("%5Cn", "%0A"), false);
-                    req = req.AddData("fkey", fkey);
+                    req.AddDataKVPair("text", Uri.EscapeDataString(message.ToString()).Replace("%5Cn", "%0A"));
+                    req.AddDataKVPair("fkey", fkey);
 
-                    var resContent = SendRequest(cookieKey, req).Content;
+                    var resContent = SendRequest(req).Data;
 
                     if (string.IsNullOrEmpty(resContent) || dispose) return false;
                     if (HandleThrottling(resContent)) continue;
@@ -607,12 +617,18 @@ namespace ChatExchangeDotNet
             {
                 while (!dispose)
                 {
-                    var req = GenerateRequest(Method.POST, $"{chatRoot}/messages/{messageID}");
+                    var req = new HttpReq
+                    {
+                        Endpoint = $"{chatRoot}/messages/{messageID}",
+                        Method = HttpMethod.POST,
+                        CookieKey = cookieKey,
+                        EscapeData = false
+                    };
 
-                    req = req.AddData("text", Uri.EscapeDataString(newContent.ToString()).Replace("%5Cn", "%0A"), false);
-                    req = req.AddData("fkey", fkey);
+                    req.AddDataKVPair("text", Uri.EscapeDataString(newContent.ToString()).Replace("%5Cn", "%0A"));
+                    req.AddDataKVPair("fkey", fkey);
 
-                    var resContent = SendRequest(cookieKey, req).Content;
+                    var resContent = SendRequest(req).Data;
 
                     if (string.IsNullOrEmpty(resContent) || dispose) return false;
                     if (HandleThrottling(resContent)) continue;
@@ -697,11 +713,16 @@ namespace ChatExchangeDotNet
             {
                 while (!dispose)
                 {
-                    var req = GenerateRequest(Method.POST, $"{chatRoot}/messages/{messageID}/delete");
+                    var req = new HttpReq
+                    {
+                        Endpoint = $"{chatRoot}/messages/{messageID}/delete",
+                        Method = HttpMethod.POST,
+                        CookieKey = cookieKey
+                    };
 
-                    req = req.AddData("fkey", fkey);
+                    req.AddDataKVPair("fkey", fkey);
 
-                    var resContent = SendRequest(cookieKey, req).Content;
+                    var resContent = SendRequest(req).Data;
 
                     if (string.IsNullOrEmpty(resContent) || dispose) return false;
                     if (HandleThrottling(resContent)) continue;
@@ -780,11 +801,16 @@ namespace ChatExchangeDotNet
             {
                 while (!dispose)
                 {
-                    var req = GenerateRequest(Method.POST, $"{chatRoot}/messages/{messageID}/star");
+                    var req = new HttpReq
+                    {
+                        Endpoint = $"{chatRoot}/messages/{messageID}/star",
+                        Method = HttpMethod.POST,
+                        CookieKey = cookieKey
+                    };
 
-                    req = req.AddData("fkey", fkey);
+                    req.AddDataKVPair("fkey", fkey);
 
-                    var resContent = SendRequest(cookieKey, req).Content;
+                    var resContent = SendRequest(req).Data;
 
                     if (string.IsNullOrEmpty(resContent) || dispose) return false;
                     if (HandleThrottling(resContent)) continue;
@@ -869,11 +895,16 @@ namespace ChatExchangeDotNet
             {
                 while (true)
                 {
-                    var req = GenerateRequest(Method.POST, $"{chatRoot}/messages/{messageID}/unstar");
+                    var req = new HttpReq
+                    {
+                        Endpoint = $"{chatRoot}/messages/{messageID}/unstar",
+                        Method = HttpMethod.POST,
+                        CookieKey = cookieKey
+                    };
 
-                    req = req.AddData("fkey", fkey);
+                    req.AddDataKVPair("fkey", fkey);
 
-                    var resContent = SendRequest(cookieKey, req).Content;
+                    var resContent = SendRequest(req).Data;
 
                     if (string.IsNullOrEmpty(resContent)) return false;
                     if (HandleThrottling(resContent)) continue;
@@ -952,11 +983,16 @@ namespace ChatExchangeDotNet
             {
                 while (true)
                 {
-                    var req = GenerateRequest(Method.POST, $"{chatRoot}/messages/{messageID}/owner-star");
+                    var req = new HttpReq
+                    {
+                        Endpoint = $"{chatRoot}/messages/{messageID}/owner-star",
+                        Method = HttpMethod.POST,
+                        CookieKey = cookieKey
+                    };
 
-                    req = req.AddData("fkey", fkey);
+                    req.AddDataKVPair("fkey", fkey);
 
-                    var resContent = SendRequest(cookieKey, req).Content;
+                    var resContent = SendRequest(req).Data;
 
                     if (string.IsNullOrEmpty(resContent)) return false;
                     if (HandleThrottling(resContent)) continue;
@@ -1039,12 +1075,17 @@ namespace ChatExchangeDotNet
             {
                 while (true)
                 {
-                    var req = GenerateRequest(Method.POST, $"{chatRoot}/rooms/kickmute/{Meta.ID}");
+                    var req = new HttpReq
+                    {
+                        Endpoint = $"{chatRoot}/rooms/kickmute/{Meta.ID}",
+                        Method = HttpMethod.POST,
+                        CookieKey = cookieKey
+                    };
 
-                    req = req.AddData("userID", userID);
-                    req = req.AddData("fkey", fkey);
+                    req.AddDataKVPair("userID", userID.ToString());
+                    req.AddDataKVPair("fkey", fkey);
 
-                    var resContent = SendRequest(cookieKey, req).Content;
+                    var resContent = SendRequest(req).Data;
 
                     if (string.IsNullOrEmpty(resContent)) return false;
                     if (HandleThrottling(resContent)) continue;
@@ -1126,10 +1167,14 @@ namespace ChatExchangeDotNet
             {
                 while (true)
                 {
-                    var req = GenerateRequest(Method.POST, $"{chatRoot}/rooms/setuseraccess/{Meta.ID}");
-
-                    req = req.AddData("aclUserId", userID);
-                    req = req.AddData("fkey", fkey);
+                    var req = new HttpReq
+                    {
+                        Endpoint = $"{chatRoot}/rooms/setuseraccess/{Meta.ID}",
+                        Method = HttpMethod.POST,
+                        CookieKey = cookieKey
+                    };
+                    req.AddDataKVPair("aclUserId", userID.ToString());
+                    req.AddDataKVPair("fkey", fkey);
 
                     var data = $"fkey={fkey}&aclUserId={userID}&userAccess=";
 
@@ -1137,30 +1182,30 @@ namespace ChatExchangeDotNet
                     {
                         case UserRoomAccess.Normal:
                         {
-                            req = req.AddData("userAccess", "remove");
+                            req.AddDataKVPair("userAccess", "remove");
                             break;
                         }
 
                         case UserRoomAccess.ExplicitReadOnly:
                         {
-                            req = req.AddData("userAccess", "read-only");
+                            req.AddDataKVPair("userAccess", "read-only");
                             break;
                         }
 
                         case UserRoomAccess.ExplicitReadWrite:
                         {
-                            req = req.AddData("userAccess", "read-write");
+                            req.AddDataKVPair("userAccess", "read-write");
                             break;
                         }
 
                         case UserRoomAccess.Owner:
                         {
-                            req = req.AddData("userAccess", "owner");
+                            req.AddDataKVPair("userAccess", "owner");
                             break;
                         }
                     }
 
-                    var resContent = SendRequest(cookieKey, req).Content;
+                    var resContent = SendRequest(req).Data;
 
                     if (string.IsNullOrEmpty(resContent)) return false;
                     if (HandleThrottling(resContent)) continue;
@@ -1217,7 +1262,7 @@ namespace ChatExchangeDotNet
 
         private void InitialiseUsernames()
         {
-            var json = SendRequest(cookieKey, GenerateRequest(Method.GET, $"http://chat.{Meta.Host}/rooms/pingable/{Meta.ID}")).Content;
+            var json = SimpleGet($"http://chat.{Meta.Host}/rooms/pingable/{Meta.ID}", cookieKey);
 
             if (string.IsNullOrEmpty(json)) throw new Exception("Unable to fetch pingable users list.");
 
@@ -1237,7 +1282,7 @@ namespace ChatExchangeDotNet
 
         private void InitialisePingableUsers()
         {
-            var json = SendRequest(cookieKey, GenerateRequest(Method.GET, $"http://chat.{Meta.Host}/rooms/pingable/{Meta.ID}")).Content;
+            var json = SimpleGet($"http://chat.{Meta.Host}/rooms/pingable/{Meta.ID}", cookieKey);
 
             if (string.IsNullOrEmpty(json)) throw new Exception("Unable to fetch pingable users list.");
 
@@ -1258,7 +1303,7 @@ namespace ChatExchangeDotNet
 
         private void InitialiseCurrentUsers()
         {
-            var html = SendRequest(cookieKey, GenerateRequest(Method.GET, $"http://chat.{Meta.Host}/rooms/{Meta.ID}/")).Content;
+            var html = SimpleGet($"http://chat.{Meta.Host}/rooms/{Meta.ID}/", cookieKey);
             var doc = CQ.CreateDocument(html);
             var obj = doc.Select("script")[3];
             var ids = findUsers.Matches(obj.InnerText);
@@ -1289,8 +1334,7 @@ namespace ChatExchangeDotNet
 
         private void InitialiseRoomOwners()
         {
-            var req = new RestRequest($"{chatRoot}/rooms/info/{Meta.ID}", Method.GET);
-            var html = SendRequest(req).Content;
+            var html = SimpleGet($"{chatRoot}/rooms/info/{Meta.ID}");
             var dom = CQ.Create(html);
             var ros = new HashSet<User>();
 
@@ -1319,7 +1363,7 @@ namespace ChatExchangeDotNet
 
         private User GetMe()
         {
-            var html = SendRequest(cookieKey, GenerateRequest(Method.GET, $"{chatRoot}/chats/join/favorite")).Content;
+            var html = SimpleGet($"{chatRoot}/chats/join/favorite", cookieKey);
 
             if (string.IsNullOrEmpty(html))
             {
@@ -1338,7 +1382,7 @@ namespace ChatExchangeDotNet
 
         private void SetFkey()
         {
-            var resContent = SendRequest(cookieKey, GenerateRequest(Method.GET, $"{chatRoot}/rooms/{Meta.ID}")).Content;
+            var resContent = SimpleGet($"{chatRoot}/rooms/{Meta.ID}", cookieKey);
 
             var ex = new Exception("Could not get fkey.");
 
@@ -1353,12 +1397,17 @@ namespace ChatExchangeDotNet
 
         private int GetGlobalEventCount()
         {
-            var req = GenerateRequest(Method.POST, $"{chatRoot}/chats/{Meta.ID}/events");
-            req = req.AddData("mode", "events");
-            req = req.AddData("msgCount", 0);
-            req = req.AddData("fkey", fkey);
+            var req = new HttpReq
+            {
+                Endpoint = $"{chatRoot}/chats/{Meta.ID}/events",
+                Method = HttpMethod.POST,
+                CookieKey = cookieKey
+            };
+            req.AddDataKVPair("mode", "events");
+            req.AddDataKVPair("msgCount", "0");
+            req.AddDataKVPair("fkey", fkey);
 
-            var resContent = SendRequest(cookieKey, req).Content;
+            var resContent = SendRequest(req).Data;
 
             if (string.IsNullOrEmpty(resContent))
             {
@@ -1374,11 +1423,16 @@ namespace ChatExchangeDotNet
         {
             var data = $"roomid={Meta.ID}&fkey={fkey}";
 
-            var req = GenerateRequest(Method.POST, $"{chatRoot}/ws-auth");
-            req = req.AddData("roomid", Meta.ID);
-            req = req.AddData("fkey", fkey);
+            var req = new HttpReq
+            {
+                Endpoint = $"{chatRoot}/ws-auth",
+                Method = HttpMethod.POST,
+                CookieKey = cookieKey
+            };
+            req.AddDataKVPair("roomid", Meta.ID.ToString());
+            req.AddDataKVPair("fkey", fkey);
 
-            var resContent = SendRequest(cookieKey, req).Content;
+            var resContent = SendRequest(req).Data;
 
             if (string.IsNullOrEmpty(resContent)) throw new Exception("Could not get WebSocket URL.");
 
@@ -1412,7 +1466,7 @@ namespace ChatExchangeDotNet
                 return GetSocketURL(count);
             };
 
-            socket.Connect(socketUrl);
+            socket.Connect(socketUrl, "http://chat." + Meta.Host);
         }
 
         private void HandleData(string json)

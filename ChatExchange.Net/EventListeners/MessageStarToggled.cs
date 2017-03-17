@@ -32,7 +32,7 @@ namespace ChatExchangeDotNet.EventListeners
         {
             if (listener == null) return new ArgumentNullException("listener");
 
-            var listenerParams = listener.Method.GetParameters();
+            var listenerParams = listener.GetMethodInfo().GetParameters();
 
             if (listenerParams == null || listenerParams.Length != 3 ||
                 listenerParams[0].ParameterType != typeof(Message) ||
