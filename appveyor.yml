@@ -1,10 +1,7 @@
+image: Visual Studio 2017
 version: 6.0.{build}.0
-
-os: Visual Studio 2017
-
 configuration: Release
-
-platform: Any CPU
+test: off # for now
 
 before_build:
 - dotnet restore
@@ -15,7 +12,7 @@ build:
   verbosity: minimal
 
 after_build:
-- ps: msbuild /t:pack /p:Configuration=Release
+- ps: msbuild ChatExchange.Net /t:pack /p:Configuration=Release
 
 artifacts:
 - path: ChatExchange.Net\bin\Release\ChatExchange.Net.dll
