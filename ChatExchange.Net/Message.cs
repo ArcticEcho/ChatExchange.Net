@@ -151,9 +151,6 @@ namespace ChatExchangeDotNet
         /// <param name="messageID">
         /// The unique identification number of the message to fetch.
         /// </param>
-        /// <param name="stripMention">
-        /// If true, removes "pings" (@Username) and message reply prefixes (:123456).
-        /// </param>
         /// <returns>The content of the message.</returns>
         /// <exception cref="MessageNotFoundException">
         /// Thrown if the message cannot be found (a result of an incorrect ID, or deletion).
