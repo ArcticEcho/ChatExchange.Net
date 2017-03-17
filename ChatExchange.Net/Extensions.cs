@@ -30,7 +30,7 @@ namespace ChatExchangeDotNet
 {
     public static class Extensions
     {
-        private static readonly Regex isReply = new Regex(@"^:\d+\s", RegexOpts);
+        private static readonly Regex isReply = new Regex(@"^:\d+\s\S", RegexOpts);
         private const string reqContentType = "application/x-www-form-urlencoded";
 
         internal static RegexOptions RegexOpts { get; } = RegexOptions.Compiled | RegexOptions.CultureInvariant;
