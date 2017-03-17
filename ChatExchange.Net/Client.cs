@@ -182,7 +182,7 @@ namespace ChatExchangeDotNet
 
             if (string.IsNullOrWhiteSpace(fkeyHtml))
             {
-                throw new WebException("Invalid response received while logging in. (Unable to get fkey.)");
+                throw new Exception("Invalid response received while logging in. (Unable to get fkey.)");
             }
 
             var fkey = CQ.Create(fkeyHtml).GetInputValue("fkey");
@@ -221,7 +221,7 @@ namespace ChatExchangeDotNet
 
             if (postRes == null || string.IsNullOrWhiteSpace(postRes.Data))
             {
-                throw new WebException($"Invalid response received while logging into {host}. (#241)");
+                throw new Exception($"Invalid response received while logging into {host}. (#241)");
             }
 
             TryFetchUserID(host);
