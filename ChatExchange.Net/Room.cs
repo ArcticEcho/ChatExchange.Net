@@ -150,11 +150,12 @@ namespace ChatExchangeDotNet
 
             if (loadUsersAsync)
             {
-                Task.Factory.StartNew(() =>
+                Task.Run(() =>
                 {
                     InitialisePingableUsers();
                     InitialiseRoomOwners();
                     InitialiseCurrentUsers();
+                    SyncPingableUsers();
                 });
             }
             else
@@ -162,11 +163,11 @@ namespace ChatExchangeDotNet
                 InitialisePingableUsers();
                 InitialiseRoomOwners();
                 InitialiseCurrentUsers();
+
+                Task.Run(() => SyncPingableUsers());
             }
 
             trackingToken = evMan.TrackRoom(this);
-
-            Task.Factory.StartNew(() => SyncPingableUsers());
         }
 
         ~Room()
@@ -1282,7 +1283,7 @@ namespace ChatExchangeDotNet
 
         private void InitialisePingableUsers()
         {
-            var json = SimpleGet($"http://chat.{Meta.Host}/rooms/pingable/{Meta.ID}", cookieKey);
+            var json = SimpleGet($"https://chat.{Meta.Host}/rooms/pingable/{Meta.ID}", cookieKey);
 
             if (string.IsNullOrEmpty(json)) throw new Exception("Unable to fetch pingable users list.");
 

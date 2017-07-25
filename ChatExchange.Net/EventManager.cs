@@ -340,13 +340,13 @@ namespace ChatExchangeDotNet
 
             // Notify relevant object listeners first (in a separate thread,
             // as we could cause a delay if there a mass of objects to notify).
-            Task.Factory.StartNew(() =>
+            Task.Run(() =>
             {
                 foreach (var obj in trackDict.Values)
                 {
                     if (!obj.Listeners.ContainsKey(eventType)) continue;
 
-                    Task.Factory.StartNew(() =>
+                    Task.Run(() =>
                     {
                         InvokeListener(obj.Listeners[eventType], eventType, args);
                     });
@@ -359,7 +359,7 @@ namespace ChatExchangeDotNet
 
             foreach (var listener in ConnectedListeners[eventType].Values)
             {
-                Task.Factory.StartNew(() =>
+                Task.Run(() =>
                 {
                     InvokeListener(listener, eventType, args);
                 });

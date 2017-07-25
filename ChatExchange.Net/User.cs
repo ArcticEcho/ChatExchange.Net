@@ -146,7 +146,7 @@ namespace ChatExchangeDotNet
         {
             var req = new HttpReq
             {
-                Endpoint = $"http://chat.{host}/users/{userId}",
+                Endpoint = $"https://chat.{host}/users/{userId}",
                 Method = HttpMethod.GET
             };
 
@@ -159,7 +159,7 @@ namespace ChatExchangeDotNet
 
         internal static bool CanPing(string cookieKey, string host, int roomID, int userID)
         {
-            var json = SimpleGet($"http://chat.{host}/rooms/pingable/{roomID}", cookieKey);
+            var json = SimpleGet($"https://chat.{host}/rooms/pingable/{roomID}", cookieKey);
 
             if (string.IsNullOrEmpty(json)) return false;
 
@@ -189,7 +189,7 @@ namespace ChatExchangeDotNet
 
             var req = new HttpReq
             {
-                Endpoint = "http://chat." + host + "/user/info",
+                Endpoint = "https://chat." + host + "/user/info",
                 Method = HttpMethod.POST,
             };
             req.AddDataKVPair("ids", userID.ToString());
