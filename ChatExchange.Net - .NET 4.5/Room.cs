@@ -27,6 +27,7 @@ using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using ChatExchangeDotNet.WebSockets;
 using CsQuery;
 using Jil;
 using static ChatExchangeDotNet.RequestManager;
@@ -1459,11 +1460,19 @@ namespace ChatExchangeDotNet
 
         private void InitialiseSocket(string socketUrl)
         {
-            socket = new WebSocket();
+			// Check if we're runing on a Windows OS older than Windows 8.
+			if (Environment.OSVersion.Version.Major < 6 && Environment.OSVersion.Version.Minor < 2)
+			{
+				socket = new WebSocketWSSharp();
+			}
+			else
+			{
+				socket = new WebSocketNative();
+			}
 
-            socket.OnError += ex => evMan.CallListeners(EventType.InternalException, false, ex);
+			socket.ExceptionRaised += ex => evMan.CallListeners(EventType.InternalException, false, ex);
 
-            socket.OnMessage += m =>
+            socket.MessageReceived += m =>
             {
                 try
                 {
@@ -1475,7 +1484,7 @@ namespace ChatExchangeDotNet
                 }
             };
 
-            socket.OnReconnectNeeded += () =>
+            socket.ReconnectNeeded += () =>
             {
                 SetFkey();
                 var count = GetGlobalEventCount();
@@ -1490,6 +1499,9 @@ namespace ChatExchangeDotNet
             evMan.CallListeners(EventType.DataReceived, false, json);
 
             var obj = JSON.Deserialize<Dictionary<string, object>>(json);
+
+			if (!obj.ContainsKey("r" + Meta.ID)) return;
+
             var r = JSON.Deserialize<Dictionary<string, object>>(obj["r" + Meta.ID].ToString());
 
             if (!r.ContainsKey("e") || r["e"] == null) return;

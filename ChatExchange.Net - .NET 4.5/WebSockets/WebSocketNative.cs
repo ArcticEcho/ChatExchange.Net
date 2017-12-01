@@ -4,45 +4,29 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace ChatExchangeDotNet
+namespace ChatExchangeDotNet.WebSockets
 {
-    internal class WebSocket : IDisposable
+    internal class WebSocketNative : WebSocket
     {
         private CancellationTokenSource cTkn;
-        private DateTime lastMsg = DateTime.MaxValue;
-        private string socketUrl;
-        private string orgn;
-        private bool connected;
-        private bool stop;
-        private bool dispose;
-
-		public TimeSpan IdlePeriod { get; set; } = TimeSpan.FromSeconds(120);
-
-        public delegate void OnMessageEventHandler(string data);
-        public event OnMessageEventHandler OnMessage;
-
-        public delegate void OnErrorEventHandler(Exception ex);
-        public event OnErrorEventHandler OnError;
-
-        public delegate string OnReconnectNeededEventHandler();
-        public event OnReconnectNeededEventHandler OnReconnectNeeded;
+		private bool connected;
 
 
 
-        public WebSocket()
+        public WebSocketNative()
         {
             cTkn = new CancellationTokenSource();
             Task.Run(() => WSRecovery());
         }
 
-        ~WebSocket()
+        ~WebSocketNative()
         {
             Dispose();
         }
 
 
 
-        public void Connect(string url, string origin)
+        public override void Connect(string url, string origin)
         {
             if (connected)
             {
@@ -55,7 +39,7 @@ namespace ChatExchangeDotNet
             Task.Run(() => ListenerLoop());
         }
 
-        public void Disconnect()
+        public override void Disconnect()
         {
             if (!connected)
             {
@@ -67,7 +51,7 @@ namespace ChatExchangeDotNet
             cTkn.Cancel();
         }
 
-        public void Dispose()
+        public override void Dispose()
         {
             if (dispose) return;
             dispose = true;
@@ -99,9 +83,9 @@ namespace ChatExchangeDotNet
 
                             var strMsg = Encoding.UTF8.GetString(buffer.Array, 0, res.Count);
 
-                            OnMessage.Invoke(strMsg);
-
                             lastMsg = DateTime.UtcNow;
+
+                            OnMessageReceived(strMsg);
                         }
 
                         if (socket.State == WebSocketState.Open)
@@ -114,7 +98,7 @@ namespace ChatExchangeDotNet
                 {
 					if (ex.InnerException.GetType() != typeof(TaskCanceledException))
 					{
-						OnError.Invoke(ex);
+						OnExceptionRaised(ex);
 						Thread.Sleep(5000);
 					}
                 }
@@ -122,28 +106,6 @@ namespace ChatExchangeDotNet
 
             stop = false;
             cTkn = new CancellationTokenSource();
-        }
-
-        private void WSRecovery()
-        {
-            while (!dispose)
-            {
-                try
-                {
-                    if ((DateTime.UtcNow - lastMsg) > IdlePeriod)
-                    {
-                        socketUrl = OnReconnectNeeded.Invoke();
-                        Disconnect();
-                        Connect(socketUrl, orgn);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    OnError.Invoke(ex);
-                }
-
-                Thread.Sleep(5000);
-            }
         }
     }
 }

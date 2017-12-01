@@ -50,6 +50,9 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
+    <Reference Include="websocket-sharp, Version=1.0.2.59611, Culture=neutral, PublicKeyToken=5660b08a1845a91e, processorArchitecture=MSIL">
+      <HintPath>..\packages\WebSocketSharp.1.0.3-rc11\lib\websocket-sharp.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ActionExecutor.cs" />
@@ -86,7 +89,9 @@
     <Compile Include="TrackedObject.cs" />
     <Compile Include="User.cs" />
     <Compile Include="UserRoomAccess.cs" />
-    <Compile Include="WebSocket.cs" />
+    <Compile Include="WebSockets\WebSocketNative.cs" />
+    <Compile Include="WebSockets\WebSocket.cs" />
+    <Compile Include="WebSockets\WebSocketWSSharp.cs" />
     <Compile Include="WhiteSpace.cs" />
   </ItemGroup>
   <ItemGroup>
