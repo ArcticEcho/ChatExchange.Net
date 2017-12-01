@@ -1,4 +1,4 @@
-/*
+﻿/*
  * ChatExchange.Net. A .Net (4.0) API for interacting with Stack Exchange chat.
  * Copyright © 2015, ArcticEcho.
  *
@@ -17,7 +17,21 @@
  */
 
 
-using System.Runtime.CompilerServices;
 
-// allows the unit tests to reference "internal" classes
-[assembly: InternalsVisibleTo("ChatExchange.Net.Tests")]
+
+
+using System;
+
+namespace ChatExchangeDotNet
+{
+    [Flags]
+    public enum TextFormattingOptions
+    {
+        None = 0,
+        Bold = 1,
+        Italic = 2,
+        InLineCode = 4,
+        Tag = 8,
+        Strikethrough = 16
+    }
+}

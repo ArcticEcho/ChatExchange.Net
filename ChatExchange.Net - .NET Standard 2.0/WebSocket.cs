@@ -108,10 +108,13 @@ namespace ChatExchangeDotNet
                         }
                     }
                 }
-                catch (Exception ex) when (ex?.InnerException.Message != "Unable to connect to the remote server")
+                catch (Exception ex)
                 {
-                    OnError.Invoke(ex);
-                    Thread.Sleep(5000);
+					if (ex.InnerException.GetType() != typeof(TaskCanceledException))
+					{
+						OnError.Invoke(ex);
+						Thread.Sleep(5000);
+					}
                 }
             }
 

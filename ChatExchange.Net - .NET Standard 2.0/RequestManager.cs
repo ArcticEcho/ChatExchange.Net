@@ -66,7 +66,7 @@ namespace ChatExchangeDotNet
 
         public string CookieKey { get; set; }
 
-        public Func<Cookie, bool> CookieFilter { get; set; }
+        //public Func<Cookie, bool> CookieFilter { get; set; }
 
         public string Data
         {
@@ -108,7 +108,7 @@ namespace ChatExchangeDotNet
 
     internal static class RequestManager
     {
-        private static Dictionary<string, List<Cookie>> cookies = new Dictionary<string, List<Cookie>>();
+        private static Dictionary<string, HashSet<Cookie>> cookies = new Dictionary<string, HashSet<Cookie>>();
 
 
 
@@ -121,7 +121,7 @@ namespace ChatExchangeDotNet
         {
             if (!HasCookieKey(key))
             {
-                cookies[key] = new List<Cookie>();
+                cookies[key] = new HashSet<Cookie>();
             }
         }
 
@@ -137,7 +137,7 @@ namespace ChatExchangeDotNet
         {
             if (HasCookieKey(key))
             {
-                cookies[key] = cookies[key].Where(x => x.Name != name).ToList();
+                cookies[key] = new HashSet<Cookie>(cookies[key].Where(x => x.Name != name));
             }
         }
 
@@ -168,13 +168,10 @@ namespace ChatExchangeDotNet
                 lock (cookies)
                 foreach (var cookie in cookies[reqInfo.CookieKey])
                 {
-                    if (reqInfo.CookieFilter?.Invoke(cookie) ?? true)
-                    {
-                        var domain = cookie.Domain.StartsWith(".") 
-                            ? cookie.Domain.Remove(0, 1) 
-                            : cookie.Domain;
-                        reqCookies.Add(new Uri("https://" + domain), cookie);
-                    }
+                    var domain = cookie.Domain.StartsWith(".") 
+                        ? cookie.Domain.Remove(0, 1) 
+                        : cookie.Domain;
+                    reqCookies.Add(new Uri("https://" + domain), cookie);
                 }
             }
 
@@ -182,7 +179,7 @@ namespace ChatExchangeDotNet
             req.Method = reqInfo.Method.ToString();
             req.CookieContainer = reqCookies;
 
-            req.Headers["Accept"] = "application/json, application/xml, text/json, text/x-json, text/javascript, text/xml";
+			req.Accept = "application/json, application/xml, text/json, text/x-json, text/javascript, text/xml";
 
             if (!string.IsNullOrEmpty(reqInfo.Referrer))
             {
@@ -196,7 +193,7 @@ namespace ChatExchangeDotNet
 
             if (!string.IsNullOrEmpty(reqInfo.Data))
             {
-                req.Headers["Content-Type"] = "application/x-www-form-urlencoded";
+                req.ContentType = "application/x-www-form-urlencoded";
                 using (var strm = req.GetRequestStreamAsync().Result)
                 {
                     var dataBytes = Encoding.UTF8.GetBytes(reqInfo.Data);
@@ -222,6 +219,13 @@ namespace ChatExchangeDotNet
                 lock (cookies)
                 foreach (Cookie c in res.Cookies)
                 {
+                    var existingCookie = cookies[reqInfo.CookieKey].SingleOrDefault(x => x.Name == c.Name);
+
+                    if (existingCookie != null)
+                    {
+                        cookies[reqInfo.CookieKey].Remove(existingCookie);
+                    }
+
                     cookies[reqInfo.CookieKey].Add(c);
                 }
             }
@@ -234,99 +238,5 @@ namespace ChatExchangeDotNet
 
             return new HttpRes(res.ResponseUri.ToString(), resData, res.StatusCode);
         }
-
-        //public static RestResponse SendRequest(RestRequest req)
-        //{
-        //    return SendRequest(null, req);
-        //}
-
-        //public static RestResponse SendRequest(string cookieKey, RestRequest req, Func<RestResponseCookie, bool> cookieFilter = null, Func<RestResponseCookie, bool> cookieFilterRedirects = null)
-        //{
-        //    var reqUri = new Uri(req.Resource);
-        //    var baseReqUrl = reqUri.Scheme + "://" + reqUri.Host;
-
-        //    // RestSharp doesn't currently honour cookie headers
-        //    // upon redirect (which is crucial for authentication
-        //    // in our case). So I've implemented my own (crude)
-        //    // means of following redirects (302s) in the meantime.
-        //    var c = new RestClient(baseReqUrl)
-        //    {
-        //        FollowRedirects = false
-        //    };
-
-        //    if (!string.IsNullOrWhiteSpace(cookieKey) && cookies.ContainsKey(cookieKey))
-        //    {
-        //        foreach (var cookie in cookies[cookieKey])
-        //        {
-        //            if (cookie.Expired) continue;
-        //            if (!(cookieFilter?.Invoke(cookie) ?? true)) continue;
-
-        //            req.AddCookie(cookie.Name, cookie.Value);
-        //        }
-        //    }
-
-        //    req.Resource = req.Resource.Remove(0, baseReqUrl.Length);
-
-        //    var are = new AutoResetEvent(false);
-        //    RestResponse res = null;
-        //    c.ExecuteAsync(req, response =>
-        //    {
-        //        res = (RestResponse)response;
-        //        are.Set();
-        //    });
-        //    are.WaitOne(TimeSpan.FromSeconds(100));
-
-        //    if (res == null) return null;
-
-        //    if (!string.IsNullOrWhiteSpace(cookieKey) && res.Cookies != null && res.Cookies.Count > 0)
-        //    {
-        //        if (!cookies.ContainsKey(cookieKey))
-        //        {
-        //            cookies[cookieKey] = new List<RestResponseCookie>();
-        //        }
-
-        //        foreach (var cookie in res.Cookies)
-        //        {
-        //            cookies[cookieKey].Add(cookie);
-        //        }
-        //    }
-
-        //    if (res.StatusCode == HttpStatusCode.Found || res.StatusCode == HttpStatusCode.Moved)
-        //    {
-        //        var url = Regex.Match(res.Content, "href=\"(\\S+)\">here<").Groups[1].Value;
-
-        //        if (!url.StartsWith("http"))
-        //        {
-        //            url = baseReqUrl + url;
-        //        }
-
-        //        return SendRequest(cookieKey, GenerateRequest(Method.GET, url), cookieFilterRedirects);
-        //    }
-
-        //    return res;
-        //}
-
-        //public static RestRequest GenerateRequest(Method meth, string endpoint)
-        //{
-        //    return new RestRequest(endpoint, meth);
-        //}
-
-        //public static RestRequest GenerateRequest(Method meth, string endpoint, string referrer)
-        //{
-        //    var req = GenerateRequest(meth, endpoint);
-
-        //    req.AddParameter("Referer", referrer, ParameterType.HttpHeader);
-
-        //    return req;
-        //}
-
-        //public static RestRequest GenerateRequest(Method meth, string endpoint, string referrer, string origin)
-        //{
-        //    var req = GenerateRequest(meth, endpoint, referrer);
-
-        //    req.AddParameter("Origin", origin, ParameterType.HttpHeader);
-
-        //    return req;
-        //}
     }
 }
