@@ -1461,7 +1461,9 @@ namespace ChatExchangeDotNet
         private void InitialiseSocket(string socketUrl)
         {
 			// Check if we're runing on a Windows OS older than Windows 8.
-			if (Environment.OSVersion.Version.Major < 6 && Environment.OSVersion.Version.Minor < 2)
+			if (Environment.OSVersion.Platform == PlatformID.Win32NT &&
+				Environment.OSVersion.Version.Major < 6 && 
+				Environment.OSVersion.Version.Minor < 2)
 			{
 				socket = new WebSocketWSSharp();
 			}
