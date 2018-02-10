@@ -24,24 +24,46 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
-using CsQuery;
+using AngleSharp.Dom.Html;
 
 namespace ChatExchangeDotNet
 {
-    public static class Extensions
+	public static class Extensions
     {
         private static readonly Regex isReply = new Regex(@"^:\d+\s\S", RegexOpts);
-        private const string reqContentType = "application/x-www-form-urlencoded";
 
-        internal static RegexOptions RegexOpts { get; } = RegexOptions.Compiled | RegexOptions.CultureInvariant;
-
+        internal static RegexOptions RegexOpts { get; } = RegexOptions.CultureInvariant;
 
 
-        internal static string GetInputValue(this CQ input, string elementName)
-        {
-            var fkeyE = input["input"].FirstOrDefault(e => e.Attributes["name"] == elementName);
-            return fkeyE?.Attributes["value"];
-        }
+
+		internal static string GetFKey(this IHtmlDocument dom)
+		{
+			return dom.QuerySelector("[name=fkey]").NodeValue;
+		}
+
+		internal static char[] Where(this string str, Func<char, bool> pred)
+		{
+			return str.ToCharArray().Where(pred).ToArray();
+		}
+
+		internal static IEnumerable<T> Where<T>(this IEnumerable<T> items, Func<T, bool> pred)
+		{
+			var filteredItems = new List<T>();
+			foreach (var item in items)
+			{
+				if (pred(item))
+				{
+					filteredItems.Add(item);
+				}
+			}
+			return filteredItems;
+		}
+
+        //internal static string GetInputValue(this CQ input, string elementName)
+        //{
+        //    var fkeyE = input["input"].FirstOrDefault(e => e.Attributes["name"] == elementName);
+        //    return fkeyE?.Attributes["value"];
+        //}
 
         public static IEnumerable<Message> GetMessagesByUser(this IEnumerable<Message> messages, User user)
         {

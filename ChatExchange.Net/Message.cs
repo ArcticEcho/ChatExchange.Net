@@ -23,15 +23,15 @@
 using System;
 using System.Net;
 using System.Text.RegularExpressions;
-using CsQuery;
+using AngleSharp.Parser.Html;
 using static ChatExchangeDotNet.RequestManager;
 
 namespace ChatExchangeDotNet
 {
-    /// <summary>
-    /// Represents a chat message.
-    /// </summary>
-    public class Message : IDisposable
+	/// <summary>
+	/// Represents a chat message.
+	/// </summary>
+	public class Message : IDisposable
     {
         private readonly Regex messageEdits = new Regex("<div class=\"message\"", Extensions.RegexOpts);
         private readonly EventManager evMan;
@@ -267,12 +267,14 @@ namespace ChatExchangeDotNet
 
         private int GetStarPinCount(string html, bool stars)
         {
-            var dom = CQ.Create(html)[stars ? ".stars" : ".owner-star"];
+            var starsEl = new HtmlParser()
+				.Parse(html)
+				.QuerySelector(stars ? ".stars" : ".owner-star");
             var count = 0;
 
-            if (dom != null && dom.Length != 0)
+            if (starsEl != null)
             {
-                var c = dom[".times"]?.First()?.Text();
+                var c = starsEl.QuerySelector(".times")?.TextContent;
 
                 if (!string.IsNullOrEmpty(c))
                 {

@@ -48,9 +48,9 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\ChatExchange.Net - .NET 4.5\ChatExchange.Net - .NET 4.5.csproj">
-      <Project>{b7186eac-d3d1-4840-9945-ba6277c01d5a}</Project>
-      <Name>ChatExchange.Net - .NET 4.5</Name>
+    <ProjectReference Include="..\ChatExchange.Net\ChatExchange.Net.csproj">
+      <Project>{6e39af76-a66a-41e8-874a-26776dc00b16}</Project>
+      <Name>ChatExchange.Net</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

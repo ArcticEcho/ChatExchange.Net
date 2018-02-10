@@ -27,17 +27,17 @@ using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using CsQuery;
-using Jil;
+using AngleSharp.Parser.Html;
+using Newtonsoft.Json;
 using static ChatExchangeDotNet.RequestManager;
 
 namespace ChatExchangeDotNet
 {
-    /// <summary>
-    /// Provides access to chat room functions, such as: message posting/editing/deleting/starring/pinning,
-    /// user kick-muting/access level changing, basic message/user retrieval and the ability to subscribe to events.
-    /// </summary>
-    public class Room : IDisposable
+	/// <summary>
+	/// Provides access to chat room functions, such as: message posting/editing/deleting/starring/pinning,
+	/// user kick-muting/access level changing, basic message/user retrieval and the ability to subscribe to events.
+	/// </summary>
+	public class Room : IDisposable
     {
         private static readonly Regex findUsers = new Regex(@"id:\s?(\d+),\sname", Extensions.RegexOpts);
         private static readonly Regex getId = new Regex(@"id: (?<id>\d+)", Extensions.RegexOpts);
@@ -272,9 +272,14 @@ namespace ChatExchangeDotNet
             {
                 throw new MessageNotFoundException();
             }
-
-            var lastestDom = CQ.Create(resContent).Select(".monologue").Last();
-            var authorID = int.Parse(lastestDom[".username a"].First().Attr("href").Split('/')[2]);
+			var parser = new HtmlParser();
+			var doc = parser.Parse(resContent);
+            var authorIDStr = doc
+				.QuerySelector(".monologue:last-child .username a")
+				.Attributes["href"]
+				.Value
+				.Split('/')[2];//CQ.Create(resContent).Select(".monologue").Last();
+			var authorID = int.Parse(authorIDStr);//int.Parse(lastestDom[".username a"].First().Attr("href")[2]);
             var message = new Message(this, ref evMan, messageID, authorID);
 
             return message;
@@ -358,7 +363,7 @@ namespace ChatExchangeDotNet
                     if (string.IsNullOrEmpty(resContent) || dispose) return null;
                     if (HandleThrottling(resContent)) continue;
 
-                    var json = JSON.Deserialize<Dictionary<string, object>>(resContent);
+                    var json = JsonConvert.DeserializeObject<Dictionary<string, object>>(resContent);
                     var messageID = -1;
                     if (json.ContainsKey("id"))
                     {
@@ -413,7 +418,7 @@ namespace ChatExchangeDotNet
                     if (string.IsNullOrEmpty(resContent) || dispose) return false;
                     if (HandleThrottling(resContent)) continue;
 
-                    return JSON.Deserialize<Dictionary<string, object>>(resContent).ContainsKey("id");
+                    return JsonConvert.DeserializeObject<Dictionary<string, object>>(resContent).ContainsKey("id");
                 }
 
                 return false;
@@ -1228,7 +1233,7 @@ namespace ChatExchangeDotNet
 
             if (msg.StartsWith("you can perform this action again in") && !dispose)
             {
-                var delay = new string(msg.Where(char.IsDigit).ToArray());
+                var delay = new string(msg.Where(char.IsDigit));
                 throttleARE.WaitOne(int.Parse(delay) * 1000);
 
                 return true;
@@ -1267,7 +1272,7 @@ namespace ChatExchangeDotNet
 
             if (string.IsNullOrEmpty(json)) throw new Exception("Unable to fetch pingable users list.");
 
-            var data = JSON.Deserialize<HashSet<List<object>>>(json);
+            var data = JsonConvert.DeserializeObject<HashSet<List<object>>>(json);
             var names = new HashSet<string>();
 
             foreach (var u in data)
@@ -1287,12 +1292,11 @@ namespace ChatExchangeDotNet
 
             if (string.IsNullOrEmpty(json)) throw new Exception("Unable to fetch pingable users list.");
 
-            var data = JSON.Deserialize<HashSet<List<object>>>(json);
+            var data = JsonConvert.DeserializeObject<HashSet<List<object>>>(json);
             var users = new HashSet<User>();
 
             foreach (var id in data)
             {
-                Thread.Sleep(1000);
                 var userID = int.Parse(id[0].ToString());
                 var user = new User(Meta, userID, true);
                 evMan.TrackUser(user);
@@ -1305,9 +1309,9 @@ namespace ChatExchangeDotNet
         private void InitialiseCurrentUsers()
         {
             var html = SimpleGet($"http://chat.{Meta.Host}/rooms/{Meta.ID}/", cookieKey);
-            var doc = CQ.CreateDocument(html);
-            var obj = doc.Select("script")[3];
-            var ids = findUsers.Matches(obj.InnerText);
+			var dom = new HtmlParser().Parse(html);
+			var obj = dom.QuerySelector("script:eq(3)");//[3];
+            var ids = findUsers.Matches(obj.TextContent);
 
             var users = new HashSet<User>();
             foreach (Match id in ids)
@@ -1319,7 +1323,6 @@ namespace ChatExchangeDotNet
                     var u = PingableUsers.SingleOrDefault(x => x.ID == userID);
                     if (u == null)
                     {
-                        Thread.Sleep(1000);
                         users.Add(GetUser(userID));
                     }
                     else
@@ -1336,10 +1339,10 @@ namespace ChatExchangeDotNet
         private void InitialiseRoomOwners()
         {
             var html = SimpleGet($"{chatRoot}/rooms/info/{Meta.ID}");
-            var dom = CQ.Create(html);
-            var ros = new HashSet<User>();
+            var dom = new HtmlParser().Parse(html);
+			var ros = new HashSet<User>();
 
-            foreach (var user in dom["[id^=owner-user]"])
+            foreach (var user in dom.QuerySelectorAll("[id^=owner-user]"))
             {
                 var id = -1;
 
@@ -1348,7 +1351,6 @@ namespace ChatExchangeDotNet
                     var u = PingableUsers.SingleOrDefault(x => x.ID == id);
                     if (u == null)
                     {
-                        Thread.Sleep(1000);
                         ros.Add(GetUser(id));
                     }
                     else
@@ -1371,9 +1373,9 @@ namespace ChatExchangeDotNet
                 throw new Exception("Unable to fetch requested user data.");
             }
 
-            var dom = CQ.Create(html);
-            var e = dom[".topbar-menu-links a"][0];
-            var id = int.Parse(e.Attributes["href"].Split('/')[2]);
+			var dom = new HtmlParser().Parse(html);
+            var e = dom.QuerySelector(".topbar-menu-links a");
+            var id = int.Parse(e.Attributes["href"].Value.Split('/')[2]);
             var user = new User(Meta, id, cookieKey);
 
             evMan.TrackUser(user);
@@ -1389,7 +1391,9 @@ namespace ChatExchangeDotNet
 
             if (string.IsNullOrEmpty(resContent)) throw ex;
 
-            var fk = CQ.Create(resContent).GetInputValue("fkey");
+			var dom = new HtmlParser().Parse(resContent);
+			var fk = dom.GetFKey();
+            //var fk = CQ.Create(resContent).GetInputValue("fkey");
 
             if (string.IsNullOrEmpty(fk)) throw ex;
 
@@ -1415,7 +1419,7 @@ namespace ChatExchangeDotNet
                 throw new Exception($"Could not get 'eventtime' for room {Meta.ID} on {Meta.Host}.");
             }
 
-            var timeObj = JSON.Deserialize<Dictionary<string, object>>(resContent)["time"];
+            var timeObj = JsonConvert.DeserializeObject<Dictionary<string, object>>(resContent)["time"];
 
             return int.Parse(timeObj.ToString());
         }
@@ -1437,7 +1441,7 @@ namespace ChatExchangeDotNet
 
             if (string.IsNullOrEmpty(resContent)) throw new Exception("Could not get WebSocket URL.");
 
-            var baseUrl = JSON.Deserialize<Dictionary<string, string>>(resContent)["url"];
+            var baseUrl = JsonConvert.DeserializeObject<Dictionary<string, string>>(resContent)["url"];
 
             return baseUrl + "?l=" + eventTime;
         }
@@ -1474,12 +1478,12 @@ namespace ChatExchangeDotNet
         {
             evMan.CallListeners(EventType.DataReceived, false, json);
 
-            var obj = JSON.Deserialize<Dictionary<string, object>>(json);
-            var r = JSON.Deserialize<Dictionary<string, object>>(obj["r" + Meta.ID].ToString());
+            var obj = JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+            var r = JsonConvert.DeserializeObject<Dictionary<string, object>>(obj["r" + Meta.ID].ToString());
 
             if (!r.ContainsKey("e") || r["e"] == null) return;
 
-            var msgs = JSON.Deserialize<Dictionary<string, object>[]>(r["e"].ToString());
+            var msgs = JsonConvert.DeserializeObject<Dictionary<string, object>[]>(r["e"].ToString());
 
             foreach (var message in msgs)
             {

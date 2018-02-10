@@ -24,17 +24,17 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
-using CsQuery;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using static ChatExchangeDotNet.RequestManager;
+using AngleSharp.Parser.Html;
 
 namespace ChatExchangeDotNet
 {
-    /// <summary>
-    /// Provides access to chat rooms via logging in using OAuth.
-    /// </summary>
-    public class Client : IDisposable
+	/// <summary>
+	/// Provides access to chat rooms via logging in using OAuth.
+	/// </summary>
+	public class Client : IDisposable
     {
         private readonly Regex userUrlRegex = new Regex("href=\"/users/\\d*?/", Extensions.RegexOpts);
         private readonly Regex openIdDelegateRegex = new Regex("https://openid\\.stackexchange\\.com/user/(.*?)\"", Extensions.RegexOpts);
@@ -178,9 +178,9 @@ namespace ChatExchangeDotNet
 
 		private string GetSEOpenIDDelegate()
 		{
-			var loginPage = SimpleGet("https://openid.stackexchange.com/account/login", cookieKey);
+			var loginPageHtml = SimpleGet("https://openid.stackexchange.com/account/login", cookieKey);
 
-			if (loginPage == null)
+			if (loginPageHtml == null)
 			{
 				throw new WebException("Invalid response received while logging in.");
 			}
@@ -193,7 +193,7 @@ namespace ChatExchangeDotNet
 				Origin = "https://openid.stackexchange.com",
 			};
 
-			var fkey = CQ.Create(loginPage).GetInputValue("fkey");
+			var fkey = new HtmlParser().Parse(loginPageHtml).GetFKey();
 
 			req.AddDataKVPair("email", accountEmail);
 			req.AddDataKVPair("password", accountPassword);
@@ -213,8 +213,8 @@ namespace ChatExchangeDotNet
 
 		private void SELogin(string openIdDelegate)
 		{
-			var loginPage = SimpleGet("https://stackexchange.com/users/login", cookieKey);
-			var fkey = CQ.Create(loginPage).GetInputValue("fkey");
+			var loginPageHtml = SimpleGet("https://stackexchange.com/users/login", cookieKey);
+			var fkey = new HtmlParser().Parse(loginPageHtml).GetFKey();
 
 			var req = new HttpReq
 			{
@@ -243,7 +243,7 @@ namespace ChatExchangeDotNet
                 throw new Exception("Invalid response received while logging in. (Unable to get fkey.)");
             }
 
-            var fkey = CQ.Create(fkeyHtml).GetInputValue("fkey");
+            var fkey = new HtmlParser().Parse(fkeyHtml).GetFKey();
             var req = new HttpReq
             {
                 Endpoint = $"https://{host}/users/login",
@@ -260,6 +260,15 @@ namespace ChatExchangeDotNet
             req.AddDataKVPair("oauth_server", "");
             req.AddDataKVPair("openid_username", "");
             req.AddDataKVPair("openid_identifier", "");
+
+            var cookie = new Cookie
+            {
+                Name = "fkey",
+                Value = fkey,
+                Domain = host
+            };
+
+            AddCookie(cookieKey, cookie);
 
             var postRes = SendRequest(req);
 

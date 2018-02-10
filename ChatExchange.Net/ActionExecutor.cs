@@ -25,6 +25,7 @@ using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace ChatExchangeDotNet
 {
@@ -32,11 +33,12 @@ namespace ChatExchangeDotNet
 
     internal class ActionExecutor : IDisposable
     {
-        private readonly ConcurrentDictionary<long, ChatAction> queuedActions = new ConcurrentDictionary<long, ChatAction>();
-        private readonly ManualResetEvent consumerClosed = new ManualResetEvent(false);
-        private readonly Thread consumerThread;
+		private readonly ConcurrentDictionary<long, ChatAction> queuedActions;
+		private readonly ManualResetEvent processQueueWait;
+		private readonly ManualResetEvent consumerKilled;
+		private readonly Task consumerThread;
         private readonly EventManager evMan;
-        private Action<long, object> ActionCompleted;
+        private Action<long, object> actionCompleted;
         private bool disposed;
 
 
@@ -44,9 +46,10 @@ namespace ChatExchangeDotNet
         public ActionExecutor(ref EventManager evMan)
         {
             this.evMan = evMan;
-
-            consumerThread = new Thread(ProcessQueue) { IsBackground = true };
-            consumerThread.Start();
+			queuedActions = new ConcurrentDictionary<long, ChatAction>();
+			processQueueWait = new ManualResetEvent(false);
+			consumerKilled = new ManualResetEvent(false);
+			consumerThread = Task.Run(() => ProcessQueue());
         }
 
         ~ActionExecutor()
@@ -61,10 +64,11 @@ namespace ChatExchangeDotNet
             if (disposed) return;
             disposed = true;
 
-            if (consumerClosed != null)
+            if (consumerKilled != null)
             {
-                consumerClosed.WaitOne();
-                consumerClosed.Dispose();
+                consumerKilled.WaitOne();
+                consumerKilled.Dispose();
+				processQueueWait.Dispose();
             }
 
             GC.SuppressFinalize(this);
@@ -87,7 +91,7 @@ namespace ChatExchangeDotNet
                 }
             });
 
-            ActionCompleted += evFunc;
+            actionCompleted += evFunc;
 
             // Add the action to the queue for processing.
             queuedActions[key] = action;
@@ -95,10 +99,9 @@ namespace ChatExchangeDotNet
             // Wait for the action to be completed.
             mre.WaitOne();
 
-            // The action's been processed; remove it from the queue.
-            ChatAction temp;
-            queuedActions.TryRemove(key, out temp);
-            ActionCompleted -= evFunc;
+			// The action's been processed; remove it from the queue.
+			queuedActions.TryRemove(key, out var temp);
+			actionCompleted -= evFunc;
 
             return data;
         }
@@ -109,9 +112,9 @@ namespace ChatExchangeDotNet
         {
             while (!disposed)
             {
-                Thread.Sleep(50);
+				processQueueWait.WaitOne(50);
 
-                if (queuedActions.IsEmpty) continue;
+				if (queuedActions.IsEmpty) continue;
 
                 var action = new ActionPair(long.MinValue, null);
                 object data = null;
@@ -131,7 +134,7 @@ namespace ChatExchangeDotNet
                 }
             }
 
-            consumerClosed.Set();
+            consumerKilled.Set();
         }
 
         private void NotifyCaller(ActionPair action, object data)
@@ -140,14 +143,14 @@ namespace ChatExchangeDotNet
             {
                 foreach (var item in queuedActions)
                 {
-                    ActionCompleted(item.Key, null);
+                    actionCompleted(item.Key, null);
                 }
 
                 evMan.CallListeners(EventType.InternalException, false, new Exception("An unknown error has occurred; all queued actions have been cleared."));
             }
             else
             {
-                ActionCompleted(action.Key, data);
+                actionCompleted(action.Key, data);
             }
         }
 

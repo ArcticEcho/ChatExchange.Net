@@ -23,17 +23,17 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
-using CsQuery;
-using Jil;
-//using RestSharp;
+using AngleSharp.Dom.Html;
+using AngleSharp.Parser.Html;
+using Newtonsoft.Json;
 using static ChatExchangeDotNet.RequestManager;
 
 namespace ChatExchangeDotNet
 {
-    /// <summary>
-    /// Provides meta data for a given room.
-    /// </summary>
-    public class RoomMetaInfo
+	/// <summary>
+	/// Provides meta data for a given room.
+	/// </summary>
+	public class RoomMetaInfo
     {
         private int totalMessageCount;
 
@@ -92,57 +92,57 @@ namespace ChatExchangeDotNet
         }
 
 
-
+		//TODO: Finish fixing this crap.
         internal RoomMetaInfo(string host, int roomID)
         {
-            Host = host;
-            ID = roomID;
+   //         var html = SimpleGet($"http://chat.{host}/rooms/info/{roomID}");
+			//var dom = new HtmlParser().Parse(html);
 
-            var dom = GetRoomStringMeta(host, roomID, out var name, out var desc, out var tags);
+   //         Host = host;
+   //         ID = roomID;
 
-            Name = name;
-            Description = desc;
-            Tags = tags;
+   //         GetRoomStringMeta(dom, host, roomID, out var name, out var desc, out var tags);
 
-            var firstMsg = DateTime.MinValue;
-            DateTime.TryParse(dom[".room-keycell"][0].ParentNode[1].InnerText, out firstMsg);
-            FirstMessage = firstMsg;
+   //         Name = name;
+   //         Description = desc;
+   //         Tags = tags;
 
-            var req = new HttpReq
-            {
-                Endpoint = $"http://chat.{host}/chats/{roomID}/events",
-                Method = HttpMethod.POST
-            };
-            req.AddDataKVPair("mode", "messages");
-            req.AddDataKVPair("msgCount", "1");
+   //         var firstMsg = DateTime.MinValue;
+   //         DateTime.TryParse(dom[".room-keycell"][0].ParentNode[1].InnerText, out firstMsg);
+   //         FirstMessage = firstMsg;
 
-            var jsonRes = SendRequest(req).Data;
-            var json = JSON.Deserialize<Dictionary<string, object>>(jsonRes);
-            var events = JSON.Deserialize<Dictionary<string, object>[]>(json["events"].ToString());
-            int.TryParse(events[0]["time_stamp"].ToString(), out var lastMsg);
-            LastMessage = new DateTime(1970, 1, 1).AddSeconds(lastMsg);
+   //         var req = new HttpReq
+   //         {
+   //             Endpoint = $"http://chat.{host}/chats/{roomID}/events",
+   //             Method = HttpMethod.POST
+   //         };
+   //         req.AddDataKVPair("mode", "messages");
+   //         req.AddDataKVPair("msgCount", "1");
 
-            var totalMsg = -1;
-            int.TryParse(dom[".clear-both.room-message-count-xxl"][0].InnerHTML, out totalMsg);
-            AllTimeMessages = totalMsg;
+   //         var jsonRes = SendRequest(req).Data;
+   //         var json = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonRes);
+   //         var events = JsonConvert.DeserializeObject<Dictionary<string, object>[]>(json["events"].ToString());
+   //         int.TryParse(events[0]["time_stamp"].ToString(), out var lastMsg);
+   //         LastMessage = new DateTime(1970, 1, 1).AddSeconds(lastMsg);
+
+   //         var totalMsg = -1;
+   //         int.TryParse(dom[".clear-both.room-message-count-xxl"][0].InnerHTML, out totalMsg);
+   //         AllTimeMessages = totalMsg;
         }
 
-        internal static CQ GetRoomStringMeta(string host, int id, out string name, out string description, out string[] tags)
-        {
-            var html = SimpleGet($"http://chat.{host}/rooms/info/{id}");
-            var dom = CQ.Create(html);
+        //internal static void GetRoomStringMeta(IHtmlDocument dom, string host, int id, out string name, out string description, out string[] tags)
+        //{
+        //    name = WebUtility.HtmlDecode(dom[".subheader h1"][0].InnerText);
+        //    description = WebUtility.HtmlDecode(dom[".roomcard-xxl p"][0].InnerText);
 
-            name = WebUtility.HtmlDecode(dom[".subheader h1"][0].InnerText);
-            description = WebUtility.HtmlDecode(dom[".roomcard-xxl p"][0].InnerText);
+        //    var ts = new List<string>();
+        //    foreach (var t in dom[".tag"])
+        //    {
+        //        ts.Add(WebUtility.HtmlDecode(t.InnerText));
+        //    }
+        //    tags = ts.ToArray();
 
-            var ts = new List<string>();
-            foreach (var t in dom[".tag"])
-            {
-                ts.Add(WebUtility.HtmlDecode(t.InnerText));
-            }
-            tags = ts.ToArray();
-
-            return dom;
-        }
+        //    return dom;
+        //}
     }
 }

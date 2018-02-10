@@ -23,8 +23,8 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
-//using RestSharp;
-using Jil;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using static ChatExchangeDotNet.RequestManager;
 
 namespace ChatExchangeDotNet
@@ -163,7 +163,7 @@ namespace ChatExchangeDotNet
 
             if (string.IsNullOrEmpty(json)) return false;
 
-            var data = JSON.Deserialize<HashSet<List<object>>>(json);
+            var data = JsonConvert.DeserializeObject<HashSet<List<object>>>(json);
 
             foreach (var user in data)
             {
@@ -199,7 +199,7 @@ namespace ChatExchangeDotNet
 
             if (!string.IsNullOrEmpty(resData) && resData.StartsWith("{\"users\":[{"))
             {
-                var data = JSON.DeserializeDynamic(resData);
+                dynamic data = JObject.Parse(resData);
 
                 if (data.Count != 0)
                 {
