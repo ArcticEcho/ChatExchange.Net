@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard1.1</TargetFramework>
+    <TargetFramework>netstandard1.3</TargetFramework>
     <AssemblyName>ChatExchange.Net</AssemblyName>
     <RootNamespace>ChatExchangeDotNet</RootNamespace>
   </PropertyGroup>
@@ -9,6 +9,8 @@
   <ItemGroup>
     <PackageReference Include="AngleSharp" Version="0.9.9.1" />
     <PackageReference Include="Newtonsoft.Json" Version="11.0.1-beta3" />
+    <PackageReference Include="System.Net.WebSockets" Version="4.3.0" />
+    <PackageReference Include="System.Net.WebSockets.Client" Version="4.3.2" />
     <PackageReference Include="System.Threading.Tasks" Version="4.3.0" />
   </ItemGroup>
 

@@ -39,7 +39,7 @@ namespace ChatExchangeDotNet.EventListeners
                 listenerParams[1].ParameterType != typeof(User) ||
                 listenerParams[2].ParameterType != typeof(UserRoomAccess))
             {
-                return new TargetException("This chat event takes three arguments of type (in order): 'User', 'User' & 'UserRoomAccess'.");
+                return new Exception("This chat event takes three arguments of type (in order): 'User', 'User' & 'UserRoomAccess'.");
             }
 
             return null;

@@ -178,6 +178,7 @@ namespace ChatExchangeDotNet
             var req = WebRequest.CreateHttp(reqInfo.Endpoint);
             req.Method = reqInfo.Method.ToString();
             req.CookieContainer = reqCookies;
+		
 
 			req.Accept = "application/json, application/xml, text/json, text/x-json, text/javascript, text/xml";
 

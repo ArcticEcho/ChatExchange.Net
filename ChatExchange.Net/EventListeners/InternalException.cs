@@ -36,7 +36,7 @@ namespace ChatExchangeDotNet.EventListeners
 
             if (listenerParams == null || listenerParams.Length != 1 || listenerParams[0].ParameterType != typeof(Exception))
             {
-                return new TargetException("This chat event takes a single argument of type 'Exception'.");
+                return new Exception("This chat event takes a single argument of type 'Exception'.");
             }
 
             return null;

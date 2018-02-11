@@ -38,7 +38,7 @@ namespace ChatExchangeDotNet.EventListeners
                 listenerParams[0].ParameterType != typeof(User) ||
                 listenerParams[1].ParameterType != typeof(int))
             {
-                return new TargetException("This chat event takes two arguments of type (in order): 'User' and 'int'.");
+                return new Exception("This chat event takes two arguments of type (in order): 'User' and 'int'.");
             }
 
             return null;

@@ -57,8 +57,17 @@ namespace ChatExchangeDotNet
             events = new ConcurrentDictionary<EventType, IEventListener>();
             trackDict = new ConcurrentDictionary<Guid, TrackedObject>();
 
-            var types = typeof(EventManager).GetTypeInfo().Assembly.GetTypes();
-            var eventTypes = types.Where(t => t.Namespace == "ChatExchangeDotNet.EventListeners");
+            var types = typeof(EventManager).GetTypeInfo().Assembly.DefinedTypes;
+			var eventTypes = new List<Type>();
+
+			foreach (var t in types)
+			{
+				if (t.ImplementedInterfaces.Count() == 1 &&
+					t.ImplementedInterfaces.First().GetTypeInfo().AsType() == typeof(IEventListener))
+				{
+					eventTypes.Add(t.AsType());
+				}
+			}
 
             foreach (EventType chatEvent in Enum.GetValues(typeof(EventType)))
             {
@@ -141,8 +150,7 @@ namespace ChatExchangeDotNet
             if (!ConnectedListeners[eventType].Values.Contains(listener)) throw new KeyNotFoundException();
 
             var key = ConnectedListeners[eventType].Where(x => x.Value == listener).First().Key;
-            Delegate temp;
-            ConnectedListeners[eventType].TryRemove(key, out temp);
+            ConnectedListeners[eventType].TryRemove(key, out var temp);
         }
 
 
@@ -330,8 +338,7 @@ namespace ChatExchangeDotNet
             if (trackID == null) throw new ArgumentNullException("trackID");
             if (!trackDict.ContainsKey(trackID)) return; // Just for now. Until I can find the bug responsible for this.
 
-            TrackedObject temp;
-            trackDict.TryRemove(trackID, out temp);
+            trackDict.TryRemove(trackID, out var temp);
         }
 
         internal void CallListeners(EventType eventType, bool selfCaused, params object[] args)

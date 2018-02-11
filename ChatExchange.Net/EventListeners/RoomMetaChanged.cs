@@ -40,7 +40,7 @@ namespace ChatExchangeDotNet.EventListeners
                 listenerParams[2].ParameterType != typeof(string) ||
                 listenerParams[3].ParameterType != typeof(string[]))
             {
-                return new TargetException("This chat event takes four arguments of type (in order): 'User', 'string', 'string' & 'string[]'.");
+                return new Exception("This chat event takes four arguments of type (in order): 'User', 'string', 'string' & 'string[]'.");
             }
 
             return null;
@@ -48,14 +48,15 @@ namespace ChatExchangeDotNet.EventListeners
 
         public void Execute(Room room, ref EventManager evMan, Dictionary<string, object> data)
         {
-            var authorID = int.Parse(data["user_id"].ToString());
-            var user =  room.GetUser(authorID);
+			//TODO: Fix this.
+            //var authorID = int.Parse(data["user_id"].ToString());
+            //var user =  room.GetUser(authorID);
 
-            string name, desc;
-            string[] tags;
-            RoomMetaInfo.GetRoomStringMeta(room.Meta.Host, room.Meta.ID, out name, out desc, out tags);
+            //string name, desc;
+            //string[] tags;
+            //RoomMetaInfo.GetRoomStringMeta(room.Meta.Host, room.Meta.ID, out name, out desc, out tags);
 
-            evMan.CallListeners(EventType.RoomMetaChanged, authorID == room.Me.ID, user, name, desc, tags);
+            //evMan.CallListeners(EventType.RoomMetaChanged, authorID == room.Me.ID, user, name, desc, tags);
         }
     }
 }

@@ -38,7 +38,7 @@ namespace ChatExchangeDotNet
 
 		internal static string GetFKey(this IHtmlDocument dom)
 		{
-			return dom.QuerySelector("[name=fkey]").NodeValue;
+			return dom.QuerySelector("[name=fkey]").Attributes["value"].Value;
 		}
 
 		internal static char[] Where(this string str, Func<char, bool> pred)
