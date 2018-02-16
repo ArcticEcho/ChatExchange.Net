@@ -3,7 +3,7 @@ ChatExchange.Net [![Build status](https://ci.appveyor.com/api/projects/status/an
 
 .NET API for interacting with [Stack Exchange](http://stackexchange.com/) chat.
 
-Supports .NET Core 1.0, .NET Framework 4.6 & Mono 4.6.
+Supports .NET Core 2.0, .NET Framework 4.6.1 & Mono 5.4.
 
 -----
 
