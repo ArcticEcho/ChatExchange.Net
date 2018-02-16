@@ -29,10 +29,29 @@ using AngleSharp.Dom.Html;
 namespace ChatExchangeDotNet
 {
 	public static class Extensions
-    {
-        private static readonly Regex isReply = new Regex(@"^:\d+\s\S", RegexOpts);
+	{
+		private static readonly Regex isReply = new Regex(@"^:\d+\s\S", RegexOpts);
 
-        internal static RegexOptions RegexOpts { get; } = RegexOptions.CultureInvariant;
+		internal static RegexOptions RegexOpts { get; } = RegexOptions.Compiled | RegexOptions.CultureInvariant;
+
+
+
+		public static IEnumerable<Message> GetMessagesByUser(this IEnumerable<Message> messages, User user)
+		{
+			var id = user?.ID ?? throw new ArgumentNullException(nameof(user));
+			return messages.GetMessagesByUser(id);
+		}
+
+		public static IEnumerable<Message> GetMessagesByUser(this IEnumerable<Message> messages, int userID)
+		{
+			return (messages ?? throw new ArgumentNullException(nameof(messages)))
+				.Where(m => m.Author.ID == userID);
+		}
+
+		public static bool IsReply(this string message)
+		{
+			return !string.IsNullOrEmpty(message) && isReply.IsMatch(message);
+		}
 
 
 
@@ -58,28 +77,5 @@ namespace ChatExchangeDotNet
 			}
 			return filteredItems;
 		}
-
-        //internal static string GetInputValue(this CQ input, string elementName)
-        //{
-        //    var fkeyE = input["input"].FirstOrDefault(e => e.Attributes["name"] == elementName);
-        //    return fkeyE?.Attributes["value"];
-        //}
-
-        public static IEnumerable<Message> GetMessagesByUser(this IEnumerable<Message> messages, User user)
-        {
-            var id = user?.ID ?? throw new ArgumentNullException(nameof(user));
-            return messages.GetMessagesByUser(id);
-        }
-
-        public static IEnumerable<Message> GetMessagesByUser(this IEnumerable<Message> messages, int userID)
-        {
-            return (messages ?? throw new ArgumentNullException(nameof(messages)))
-                .Where(m => m.Author.ID == userID);
-        }
-
-        public static bool IsReply(this string message)
-        {
-            return !string.IsNullOrEmpty(message) && isReply.IsMatch(message);
-        }
-    }
+	}
 }

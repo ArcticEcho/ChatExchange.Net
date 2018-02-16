@@ -22,7 +22,6 @@
 
 using System;
 using System.Linq;
-using System.Net;
 using System.Text.RegularExpressions;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
@@ -36,19 +35,18 @@ namespace ChatExchangeDotNet
 	/// </summary>
 	public class Client : IDisposable
 	{
-		private const string OPENID_SE						= "https://openid.stackexchange.com";
-		private const string OPENID_SE_USER					= OPENID_SE + "/user";
-		private const string OPENID_SE_ACCOUNT_LOGIN		= OPENID_SE + "/account/login";
+		private const string OPENID_SE                      = "https://openid.stackexchange.com";
+		private const string OPENID_SE_USER                 = OPENID_SE + "/user";
+		private const string OPENID_SE_ACCOUNT_LOGIN        = OPENID_SE + "/account/login";
 		private const string OPENID_SE_ACCOUNT_LOGIN_SUBMIT = OPENID_SE_ACCOUNT_LOGIN + "/submit";
 
-		private const string USERS_LOGIN	= "https://{0}/users/login";
-		private const string USERS_AUTH		= "https://{0}/users/authenticate";
-		private const string USERS_CURRENT	= "https://{0}/users/current";
+		private const string USERS_LOGIN   = "https://{0}/users/login";
+		private const string USERS_AUTH    = "https://{0}/users/authenticate";
+		private const string USERS_CURRENT = "https://{0}/users/current";
 
-		private readonly Regex userUrlRegex			= new Regex("href=\"/users/\\d*?/", Extensions.RegexOpts);
-		private readonly Regex openIdDelegateRegex	= new Regex("https://openid\\.stackexchange\\.com/user/(.*?)\"", Extensions.RegexOpts);
-		private readonly Regex hostParserRegex		= new Regex("https?://(chat.)?|/.*", Extensions.RegexOpts);
-		private readonly Regex idParserRegex		= new Regex(".*/rooms/|/.*", Extensions.RegexOpts);
+		private readonly Regex openIdDelegateRegex = new Regex("https://openid\\.stackexchange\\.com/user/(.*?)\"", Extensions.RegexOpts);
+		private readonly Regex hostParserRegex     = new Regex("https?://(chat.)?|/.*", Extensions.RegexOpts);
+		private readonly Regex idParserRegex       = new Regex(".*/rooms/|/.*", Extensions.RegexOpts);
 		private readonly string accountEmail;
 		private readonly string accountPassword;
 		private readonly string cookieKey;
@@ -70,11 +68,11 @@ namespace ChatExchangeDotNet
 		{
 			if (string.IsNullOrEmpty(email) || !email.Contains("@"))
 			{
-				throw new ArgumentException("'email' must be a valid email address.", "email");
+				throw new ArgumentException("Invalid email address.", nameof(email));
 			}
 			if (string.IsNullOrEmpty(password))
 			{
-				throw new ArgumentException("'password' must not be null or empty.", "password");
+				throw new ArgumentNullException(nameof(password));
 			}
 
 			accountEmail = email;
@@ -189,8 +187,6 @@ namespace ChatExchangeDotNet
 			}
 
 			var fkey = new HtmlParser().Parse(fkeyHtml).GetFKey();
-
-			//TODO: Do we need to specify the origin?
 			var req = RequestManager.GenerateRequest(Method.POST, OPENID_SE_ACCOUNT_LOGIN_SUBMIT);
 
 			req.AddObject(new
@@ -240,7 +236,6 @@ namespace ChatExchangeDotNet
 		private void TryFetchUserId(string host)
 		{
 			var url = String.Format(USERS_CURRENT, host);
-
 			var req = RequestManager.GenerateRequest(Method.GET, url);
 			var res = RequestManager.SendRequest(req, cookieKey);
 			var split = res.ResponseUri.ToString().Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
