@@ -7,4 +7,4 @@ Supports .NET Core 2.0, .NET Framework 4.6.1 & Mono 5.4.
 
 -----
 
-<sup><sup>Related libraries: [ChatExchange](https://github.com/Manishearth/ChatExchange) (Python) and [stackexchange-chatty](https://github.com/KeyboardFire/stackexchange-chatty) (Ruby).</sup></sup>
+<sup><sup>Related libraries: [ChatExchange](https://github.com/Manishearth/ChatExchange) (Python), [stackexchange-chatty](https://github.com/KeyboardFire/stackexchange-chatty) (Ruby), and [chatexchange](https://github.com/Tunaki/chatexchange) (Java).</sup></sup>
