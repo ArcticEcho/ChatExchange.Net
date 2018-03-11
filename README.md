@@ -1,1 +1,1 @@
-This project is being  moved to [StackExchange.Net](https://github.com/ArcticEcho/StackExchange/tree/master). StackExchange.Net will still offer chat functionality, but also aims to add suport for other common non-chat tasks.
+This project is being  moved to [StackExchange](https://github.com/ArcticEcho/StackExchange/tree/master). StackExchange will still offer chat functionality, but also aims to add support for other common non-chat tasks.
